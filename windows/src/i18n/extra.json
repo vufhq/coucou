@@ -4373,16 +4373,16 @@
    "ru": "Дата и время в середине острова, когда он свёрнут.",
    "id": "Tanggal dan jam di tengah pulau saat ringkas."
   },
-  "Give agent-01 a task. It works in its own Linux computer and asks you before anything risky.": {
-   "zh-Hans": "给 agent-01 一个任务。它在自己的 Linux 电脑里工作，做任何有风险的事之前都会先问你。",
-   "hi": "agent-01 को कोई काम दें। यह अपने ख़ुद के Linux कंप्यूटर में काम करता है और कुछ भी जोखिम भरा करने से पहले आपसे पूछता है।",
-   "es": "Dale una tarea a agent-01. Trabaja en su propio ordenador Linux y te pregunta antes de hacer algo arriesgado.",
-   "ar": "أعطِ agent-01 مهمة. يعمل على حاسوب Linux الخاص به ويسألك قبل أي خطوة فيها مخاطرة.",
-   "fr": "Confiez une tâche à agent-01. Il travaille dans son propre ordinateur Linux et vous demande avant toute action risquée.",
-   "bn": "agent-01 কে একটি কাজ দিন। এটি নিজের Linux কম্পিউটারে কাজ করে এবং ঝুঁকিপূর্ণ কিছু করার আগে আপনাকে জিজ্ঞেস করে।",
-   "pt-BR": "Dê uma tarefa ao agent-01. Ele trabalha no próprio computador Linux e pergunta a você antes de qualquer coisa arriscada.",
-   "ru": "Дайте agent-01 задачу. Он работает на своём собственном компьютере с Linux и спрашивает вас перед любым рискованным действием.",
-   "id": "Beri agent-01 sebuah tugas. Ia bekerja di komputer Linux miliknya sendiri dan bertanya kepada Anda sebelum melakukan hal yang berisiko."
+  "Give your agents a task. Each one works in its own Linux computer and asks you before anything risky.": {
+   "zh-Hans": "给你的代理一个任务。每个代理都在自己的 Linux 电脑里工作，做任何有风险的事之前都会先问你。",
+   "hi": "अपने एजेंट को कोई काम दें। हर एजेंट अपने ख़ुद के Linux कंप्यूटर में काम करता है और कुछ भी जोखिम भरा करने से पहले आपसे पूछता है।",
+   "es": "Dale una tarea a tus agentes. Cada uno trabaja en su propio ordenador Linux y te pregunta antes de hacer algo arriesgado.",
+   "ar": "أعطِ وكلاءك مهمة. يعمل كل واحد منهم على حاسوب Linux الخاص به ويسألك قبل أي خطوة فيها مخاطرة.",
+   "fr": "Confiez une tâche à vos agents. Chacun travaille dans son propre ordinateur Linux et vous demande avant toute action risquée.",
+   "bn": "আপনার এজেন্টদের একটি কাজ দিন। প্রত্যেকে নিজের Linux কম্পিউটারে কাজ করে এবং ঝুঁকিপূর্ণ কিছু করার আগে আপনাকে জিজ্ঞেস করে।",
+   "pt-BR": "Dê uma tarefa aos seus agentes. Cada um trabalha no próprio computador Linux e pergunta a você antes de qualquer coisa arriscada.",
+   "ru": "Дайте задачу своим агентам. Каждый работает на своём собственном компьютере с Linux и спрашивает вас перед любым рискованным действием.",
+   "id": "Beri agen Anda sebuah tugas. Masing-masing bekerja di komputer Linux miliknya sendiri dan bertanya kepada Anda sebelum melakukan hal yang berisiko."
   },
   "Orchestrator backend": {
    "zh-Hans": "编排后端",
@@ -4428,16 +4428,16 @@
    "ru": "Бэкенд должен работать на этом компьютере, например http://127.0.0.1:47620",
    "id": "Backend harus berjalan di komputer ini, mis. http://127.0.0.1:47620"
   },
-  "What should agent-01 do?": {
-   "zh-Hans": "agent-01 应该做什么？",
-   "hi": "agent-01 को क्या करना चाहिए?",
-   "es": "¿Qué debe hacer agent-01?",
-   "ar": "ماذا يجب أن يفعل agent-01؟",
-   "fr": "Que doit faire agent-01 ?",
-   "bn": "agent-01 কী করবে?",
-   "pt-BR": "O que o agent-01 deve fazer?",
-   "ru": "Что должен сделать agent-01?",
-   "id": "Apa yang harus dilakukan agent-01?"
+  "What should the agent do?": {
+   "zh-Hans": "代理应该做什么？",
+   "hi": "एजेंट को क्या करना चाहिए?",
+   "es": "¿Qué debe hacer el agente?",
+   "ar": "ماذا يجب أن يفعل الوكيل؟",
+   "fr": "Que doit faire l’agent ?",
+   "bn": "এজেন্ট কী করবে?",
+   "pt-BR": "O que o agente deve fazer?",
+   "ru": "Что должен сделать агент?",
+   "id": "Apa yang harus dilakukan agen?"
   },
   "Start task": {
    "zh-Hans": "开始任务",
@@ -4603,6 +4603,116 @@
    "pt-BR": "O Chromium não está instalado: as etapas na web vão falhar.",
    "ru": "Chromium не установлен: шаги в браузере не выполнятся.",
    "id": "Chromium tidak ada: langkah web akan gagal."
+  },
+  "Ask {name}…": {
+   "zh-Hans": "问问 {name}…",
+   "hi": "{name} से पूछें…",
+   "es": "Pídele algo a {name}…",
+   "ar": "اسأل {name}…",
+   "fr": "Demander à {name}…",
+   "bn": "{name} কে বলুন…",
+   "pt-BR": "Peça a {name}…",
+   "ru": "Спросить {name}…",
+   "id": "Minta {name}…"
+  },
+  "Last: {text}": {
+   "zh-Hans": "上次：{text}",
+   "hi": "पिछला: {text}",
+   "es": "Último: {text}",
+   "ar": "الأخير: {text}",
+   "fr": "Dernier : {text}",
+   "bn": "শেষ: {text}",
+   "pt-BR": "Último: {text}",
+   "ru": "Последнее: {text}",
+   "id": "Terakhir: {text}"
+  },
+  "Page {n}": {
+   "zh-Hans": "第 {n} 页",
+   "hi": "पेज {n}",
+   "es": "Página {n}",
+   "ar": "الصفحة {n}",
+   "fr": "Page {n}",
+   "bn": "পৃষ্ঠা {n}",
+   "pt-BR": "Página {n}",
+   "ru": "Страница {n}",
+   "id": "Halaman {n}"
+  },
+  "Starting…": {
+   "zh-Hans": "正在开始…",
+   "hi": "शुरू हो रहा है…",
+   "es": "Empezando…",
+   "ar": "جارٍ البدء…",
+   "fr": "Démarrage…",
+   "bn": "শুরু হচ্ছে…",
+   "pt-BR": "Começando…",
+   "ru": "Запуск…",
+   "id": "Memulai…"
+  },
+  "Working…": {
+   "zh-Hans": "正在工作…",
+   "hi": "काम चल रहा है…",
+   "es": "Trabajando…",
+   "ar": "يعمل…",
+   "fr": "Au travail…",
+   "bn": "কাজ চলছে…",
+   "pt-BR": "Trabalhando…",
+   "ru": "Работает…",
+   "id": "Sedang bekerja…"
+  },
+  "Waiting for your approval: {target}": {
+   "zh-Hans": "等待你的批准：{target}",
+   "hi": "आपकी मंज़ूरी का इंतज़ार: {target}",
+   "es": "Esperando tu aprobación: {target}",
+   "ar": "بانتظار موافقتك: {target}",
+   "fr": "En attente de votre accord : {target}",
+   "bn": "আপনার অনুমোদনের অপেক্ষায়: {target}",
+   "pt-BR": "Aguardando sua aprovação: {target}",
+   "ru": "Ждёт вашего одобрения: {target}",
+   "id": "Menunggu persetujuan Anda: {target}"
+  },
+  "Files: {list}": {
+   "zh-Hans": "文件：{list}",
+   "hi": "फ़ाइलें: {list}",
+   "es": "Archivos: {list}",
+   "ar": "الملفات: {list}",
+   "fr": "Fichiers : {list}",
+   "bn": "ফাইল: {list}",
+   "pt-BR": "Arquivos: {list}",
+   "ru": "Файлы: {list}",
+   "id": "Berkas: {list}"
+  },
+  "Couldn't finish: {message}": {
+   "zh-Hans": "没能完成：{message}",
+   "hi": "पूरा नहीं हो सका: {message}",
+   "es": "No pudo terminar: {message}",
+   "ar": "تعذّر الإكمال: {message}",
+   "fr": "Pas pu finir : {message}",
+   "bn": "শেষ করা গেল না: {message}",
+   "pt-BR": "Não conseguiu terminar: {message}",
+   "ru": "Не удалось закончить: {message}",
+   "id": "Tidak bisa selesai: {message}"
+  },
+  "Couldn't send it: {error}": {
+   "zh-Hans": "没能发送：{error}",
+   "hi": "भेजा नहीं जा सका: {error}",
+   "es": "No se pudo enviar: {error}",
+   "ar": "تعذّر الإرسال: {error}",
+   "fr": "Envoi impossible : {error}",
+   "bn": "পাঠানো গেল না: {error}",
+   "pt-BR": "Não foi possível enviar: {error}",
+   "ru": "Не удалось отправить: {error}",
+   "id": "Tidak bisa dikirim: {error}"
+  },
+  "Each message is a task for {name}, in its own computer.": {
+   "zh-Hans": "每条消息都是交给 {name} 的任务，在它自己的电脑里完成。",
+   "hi": "हर संदेश {name} के लिए एक काम है, जो उसके अपने कंप्यूटर में होता है।",
+   "es": "Cada mensaje es una tarea para {name}, en su propio ordenador.",
+   "ar": "كل رسالة مهمة لـ {name}، على حاسوبه الخاص.",
+   "fr": "Chaque message est une tâche pour {name}, dans son propre ordinateur.",
+   "bn": "প্রতিটি বার্তা {name}-এর জন্য একটি কাজ, তার নিজের কম্পিউটারে।",
+   "pt-BR": "Cada mensagem é uma tarefa para {name}, no próprio computador dele.",
+   "ru": "Каждое сообщение — задача для {name} на его собственном компьютере.",
+   "id": "Setiap pesan adalah tugas untuk {name}, di komputernya sendiri."
   }
  }
 }

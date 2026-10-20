@@ -58,8 +58,9 @@ describe("decisions", () => {
 });
 
 describe("task requests", () => {
-  it("defaults to agent-01 and requires an idempotency key", () => {
-    expect(CreateTaskRequest.parse({ prompt: "hi", idempotencyKey: "abcdefgh12" }).agentId).toBe("agent-01");
+  it("leaves the agent to the backend when none is named, and requires an idempotency key", () => {
+    expect(CreateTaskRequest.parse({ prompt: "hi", idempotencyKey: "abcdefgh12" }).agentId).toBeUndefined();
+    expect(CreateTaskRequest.parse({ prompt: "hi", idempotencyKey: "abcdefgh12", agentId: "agent-02" }).agentId).toBe("agent-02");
     expect(CreateTaskRequest.safeParse({ prompt: "hi" }).success).toBe(false);
     expect(CreateTaskRequest.safeParse({ prompt: "hi", idempotencyKey: "abcdefgh12", agentId: "claude" }).success).toBe(false);
   });

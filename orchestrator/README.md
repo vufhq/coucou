@@ -1,16 +1,17 @@
 # Coucou orchestrator
 
 The backend that turns Coucou into the control surface for agents running in
-their own Linux computers. Phase 1: **one agent (`agent-01`), one persistent
-WSL2 VM, one task at a time**, with a reconnectable activity stream into Coucou.
+their own Linux computers: **agents (`agent-01`, `agent-02`…), each in its own
+persistent WSL2 VM**, each doing one task at a time, with a reconnectable
+activity stream into Coucou.
 
 ```
 Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (this folder, Node on Windows)
                                                                  tasks · steps · jobs · approvals · events (SQLite)
                                                                  policy · model router (Claude Code / Cursor CLIs)
                                                                      ▲ worker pulls jobs (WSL interface :47621)
-                                                       agent-01 (WSL2, Ubuntu 24.04) — coucou-worker
-                                                       browser (Playwright/Chromium) · files · terminal
+                                                       agent-01, agent-02… (one WSL2 distro each, Ubuntu 24.04)
+                                                       coucou-worker · browser (Playwright/Chromium) · files · terminal
 ```
 
 The model proposes one operation at a time. The backend's policy decides:
@@ -31,9 +32,10 @@ The model never gets host access, credentials or control over the VM.
 You need Node 24+ on Windows, WSL2, and at least one subscription CLI signed in:
 Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
 
-1. **Install and start the backend once.** This creates its two access tokens
-   in the Windows Credential Manager (`orchestrator-token`,
-   `orchestrator-worker-token`, service `fr.louisraille.coucou`):
+1. **Install and start the backend once.** This creates its access tokens
+   in the Windows Credential Manager (`orchestrator-token` for Coucou, and one
+   worker token per agent: `orchestrator-worker-token` for agent-01,
+   `orchestrator-worker-token-agent-02` and so on; service `fr.louisraille.coucou`):
 
    ```powershell
    cd orchestrator
@@ -64,10 +66,35 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    `/workspace` are kept. (After a backend update that changes the worker, as
    0.2 did for downloads and health reports, run `-Update` once.)
 
+   **More agents.** Each one is its own distro, with its own worker token:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-02
+   ```
+
+   It goes in `D:\coucou-vms\agent-02` (about 3.5 GB). Then list every agent in
+   `orchestrator\.env` and restart the backend:
+
+   ```
+   ORCH_AGENTS=agent-01,agent-02
+   ```
+
 3. **In Coucou**, open **Tasks** in the sidebar and switch on
    **Orchestrator backend**. Then give agent-01 a task, for example:
    *"Open the documentation for httpx, find the current installation
    instructions, and save a summary to report.md."*
+
+   Each agent then has a pill in the island that stays, after Claude Code and
+   Cursor, like a ChatGPT dot: its mini Mochi works, asks and finishes with
+   its tasks, and dims when its computer is off. Pick it to see how it is and
+   how its last task ended; **Chat with …** opens the island's chat talking to
+   that agent (agents are also in the chat's model picker). Each message is a
+   task for it: the chat shows what it is doing as it goes and its answer when
+   it is done, and the conversation so far goes with each task as background,
+   so a follow-up makes sense. ↗ opens its Activity on the Tasks page. More than four
+   pills go in pages, with a dot under the grid for each, and a page whose pill
+   needs you lights its dot. Rename an agent or change its colour on the Tasks
+   page.
 
 Keep `npm start` running. Closing Coucou does not stop a task. Stopping the
 backend pauses tasks, and they carry on when it starts again.
@@ -112,7 +139,9 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_LOCAL_MODEL` | `local` | Model sent to the local server |
 | `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
 | `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
-| `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distro running |
+| `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distros running |
+| `ORCH_AGENTS` | `agent-01` | The agents, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name` |
+| `ORCH_MAX_PARALLEL` | `2` | How many agents may work at the same time. The others' tasks wait their turn |
 
 ## Safety model
 
@@ -132,6 +161,15 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   in the VM. Every event and job result is redacted before it is stored,
   streamed, or shown to the model. Both model CLIs run so that they can only
   answer (see Models): no shell, no files, no web, no MCP on this computer.
+- **Between agents:** each agent has its own distro, disk, browser and worker
+  token. The backend knows which agent is calling from its token alone, so one
+  agent's worker can never claim, report on or cancel another's jobs. Site
+  approvals are per agent: approving a site for agent-01 does not open it for
+  agent-02.
+- **Folders WSL shares:** every distro sees `/mnt/wsl` and `/mnt/wslg`, where
+  Podman, Docker and WSLg leave their sockets, under user ids that can equal the
+  agent's. The worker and everything it runs cannot reach them
+  (`InaccessiblePaths` in the systemd unit).
 - **Isolation limit:** all WSL2 distros on this PC, including Docker's and
   Podman's, share one utility VM and kernel. agent-01 is isolated from Windows,
   but it shares a kernel with those distros.
@@ -140,6 +178,8 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 
 - Submitting is idempotent: the client sends an `idempotencyKey`, and a
   retry returns the same task.
+- A task can name its agent, or leave it to the backend, which picks an online
+  agent before an offline one, then the one with the least work.
 - Every step is written down before it runs. A restarted backend resumes each
   task where it was and never asks the model or runs a job twice.
 - Jobs have leases kept alive by heartbeats. If a worker goes quiet, a
@@ -180,7 +220,8 @@ npm run typecheck
 
 ## Known limits
 
-- One agent, one task at a time. Further tasks queue.
+- Each agent does one task at a time; at most `ORCH_MAX_PARALLEL` agents work at once.
+- All agents share WSL's memory (half the PC's by default) and your plan's limits.
 - Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
   with `provision.ps1 -Update`.
 - After you approve a site, redirects to another site are followed without asking.

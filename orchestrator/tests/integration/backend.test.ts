@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentEvent, Task } from "@coucou-orchestrator/protocol";
-import { ModelError } from "../../server/src/model/adapter.ts";
+import { ModelError, type ModelAdapter, type ModelInput, type ModelOutput } from "../../server/src/model/adapter.ts";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import type { Worker } from "../../worker/src/worker.ts";
 import {
@@ -10,6 +10,7 @@ import {
   PNG_BYTES,
   WORKER_TOKEN,
   cleanup,
+  workerTokenFor,
   ended,
   freePort,
   key,
@@ -474,6 +475,23 @@ describe("agents", () => {
     expect((await r.api("/api/agents")).body.agents[0].problems).toEqual(["worker_down"]);
   }, 20_000);
 
+  it("lets the user rename and recolour an agent, and tells every window", async () => {
+    const { r } = await setup([]);
+    const patch = (body: unknown, id = "agent-01") => r.api(`/api/agents/${id}`, { method: "PATCH", body });
+    const renamed = await patch({ name: "  Scout ", color: "#22c55e" });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.agent).toMatchObject({ id: "agent-01", name: "Scout", color: "#22C55E" });
+    expect((await r.api("/api/agents")).body.agents[0]).toMatchObject({ name: "Scout", color: "#22C55E" });
+    expect(r.backend.events.after(0).filter((e) => e.type === "agent.updated")).toHaveLength(1);
+
+    // Null puts the default back; a missing field is left alone.
+    expect((await patch({ name: null })).body.agent).toMatchObject({ name: "agent-01", color: "#22C55E" });
+    for (const bad of [{ name: "" }, { name: "x".repeat(25) }, { name: "ab" }, { color: "green" }, { color: "#22C55E", extra: 1 }]) {
+      expect((await patch(bad)).status).toBe(400);
+    }
+    expect((await patch({ name: "X" }, "agent-99")).status).toBe(404);
+  });
+
   it("hands the worker the retention period", async () => {
     const { r } = await setup([], undefined, { retentionDays: 7 });
     const res = await fetch(`http://127.0.0.1:${r.workerPort}/worker/v1/hello`, {
@@ -510,5 +528,151 @@ describe("models", () => {
     expect(main.calls).toHaveLength(0);
     expect(other.calls).toHaveLength(2);
     expect(await readFile(join(workspace, "tasks", task.id, "a.md"), "utf8")).toBe("from the other model");
+  });
+});
+
+/**
+ * A model for several agents at once: each task writes `<agent>.md`, then is
+ * done. First steps wait at a barrier until `meet` of them have arrived, which
+ * only happens if that many tasks really run at the same time.
+ */
+class TeamModel implements ModelAdapter {
+  readonly agents: string[] = [];
+  private waiting: (() => void)[] = [];
+  private readonly meet: number;
+  constructor(meet: number) {
+    this.meet = meet;
+  }
+
+  async generate(input: ModelInput): Promise<ModelOutput> {
+    const agent = /^You are ([a-z0-9-]+),/.exec(input.system)?.[1] ?? "?";
+    let answer: Record<string, unknown>;
+    if (input.prompt.includes("No steps yet.")) {
+      this.agents.push(agent);
+      if (this.agents.length < this.meet) await new Promise<void>((resolve) => this.waiting.push(resolve));
+      else for (const go of this.waiting.splice(0)) go();
+      answer = act("fs.write_artifact", { path: `${agent}.md`, content: agent });
+    } else {
+      answer = done(`${agent} finished`);
+    }
+    return { text: JSON.stringify(answer), json: answer };
+  }
+}
+
+describe("several agents", () => {
+  async function team(model: ModelAdapter, options: { agents: string[]; maxParallel: number; online?: string[] }) {
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, model, undefined, {}, options);
+    running.push(r);
+    const spaces: Record<string, string> = {};
+    for (const id of options.online ?? options.agents) {
+      spaces[id] = await tempDir(`orch-ws-${id}-`);
+      dirs.push(spaces[id]);
+      const { worker } = startWorker(spaces[id], r.workerPort, new FakeBrowser(), id);
+      workers.push(worker);
+    }
+    await waitFor(async () => {
+      const res = await r.api<{ agents: { id: string; status: string }[] }>("/api/agents");
+      const ready = res.body.agents.filter((a) => a.status !== "offline").map((a) => a.id);
+      return ready.length === Object.keys(spaces).length ? ready : null;
+    }, 5_000, "the workers to say hello");
+    return { r, spaces };
+  }
+
+  it("runs two agents' tasks at the same time, each in its own computer", async () => {
+    const model = new TeamModel(2);
+    const { r, spaces } = await team(model, { agents: ["agent-01", "agent-02"], maxParallel: 2 });
+    const a = await submit(r, "write your file", { agentId: "agent-01" });
+    const b = await submit(r, "write your file", { agentId: "agent-02" });
+    const [ea, eb] = await Promise.all([taskEnd(r, a.id), taskEnd(r, b.id)]);
+    expect(ea.at(-1)).toMatchObject({ type: "task.completed", agentId: "agent-01", payload: { summary: "agent-01 finished" } });
+    expect(eb.at(-1)).toMatchObject({ type: "task.completed", agentId: "agent-02", payload: { summary: "agent-02 finished" } });
+    expect(model.agents.sort()).toEqual(["agent-01", "agent-02"]);
+    // Each wrote in its own workspace only.
+    expect(await readFile(join(spaces["agent-01"]!, "tasks", a.id, "agent-01.md"), "utf8")).toBe("agent-01");
+    expect(await readFile(join(spaces["agent-02"]!, "tasks", b.id, "agent-02.md"), "utf8")).toBe("agent-02");
+    await expect(readFile(join(spaces["agent-01"]!, "tasks", b.id, "agent-02.md"), "utf8")).rejects.toThrow();
+  });
+
+  it("keeps to the parallel cap: the second agent waits for the first to finish", async () => {
+    const model = new TeamModel(1);
+    const { r } = await team(model, { agents: ["agent-01", "agent-02"], maxParallel: 1 });
+    const a = await submit(r, "write your file", { agentId: "agent-01" });
+    const b = await submit(r, "write your file", { agentId: "agent-02" });
+    await Promise.all([taskEnd(r, a.id), taskEnd(r, b.id)]);
+    const all = r.backend.events.after(0);
+    const seq = (type: string, taskId: string) => all.find((e) => e.type === type && e.taskId === taskId)!.seq;
+    expect(seq("task.started", b.id)).toBeGreaterThan(seq("task.completed", a.id));
+  });
+
+  it("sends a task that names no agent to a free one, online first", async () => {
+    const model = new TeamModel(2);
+    const { r } = await team(model, { agents: ["agent-01", "agent-02"], maxParallel: 2 });
+    const a = await submit(r, "write your file");
+    const b = await submit(r, "write your file");
+    expect([a.agentId, b.agentId].sort()).toEqual(["agent-01", "agent-02"]);
+    await Promise.all([taskEnd(r, a.id), taskEnd(r, b.id)]);
+
+    const lone = await team(new TeamModel(1), { agents: ["agent-01", "agent-02"], maxParallel: 2, online: ["agent-02"] });
+    expect((await submit(lone.r, "write your file")).agentId).toBe("agent-02");
+  });
+
+  it("knows each worker by its token: one agent can never act as another", async () => {
+    const { r } = await team(new TeamModel(1), { agents: ["agent-01", "agent-02"], maxParallel: 2, online: [] });
+    const post = (path: string, token: string, body: unknown) =>
+      fetch(`http://127.0.0.1:${r.workerPort}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+    const hello = (agentId: string) => ({ agentId, version: "test", capabilities: [], journal: [] });
+    const two = workerTokenFor("agent-02");
+
+    expect((await post("/worker/v1/hello", two, hello("agent-01"))).status).toBe(403);
+    expect((await post("/worker/v1/jobs/claim", two, { agentId: "agent-01" })).status).toBe(403);
+    expect((await post("/worker/v1/heartbeat", two, { agentId: "agent-01", running: [] })).status).toBe(403);
+    expect((await post("/worker/v1/hello", "not-a-token", hello("agent-02"))).status).toBe(401);
+    expect((await post("/worker/v1/hello", two, hello("agent-02"))).status).toBe(200);
+
+    // A job of agent-01's, which agent-02 tries to report on.
+    const task = await submit(r, "x", { agentId: "agent-01" });
+    const job = r.backend.store.createJob({ taskId: task.id, agentId: "agent-01", op: "fs.list", args: {}, deadlineMs: 1_000 });
+    // The task's own first job may be ahead in the queue: claim until ours is held.
+    for (let i = 0; i < 5 && r.backend.store.job(job.id)?.status !== "claimed"; i++) r.backend.store.claimJob("agent-01", 10_000);
+    const done = await post(`/worker/v1/jobs/${job.id}/complete?agentId=agent-01`, two, { status: "succeeded", result: "[]" });
+    expect(done.status).toBe(404);
+    expect(r.backend.store.job(job.id)?.status).toBe("claimed");
+    expect((await post(`/worker/v1/jobs/${job.id}/events?agentId=agent-01`, two, { events: [{ type: "tool.output", payload: { text: "x" } }] })).status).toBe(409);
+    // The real owner can.
+    expect((await post(`/worker/v1/jobs/${job.id}/complete`, WORKER_TOKEN, { status: "succeeded", result: "[]" })).status).toBe(200);
+  });
+
+  it("gives the model the conversation a task comes from, as background", async () => {
+    const model = new ScriptedModel([done("shorter")]);
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, model, undefined, {}, {});
+    running.push(r);
+    const context = "User: summarise the httpx docs\nAgent: Saved report.md with the install steps.";
+    const task = await submit(r, "now make it shorter", { context });
+    expect(task.prompt).toBe("now make it shorter");
+    await taskEnd(r, task.id);
+    const prompt = model.calls[0]!.prompt;
+    expect(prompt).toContain(`<conversation>\n${context}\n</conversation>`);
+    expect(prompt.indexOf("</conversation>")).toBeLessThan(prompt.indexOf("Task: now make it shorter"));
+    expect((await r.api("/api/tasks", { body: { prompt: "x", idempotencyKey: key(), context: "y".repeat(8_001) } })).status).toBe(400);
+  });
+
+  it("tells the model which agent it is", async () => {
+    const model = new ScriptedModel([done("hi")]);
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, model, undefined, {}, { agents: ["agent-07"] });
+    running.push(r);
+    const task = await submit(r, "who are you");
+    expect(task.agentId).toBe("agent-07");
+    await taskEnd(r, task.id);
+    expect(model.calls[0]?.system).toMatch(/^You are agent-07,/);
   });
 });

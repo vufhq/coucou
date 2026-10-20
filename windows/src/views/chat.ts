@@ -14,7 +14,8 @@ import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
 import { Sound } from "../core/sound";
-import { State, type ChatMessage } from "../core/state";
+import { State, type AgentTask, type ChatMessage } from "../core/state";
+import { agentHistory, sendToAgent } from "../island/agent-chat";
 import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 
@@ -44,12 +45,21 @@ function bubble(message: ChatMessage): HTMLElement {
   return h("div", { class: "chat-row" }, reply);
 }
 
-function typingDots(): HTMLElement {
+function typingDots(line?: string): HTMLElement {
   return h(
     "div",
     { class: "chat-row" },
     h("div", { class: "typing" }, h("i"), h("i"), h("i")),
+    line ? h("div", { class: "agent-run", text: line }) : null,
   );
+}
+
+/** The agent the chat talks to, while it still has its pill. */
+function chatAgentTask(): AgentTask | null {
+  if (!State.chatAgent) return null;
+  const task = State.tasks.find((x) => x.orchestrator?.agentId === State.chatAgent) ?? null;
+  if (!task) State.chatAgent = null;
+  return task;
 }
 
 /** The coloured chip showing what the question is about (a dropped file). */
@@ -75,8 +85,10 @@ interface Picker {
 /** Provider chips, then the chosen provider's models — ModelPickerView. */
 function buildPicker(onChange: () => void): Picker {
   const chips = h("div", { class: "picker-chips" });
+  // The orchestrator's agents: pick one and the chat talks to it.
+  const agentChips = h("div", { class: "picker-chips" });
   const list = h("div", { class: "picker-list" });
-  const el = h("div", { class: "picker" }, chips, h("div", { class: "picker-rule" }), list);
+  const el = h("div", { class: "picker" }, chips, agentChips, h("div", { class: "picker-rule" }), list);
 
   /** Models already asked for, by provider; a model server is asked again each time. */
   const cache = new Map<string, ModelInfo[]>();
@@ -85,8 +97,24 @@ function buildPicker(onChange: () => void): Picker {
 
   function drawChips() {
     clear(chips);
+    clear(agentChips);
+    for (const a of State.tasks.filter((x) => x.orchestrator)) {
+      const id = a.orchestrator!.agentId;
+      const chip = h(
+        "button",
+        { class: State.chatAgent === id ? "picker-chip on" : "picker-chip", style: `--accent:${a.color}` },
+        h("i", { class: "picker-dot" }),
+        h("span", { text: a.name }),
+      );
+      chip.addEventListener("click", () => {
+        State.chatAgent = id;
+        Sound.play("pop");
+        close();
+      });
+      agentChips.append(chip);
+    }
     for (const p of visibleProviders(State.settings)) {
-      const on = p.id === State.settings.chatProvider;
+      const on = !State.chatAgent && p.id === State.settings.chatProvider;
       const chip = h(
         "button",
         { class: on ? "picker-chip on" : "picker-chip", style: `--accent:${p.accent}` },
@@ -94,6 +122,16 @@ function buildPicker(onChange: () => void): Picker {
         h("span", { text: t(p.name) }),
       );
       chip.addEventListener("click", () => {
+        if (State.chatAgent) {
+          // Back to talking to a model.
+          State.chatAgent = null;
+          if (p.id === State.settings.chatProvider) {
+            drawChips();
+            void loadModels();
+            onChange();
+            return;
+          }
+        }
         if (p.id === State.settings.chatProvider) return;
         State.settings = { ...State.settings, chatProvider: p.id };
         saveSettings();
@@ -144,6 +182,12 @@ function buildPicker(onChange: () => void): Picker {
   }
 
   async function loadModels() {
+    const agent = chatAgentTask();
+    if (agent) {
+      request++;
+      status(t("Each message is a task for {name}, in its own computer.", { name: agent.name }));
+      return;
+    }
     const p = providerDef(State.settings.chatProvider);
     const ticket = ++request;
     const cached = p.urlField ? undefined : cache.get(p.id);
@@ -235,14 +279,15 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
 
   let sending = false;
-  let renderedCount = -1;
+  let renderedCount = "";
   // A local model answers token by token: where its text so far is shown.
   let live: HTMLElement | null = null;
 
   function drawModelButton() {
+    const agent = chatAgentTask();
     const p = providerDef(State.settings.chatProvider);
-    modelDot.style.background = p.accent;
-    modelName.textContent = activeModel(State.settings) || t(STRINGS.noModel);
+    modelDot.style.background = agent ? agent.color : p.accent;
+    modelName.textContent = agent ? agent.name : activeModel(State.settings) || t(STRINGS.noModel);
     modelBtn.classList.toggle("open", picker.isOpen);
     modelBtn.disabled = sending;
   }
@@ -268,6 +313,17 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     const query = input.value.trim();
     if (!query || sending) return;
     if (picker.isOpen) picker.close();
+    const agent = chatAgentTask();
+    if (agent) {
+      // A message to an agent: a task for it; its answer comes back by itself.
+      input.value = "";
+      Sound.play("send");
+      onHeightChange();
+      await sendToAgent(agent.orchestrator!.agentId, query);
+      onHeightChange();
+      input.focus();
+      return;
+    }
     input.value = "";
     sending = true;
     drawModelButton();
@@ -295,7 +351,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     } finally {
       sending = false;
       live = null;
-      renderedCount = -1; // the finished answer replaces the streamed one
+      renderedCount = ""; // the finished answer replaces the streamed one
       drawModelButton();
       State.notify();
       onHeightChange();
@@ -327,21 +383,30 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
         if (wantChip) chipRow.append(contextChip(wantChip));
       }
 
-      const thinking = State.stateOverride === "thinking";
-      const count = State.chatHistory.length + (thinking ? 0.5 : 0);
+      // The model's conversation, or the agent's the chat talks to.
+      const agent = chatAgentTask();
+      const agentId = agent?.orchestrator?.agentId ?? null;
+      const history = agentId ? agentHistory(agentId) : State.chatHistory;
+      const run = agentId ? State.agentRuns.get(agentId) : undefined;
+      const thinking = agentId ? run != null : State.stateOverride === "thinking";
+      const count = `${agentId ?? ""}|${history.length}|${thinking ? run?.line ?? "…" : ""}`;
       if (count !== renderedCount && !live) {
         renderedCount = count;
         clear(log);
-        for (const m of State.chatHistory) log.append(bubble(m));
-        if (thinking) log.append(typingDots());
+        for (const m of history) log.append(bubble(m));
+        if (thinking) log.append(typingDots(run?.line));
         log.scrollTop = log.scrollHeight;
+        // An agent answers later, by itself: the island grows with its conversation.
+        if (agentId) onHeightChange();
       }
 
       // Leaving the chat folds the picker away.
       if (State.view !== "prompt" && picker.isOpen) picker.close();
       drawModelButton();
 
-      input.placeholder = t(State.chatHistory.length === 0 ? STRINGS.placeholderFirst : STRINGS.placeholderNext);
+      input.placeholder = agent
+        ? t("Ask {name}…", { name: agent.name })
+        : t(history.length === 0 ? STRINGS.placeholderFirst : STRINGS.placeholderNext);
       input.disabled = sending;
     },
     focus() {

@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS agents (
   model_profile_id TEXT NOT NULL,
   last_seen_at TEXT,
   approved_domains TEXT NOT NULL DEFAULT '[]',
-  health TEXT
+  health TEXT,
+  custom_name TEXT,
+  color TEXT
 );
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
@@ -43,6 +45,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   error TEXT,
   cancel_requested INTEGER NOT NULL DEFAULT 0,
   idempotency_key TEXT NOT NULL UNIQUE,
+  context TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   started_at TEXT
@@ -107,6 +110,9 @@ CREATE INDEX IF NOT EXISTS tasks_by_age ON tasks(status, updated_at);
 /** Columns added after a database was first created: added in place, data kept. */
 const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "agents", column: "health", ddl: "ALTER TABLE agents ADD COLUMN health TEXT" },
+  { table: "agents", column: "custom_name", ddl: "ALTER TABLE agents ADD COLUMN custom_name TEXT" },
+  { table: "agents", column: "color", ddl: "ALTER TABLE agents ADD COLUMN color TEXT" },
+  { table: "tasks", column: "context", ddl: "ALTER TABLE tasks ADD COLUMN context TEXT" },
 ];
 
 export type JobStatus = "queued" | "claimed" | "succeeded" | "failed" | "cancelled";
@@ -232,6 +238,14 @@ export class Store {
     return Number(r.changes) > 0;
   }
 
+  /** The user's name and colour for an agent; null puts the default back, undefined leaves it. */
+  setAgentIdentity(id: string, identity: { name?: string | null; color?: string | null }): void {
+    if (identity.name !== undefined) this.db.prepare("UPDATE agents SET custom_name = ? WHERE id = ?").run(identity.name, id);
+    if (identity.color !== undefined) {
+      this.db.prepare("UPDATE agents SET color = ? WHERE id = ?").run(identity.color?.toUpperCase() ?? null, id);
+    }
+  }
+
   setAgentHealth(id: string, health: WorkerHealth): void {
     this.db.prepare("UPDATE agents SET health = ? WHERE id = ?").run(json({ ...health, checkedAt: now() }), id);
   }
@@ -257,7 +271,7 @@ export class Store {
    * Creates the task, or returns the one already created with this key.
    * `created` tells the caller which, so it only announces new tasks.
    */
-  createTask(req: CreateTaskRequest & { agentId: string }, modelProfileId: string): { task: Task; created: boolean } {
+  createTask(req: Omit<CreateTaskRequest, "agentId"> & { agentId: string }, modelProfileId: string): { task: Task; created: boolean } {
     return this.tx(() => {
       const existing = this.db.prepare("SELECT * FROM tasks WHERE idempotency_key = ?").get(req.idempotencyKey) as
         | Row
@@ -268,10 +282,13 @@ export class Store {
       const t = now();
       this.db
         .prepare(
-          `INSERT INTO tasks (id, agent_id, prompt, status, model_profile_id, workspace, budget, idempotency_key, created_at, updated_at)
-           VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO tasks (id, agent_id, prompt, status, model_profile_id, workspace, budget, idempotency_key, context, created_at, updated_at)
+           VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(id, req.agentId, req.prompt, modelProfileId, `/workspace/tasks/${id}`, json(budget), req.idempotencyKey, t, t);
+        .run(
+          id, req.agentId, req.prompt, modelProfileId, `/workspace/tasks/${id}`, json(budget), req.idempotencyKey,
+          req.context?.trim() || null, t, t,
+        );
       return { task: this.task(id)!, created: true };
     });
   }
@@ -279,6 +296,12 @@ export class Store {
   task(id: string): Task | null {
     const row = this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as Row | undefined;
     return row ? toTask(row) : null;
+  }
+
+  /** The chat this task came from, if any. */
+  taskContext(id: string): string | null {
+    const row = this.db.prepare("SELECT context FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return (row?.context as string | null) ?? null;
   }
 
   taskStartedAt(id: string): string | null {
@@ -301,6 +324,20 @@ export class Store {
         .prepare("SELECT * FROM tasks WHERE status IN ('starting','running','waiting_for_approval') ORDER BY created_at")
         .all() as Row[]
     ).map(toTask);
+  }
+
+  /** Tasks waiting for this agent. */
+  queuedCount(agentId: string): number {
+    const row = this.db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE agent_id = ? AND status = 'queued'").get(agentId) as Row;
+    return Number(row.n);
+  }
+
+  /** How many tasks are being worked on, all agents together. */
+  inFlightCount(): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM tasks WHERE status IN ('starting','running','waiting_for_approval')")
+      .get() as Row;
+    return Number(row.n);
   }
 
   nextQueued(agentId: string): Task | null {
@@ -570,9 +607,10 @@ export class Store {
 function toAgent(r: Row): Agent {
   return {
     id: String(r.id),
-    name: String(r.name),
+    name: String(r.custom_name ?? r.name),
     vmId: String(r.vm_id),
     status: String(r.status) as Agent["status"],
+    color: (r.color as string | null) ?? null,
     modelProfileId: String(r.model_profile_id),
     lastSeenAt: (r.last_seen_at as string | null) ?? null,
     health: parseOrNull(r.health),

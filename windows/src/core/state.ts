@@ -39,6 +39,30 @@ export interface AgentTask {
   sessionId?: string | null;
   /** Claude's final message after Stop, one line; cleared when a new turn starts. */
   finalLine?: string | null;
+  /**
+   * An agent of the orchestrator backend: its pill stays in the island while
+   * the backend is on, between tasks too (like a ChatGPT dot), instead of
+   * going away when a session ends.
+   */
+  orchestrator?: OrchestratorPill | null;
+}
+
+export interface OrchestratorPill {
+  agentId: string;
+  status: "offline" | "starting" | "ready" | "busy" | "error";
+  /** What is wrong with its computer, as codes (AgentProblem). */
+  problems: string[];
+  /** The last task's final line, kept once the pill is back to rest. */
+  last: string | null;
+}
+
+/** One agent as the backend lists it, with the colour it is painted with. */
+export interface OrchestratorAgentInfo {
+  agentId: string;
+  name: string;
+  color: string;
+  status: OrchestratorPill["status"];
+  problems: string[];
 }
 
 export interface ApprovalInfo {
@@ -228,6 +252,12 @@ class AppState {
   noteMessage: string | null = null;
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
+  /** The orchestrator agent the chat talks to (its id), or null for the chosen model. */
+  chatAgent: string | null = null;
+  /** Each agent's conversation, kept apart from the model chat's. */
+  agentChats = new Map<string, ChatMessage[]>();
+  /** An agent's task started from the chat and not finished: what it is doing now. */
+  agentRuns = new Map<string, { taskId: string | null; line: string }>();
   pendingApproval: ApprovalInfo | null = null;
   /** The pill that was in front when the card came up; it comes back after. */
   focusBeforeApproval: string | null = null;
@@ -290,6 +320,15 @@ class AppState {
   /** Spotify plays on a declared pill: Mochi dances (Linux; never on Windows yet). */
   get spotifyPlaying(): boolean {
     return musicPlaying(Spotify.state, sanitizeDeclared(this.settings, this.os).activeIntegrations);
+  }
+
+  /** How long the conversation on show is: an agent's when the chat talks to one, its run counting as a line. */
+  get chatLength(): number {
+    const agent = this.chatAgent;
+    if (agent && this.tasks.some((t) => t.orchestrator?.agentId === agent)) {
+      return (this.agentChats.get(agent)?.length ?? 0) + (this.agentRuns.has(agent) ? 1 : 0);
+    }
+    return this.chatHistory.length;
   }
 
   get otherTasks(): AgentTask[] {
@@ -399,7 +438,49 @@ class AppState {
    */
   isKept(id: string): boolean {
     const d = sanitizeDeclared(this.settings, this.os);
+    if (this.tasks.some((t) => t.id === id && t.orchestrator)) return true;
     return id === d.mainPill || d.activeIntegrations.includes(id);
+  }
+
+  /**
+   * The orchestrator's agents, as pills that stay: one per agent, after the
+   * catalog pills, named and coloured as the user chose. An agent the backend
+   * no longer lists loses its pill once it is at rest; null (orchestrator
+   * switched off) takes them all away the same way.
+   */
+  syncOrchestratorAgents(agents: OrchestratorAgentInfo[] | null) {
+    const want = new Map((agents ?? []).map((a) => [`agent_${a.agentId}`, a]));
+    this.tasks = this.tasks.filter((t) => {
+      if (!t.orchestrator || want.has(t.id)) return true;
+      t.orchestrator = null;
+      return t.state !== "idle" || t.steps.length > 0;
+    });
+    for (const [id, a] of want) {
+      let t = this.tasks.find((x) => x.id === id);
+      if (!t) {
+        t = { id, name: a.name, color: a.color, state: "idle", stepIndex: 0, steps: [], source: "agent", isIntegration: false };
+        this.tasks.push(t);
+      }
+      t.name = a.name;
+      t.color = a.color;
+      t.orchestrator = { agentId: a.agentId, status: a.status, problems: a.problems, last: t.orchestrator?.last ?? null };
+    }
+    this.tasks = orderPills(this.tasks, this.mainPillId);
+    if (!this.focusId || !this.tasks.some((t) => t.id === this.focusId)) this.focusId = this.tasks[0]?.id ?? this.mainPillId;
+    this.notify();
+  }
+
+  /** The backend cannot be reached: its agents' pills stay, dimmed. */
+  markOrchestratorOffline() {
+    let changed = false;
+    for (const t of this.tasks) {
+      if (t.orchestrator && t.orchestrator.status !== "offline") {
+        t.orchestrator.status = "offline";
+        t.orchestrator.problems = [];
+        changed = true;
+      }
+    }
+    if (changed) this.notify();
   }
 
   /**
@@ -437,6 +518,8 @@ class AppState {
     if (idx < 0) return;
     if (this.isKept(id)) {
       const t = this.tasks[idx];
+      // An agent's pill remembers how its last task ended.
+      if (t.orchestrator && t.finalLine) t.orchestrator.last = t.finalLine;
       t.state = "idle";
       t.steps = [];
       t.stepIndex = 0;

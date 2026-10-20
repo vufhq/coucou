@@ -110,3 +110,27 @@ describe("retention", () => {
     }
   });
 });
+
+describe("agents config and tokens", () => {
+  it("reads ORCH_AGENTS, names each agent and its VM, and refuses bad ids", async () => {
+    const { parseAgents } = await import("../../server/src/config.ts");
+    expect(parseAgents(undefined)).toEqual([{ id: "agent-01", name: "Agent 01", vmId: "wsl:agent-01" }]);
+    expect(parseAgents(" agent-01, agent-02 ,agent-01").map((a) => [a.id, a.name, a.vmId])).toEqual([
+      ["agent-01", "Agent 01", "wsl:agent-01"],
+      ["agent-02", "Agent 02", "wsl:agent-02"],
+    ]);
+    expect(() => parseAgents("agent-01,Agent 2")).toThrow(/not an agent id/);
+    expect(() => parseAgents("claude")).toThrow();
+    expect(() => parseAgents(",")).toThrow(/no agent/);
+  });
+
+  it("keeps agent-01's token entry and finds the agent from a token", async () => {
+    const { agentForBearer, workerTokenKey } = await import("../../server/src/tokens.ts");
+    expect(workerTokenKey("agent-01")).toBe("orchestrator-worker-token");
+    expect(workerTokenKey("agent-02")).toBe("orchestrator-worker-token-agent-02");
+    const tokens = new Map([["agent-01", "aaaa"], ["agent-02", "bbbb"]]);
+    expect(agentForBearer("Bearer bbbb", tokens)).toBe("agent-02");
+    expect(agentForBearer("Bearer cccc", tokens)).toBeNull();
+    expect(agentForBearer(undefined, tokens)).toBeNull();
+  });
+});

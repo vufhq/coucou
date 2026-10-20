@@ -4,6 +4,7 @@
 // its coloured band. Port of FlowHub.swift.
 
 import "./hub.css";
+import { showAgentTasks } from "./pages/tasks";
 import { h, clear } from "../views/dom";
 import { t } from "../i18n/i18n";
 import { onEvent } from "../core/bridge";
@@ -184,8 +185,12 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
   await show(current);
 
   void onEvent<string>("hub-page", (page) => {
-    const id = (page === "settings" ? "flowsettings" : page) as PageId;
-    if (ALL.some((p) => p.id === id)) void show(id);
+    // "tasks?agent=agent-02": the island's Activity link, one agent's tasks.
+    const [base = "", query = ""] = page.split("?");
+    const id = (base === "settings" ? "flowsettings" : base) as PageId;
+    if (!ALL.some((p) => p.id === id)) return;
+    if (id === "tasks") showAgentTasks(new URLSearchParams(query).get("agent"));
+    void show(id);
   });
   void onEvent<FlowPrefs>("flow-prefs", (prefs) => {
     status = { ...status, prefs };

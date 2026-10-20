@@ -30,7 +30,7 @@ function loopbackUrl(raw: string | undefined): string | undefined {
   }
   return raw;
 }
-const tokens = await loadTokens();
+const tokens = await loadTokens(config.agents.map((a) => a.id));
 
 // The subscriptions this machine has. Each falls back to the other only when
 // it is rate-limited or unavailable (ORCH_MODEL_FALLBACK=0 turns that off).

@@ -1,8 +1,9 @@
-// Prints the worker's token for provisioning (`npm run worker-token`), so it
-// can be piped straight into the VM without ever being written to a file on
-// Windows. Creates the token on first use, like the backend does.
+// Prints an agent's worker token for provisioning (`npm run worker-token --
+// agent-02`), so it can be piped straight into that agent's VM without ever
+// being written to a file on Windows. Creates the token on first use.
 
-import { loadTokens } from "./tokens.ts";
+import { AgentId } from "@coucou-orchestrator/protocol";
+import { workerToken } from "./tokens.ts";
 
-const tokens = await loadTokens();
-process.stdout.write(tokens.worker);
+const agentId = AgentId.parse(process.argv[2] ?? "agent-01");
+process.stdout.write(await workerToken(agentId));

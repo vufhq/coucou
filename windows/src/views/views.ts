@@ -22,6 +22,7 @@ import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
 import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+import { buildAgentCard, type AgentCardHost } from "./agent-card";
 import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
@@ -199,6 +200,21 @@ function buildOverview(actions: ViewActions): ViewHost {
   // runs on, and a slider being dragged must not be rebuilt under the pointer.
   const spotifyCard = buildSpotifyCard();
   let spotifyPill: SpotifyPillHost | null = null;
+  // The orchestrator agents' cards, kept so a redraw leaves what is typed.
+  const agentCards = new Map<string, AgentCardHost>();
+  // More pills than the four slots: they go in pages, with a dot for each.
+  const PILLS_PER_PAGE = 4;
+  let pillPage = 0;
+  let pillPages = 1;
+  pills.addEventListener(
+    "wheel",
+    (e) => {
+      if (pillPages < 2 || e.deltaY === 0) return;
+      pillPage = (pillPage + (e.deltaY > 0 ? 1 : -1) + pillPages) % pillPages;
+      State.notify();
+    },
+    { passive: true },
+  );
 
   const el = h("div", { class: "view overview" },
     h("div", { class: "left" }, left),
@@ -208,7 +224,7 @@ function buildOverview(actions: ViewActions): ViewHost {
   let pillIds = "";
   let detailOpen = false;
   let lastFocus: string | null = null;
-  let mode: "ticker" | "card" | "plan" | "diff" | "spotify" | null = null;
+  let mode: "ticker" | "card" | "plan" | "diff" | "spotify" | "agent" | null = null;
   let cardKey = "";
   /** The list row highlighted at the last sync, to scroll only when it moves. */
   let shownSelection: number | null = null;
@@ -334,6 +350,23 @@ function buildOverview(actions: ViewActions): ViewHost {
             open: (path) => void Bridge.openFileInVSCode(path),
           }));
         }
+      } else if (task?.orchestrator && task.state === "idle") {
+        // An agent at rest: its own card, kept per agent.
+        let host = agentCards.get(task.id);
+        if (!host) {
+          host = buildAgentCard(task, (agentId) => {
+            State.chatAgent = agentId;
+            actions.setView("prompt");
+          });
+          agentCards.set(task.id, host);
+        }
+        if (mode !== "agent" || cardKey !== task.id) {
+          clear(leftBody);
+          leftBody.append(host.el);
+          mode = "agent";
+          cardKey = task.id;
+        }
+        host.sync(task);
       } else if (task && sessionActive) {
         if (mode !== "ticker") {
           clear(leftBody);
@@ -389,8 +422,21 @@ function buildOverview(actions: ViewActions): ViewHost {
       highlightRow(rows, State.cardSelection, State.cardSelection !== shownSelection);
       shownSelection = State.cardSelection;
 
-      const others = State.otherTasks.slice(0, 4);
-      const pillKey = others.map((t) => `${t.id}:${t.color}:${t.pillBadge ?? ""}`).join("|");
+      // Up to four pills, as always; more go in pages with a dot for each,
+      // and a page whose pill needs you lights its dot.
+      const all = State.otherTasks;
+      pillPages = Math.max(1, Math.ceil(all.length / PILLS_PER_PAGE));
+      if (pillPage >= pillPages) pillPage = pillPages - 1;
+      const others = all.slice(pillPage * PILLS_PER_PAGE, (pillPage + 1) * PILLS_PER_PAGE);
+      const needsYou = (t: AgentTask) => t.pillBadge === "approval" || t.state === "question";
+      const pageAlerts = Array.from({ length: pillPages }, (_, p) =>
+        all.slice(p * PILLS_PER_PAGE, (p + 1) * PILLS_PER_PAGE).some(needsYou),
+      );
+      const pillKey = [
+        pillPage,
+        pageAlerts.join(","),
+        ...others.map((t) => `${t.id}:${t.name}:${t.color}:${t.pillBadge ?? ""}:${t.orchestrator?.status ?? ""}`),
+      ].join("|");
       if (pillKey !== pillIds) {
         pillIds = pillKey;
         clear(pills);
@@ -402,6 +448,22 @@ function buildOverview(actions: ViewActions): ViewHost {
           } else {
             pills.append(buildPill(t, actions));
           }
+        }
+        pills.classList.toggle("paged", pillPages > 1);
+        if (pillPages > 1) {
+          const dots = h("div", { class: "pill-dots" });
+          pageAlerts.forEach((alert, p) => {
+            const cls = [p === pillPage ? "on" : "", alert ? "alert" : ""].filter(Boolean).join(" ");
+            dots.append(h("button", {
+              class: cls,
+              title: t("Page {n}", { n: String(p + 1) }),
+              onclick: () => {
+                pillPage = p;
+                State.notify();
+              },
+            }));
+          });
+          pills.append(dots);
         }
         pruneMiniBots();
       }
@@ -427,9 +489,10 @@ export function hasSessionTicker(task: AgentTask): boolean {
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
   const label = task.id === "integration_claude" ? pillDefinition(task.id)!.name : task.name;
   const canvas = createMiniBot(task, 24);
+  const offline = task.orchestrator?.status === "offline";
   const pill = h(
     "div",
-    { class: "pill", onclick: () => actions.setFocus(task.id) },
+    { class: offline ? "pill off" : "pill", onclick: () => actions.setFocus(task.id) },
     canvas,
     h("span", { class: "lbl", text: label }),
   );

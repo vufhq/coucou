@@ -1,26 +1,36 @@
 <#
-  Creates agent-01, the agent's persistent Linux computer, as a WSL2 distro,
-  and installs the worker in it. Run it yourself, from the orchestrator folder:
+  Creates an agent's persistent Linux computer as a WSL2 distro named after
+  the agent, and installs the worker in it. Run it yourself, from the
+  orchestrator folder:
 
-      powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1
+      powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1                  # agent-01
+      powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-02   # another agent
+
+  Then list every agent in ORCH_AGENTS in the orchestrator's .env
+  (ORCH_AGENTS=agent-01,agent-02) and restart the backend.
 
   Run it again with -Update to copy a newer worker in and restart it; the
   distro, its disk and /workspace are kept.
 
   What it does, and nothing else:
-    1. wsl --install Ubuntu-24.04 --name agent-01 --location <Location>   (first run only)
+    1. wsl --install Ubuntu-24.04 --name <Name> --location <Location>   (first run only)
     2. copies this folder's code into /opt/coucou-worker (a tar stream: no shared folder)
-    3. runs worker/provision/setup.sh inside the distro as root
-    4. pipes the worker's token into /etc/coucou-worker/worker-token (never written on Windows)
+    3. runs worker/provision/setup.sh <Name> inside the distro as root
+    4. pipes that agent's own worker token into /etc/coucou-worker/worker-token (never written on Windows)
     5. restarts the distro so /etc/wsl.conf applies (no Windows drives, no Windows programs)
 #>
 param(
   [string]$Name = "agent-01",
-  [string]$Location = "D:\coucou-vms\agent-01",
+  [string]$Location = "",
   [switch]$Update
 )
 
 $ErrorActionPreference = "Stop"
+# The agent id rule: it names the distro, the pill (agent_<name>) and the token.
+if ($Name -cnotmatch '^[a-z0-9-]{1,24}$' -or $Name -eq "claude") {
+  throw "-Name must be lowercase letters, digits and dashes (up to 24), e.g. agent-02."
+}
+if (-not $Location) { $Location = "D:\coucou-vms\$Name" }
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 function Invoke-Checked([string]$what, [scriptblock]$block) {
@@ -45,13 +55,13 @@ Invoke-Checked "Copying the worker into $Name" {
 }
 
 Invoke-Checked "Setting up $Name (this takes a few minutes the first time)" {
-  wsl.exe -d $Name -u root --exec bash /opt/coucou-worker/worker/provision/setup.sh
+  wsl.exe -d $Name -u root --exec bash /opt/coucou-worker/worker/provision/setup.sh $Name
 }
 
 Invoke-Checked "Handing the worker its token" {
   Push-Location $root
   try {
-    node server/src/print-token.ts |
+    node server/src/print-token.ts $Name |
       wsl.exe -d $Name -u root --exec sh -c "umask 077 && mkdir -p /etc/coucou-worker && cat > /etc/coucou-worker/worker-token"
   } finally { Pop-Location }
 }
@@ -60,5 +70,9 @@ Invoke-Checked "Restarting $Name" { wsl.exe --terminate $Name }
 Invoke-Checked "Starting the worker" { wsl.exe -d $Name -u root --exec systemctl restart coucou-worker.service }
 
 Write-Host ""
-Write-Host "$Name is ready. Start the backend with: npm start   (in $root)"
+Write-Host "$Name is ready."
+if ($Name -ne "agent-01") {
+  Write-Host "Add it to ORCH_AGENTS in $root\.env (for example ORCH_AGENTS=agent-01,$Name), then restart the backend."
+}
+Write-Host "Start the backend with: npm start   (in $root)"
 Write-Host "Worker log: wsl -d $Name -u root --exec journalctl -u coucou-worker -n 50"

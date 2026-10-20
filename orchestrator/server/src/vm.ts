@@ -43,9 +43,13 @@ export function keepWslAlive(distro: string, log: (line: string) => void): KeepA
   if (process.platform !== "win32" || !/^[A-Za-z0-9._-]{1,64}$/.test(distro)) return { stop() {} };
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
+  // A distro that is not there yet (listed in ORCH_AGENTS before provision.ps1
+  // ran) fails at once: wait longer each time, up to 5 min, and say it once.
+  let delayMs = 10_000;
 
   const start = () => {
     if (stopped) return;
+    const startedAt = Date.now();
     const child = spawn("wsl.exe", ["-d", distro, "--exec", "sleep", "infinity"], {
       stdio: "ignore",
       windowsHide: true,
@@ -55,8 +59,17 @@ export function keepWslAlive(distro: string, log: (line: string) => void): KeepA
     child.on("error", (err) => log(`keep-alive for ${distro} could not start: ${err.message}`));
     child.on("exit", (code) => {
       if (stopped) return;
-      log(`keep-alive for ${distro} ended (${code}); starting it again in 10 s`);
-      timer = setTimeout(start, 10_000);
+      const quick = Date.now() - startedAt < 5_000;
+      if (!quick) delayMs = 10_000;
+      if (delayMs === 10_000) {
+        log(
+          quick
+            ? `keep-alive for ${distro} could not start it (${code}); is it provisioned? Trying again, less and less often`
+            : `keep-alive for ${distro} ended (${code}); starting it again in 10 s`,
+        );
+      }
+      timer = setTimeout(start, delayMs);
+      if (quick) delayMs = Math.min(delayMs * 2, 5 * 60_000);
     });
   };
   start();

@@ -32,7 +32,8 @@ export const DEFAULT_BUDGET: Budget = { maxSteps: 20, timeoutMs: 10 * 60_000, op
 
 export const CreateTaskRequest = z.object({
   prompt: z.string().trim().min(1).max(8_000),
-  agentId: AgentId.default("agent-01"),
+  /** Which agent runs it. Left out, the backend picks one (an idle one first). */
+  agentId: AgentId.optional(),
   /**
    * Chosen by the client and sent again on a retry: the same key returns the
    * task already created instead of starting a second one.
@@ -40,6 +41,12 @@ export const CreateTaskRequest = z.object({
   idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
   modelProfileId: z.string().min(1).max(64).optional(),
   budget: Budget.partial().optional(),
+  /**
+   * The conversation this task comes from (Coucou's chat with the agent), so
+   * a follow-up like "now make it shorter" makes sense. Background for the
+   * model, never instructions.
+   */
+  context: z.string().max(8_000).optional(),
 });
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequest>;
 
@@ -80,6 +87,8 @@ export const Agent = z.object({
   name: z.string(),
   vmId: z.string(),
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
+  /** The colour the user gave it (#RRGGBB), or null for Coucou's default. */
+  color: z.string().nullable(),
   modelProfileId: z.string(),
   lastSeenAt: z.string().nullable(),
   /** The worker's last health report, and when it came. */
@@ -104,6 +113,26 @@ export type Agent = z.infer<typeof Agent>;
  */
 export const AgentProblem = z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser"]);
 export type AgentProblem = z.infer<typeof AgentProblem>;
+
+/** What the user may change about an agent: its name and colour. Null puts the default back. */
+export const AgentIdentity = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(24)
+      .regex(/^[^\p{Cc}\p{Cf}]+$/u, "no control characters")
+      .nullable()
+      .optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9A-Fa-f]{6}$/, "a colour like #22C55E")
+      .nullable()
+      .optional(),
+  })
+  .strict();
+export type AgentIdentity = z.infer<typeof AgentIdentity>;
 
 export const ApprovalDecision = z.object({
   approvalId: z.string().min(1).max(64),

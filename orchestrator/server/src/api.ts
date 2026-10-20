@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import {
   AgentId,
+  AgentIdentity,
   ApprovalDecision,
   CreateTaskRequest,
   RelPath,
@@ -105,7 +106,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   app.post("/api/tasks", async (req, reply) => {
     const body = CreateTaskRequest.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
-    if (!store.agent(body.data.agentId)) return bad(reply, `unknown agent ${body.data.agentId}`);
+    if (body.data.agentId && !store.agent(body.data.agentId)) return bad(reply, `unknown agent ${body.data.agentId}`);
     if (body.data.modelProfileId && !deps.models.has(body.data.modelProfileId)) {
       return bad(reply, `unknown model profile ${body.data.modelProfileId}`);
     }
@@ -156,7 +157,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
 
   app.get("/api/models", async () => ({
     profiles: deps.models.list(),
-    default: store.agent("agent-01")?.modelProfileId ?? null,
+    default: store.agents()[0]?.modelProfileId ?? null,
   }));
 
   app.get("/api/agents", async () => {
@@ -167,6 +168,16 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
       })),
     );
     return { agents, approvals: store.pendingApprovals() };
+  });
+
+  // The user renames or recolours an agent; every window hears it.
+  app.patch<{ Params: { id: string } }>("/api/agents/:id", async (req, reply) => {
+    const body = AgentIdentity.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    store.setAgentIdentity(req.params.id, body.data);
+    events.emit("agent.updated", req.params.id, null, {});
+    return { agent: store.agent(req.params.id) };
   });
 
   app.post<{ Params: { id: string } }>("/api/agents/:id/approval", async (req, reply) => {

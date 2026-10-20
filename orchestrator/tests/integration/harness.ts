@@ -20,6 +20,9 @@ import { Worker } from "../../worker/src/worker.ts";
 export const API_TOKEN = "test-api-token-0123456789";
 export const WORKER_TOKEN = "test-worker-token-0123456789";
 
+/** Each agent's own worker token; agent-01's is WORKER_TOKEN. */
+export const workerTokenFor = (agentId: string) => (agentId === "agent-01" ? WORKER_TOKEN : `${WORKER_TOKEN}-${agentId}`);
+
 export function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const srv = createServer();
@@ -100,7 +103,7 @@ export async function startBackend(
   ports?: { api: number; worker: number },
   /** More model profiles, by id, beside the default "scripted" one. */
   extraModels: Record<string, ModelAdapter> = {},
-  options: { vmProbe?: VmProbe; retentionDays?: number } = {},
+  options: { vmProbe?: VmProbe; retentionDays?: number; agents?: string[]; maxParallel?: number } = {},
 ): Promise<Running> {
   const config: Config = {
     dataDir,
@@ -112,7 +115,8 @@ export async function startBackend(
     claimWaitMs: 300,
     retentionDays: options.retentionDays ?? 30,
     defaultModelProfile: "scripted",
-    agents: [{ id: "agent-01", name: "Agent 01", vmId: "test" }],
+    agents: (options.agents ?? ["agent-01"]).map((id) => ({ id, name: id, vmId: `test:${id}` })),
+    maxParallel: options.maxParallel ?? 2,
   };
   const models = new ModelRouter();
   models.register(
@@ -122,7 +126,8 @@ export async function startBackend(
   for (const [id, adapter] of Object.entries(extraModels)) {
     models.register({ id, provider: "test", model: id, capabilities: { streaming: false, toolCalling: false, structuredOutput: false } }, adapter);
   }
-  const backend = createBackend(config, { api: API_TOKEN, worker: WORKER_TOKEN }, models, {
+  const workers = new Map(config.agents.map((a) => [a.id, workerTokenFor(a.id)]));
+  const backend = createBackend(config, { api: API_TOKEN, workers }, models, {
     pollMs: 50,
     transientRetryDelaysMs: [20, 20],
     vmProbe: options.vmProbe ?? (async () => null),
@@ -157,9 +162,15 @@ export async function startBackend(
   };
 }
 
-export function startWorker(workspace: string, workerPort: number, browser: BrowserDriver): { worker: Worker; done: Promise<void> } {
+export function startWorker(
+  workspace: string,
+  workerPort: number,
+  browser: BrowserDriver,
+  agentId = "agent-01",
+  token = workerTokenFor(agentId),
+): { worker: Worker; done: Promise<void> } {
   const worker = new Worker({
-    client: new BackendClient(`http://127.0.0.1:${workerPort}`, WORKER_TOKEN, "agent-01"),
+    client: new BackendClient(`http://127.0.0.1:${workerPort}`, token, agentId),
     journal: new Journal(workspace),
     browser,
     workspace,
