@@ -6,6 +6,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { z } from "zod";
 import { AgentId, ApprovalDecision, CreateTaskRequest, RelPath } from "@coucou-orchestrator/protocol";
 import type { EventLog } from "./events.ts";
+import type { ModelRouter } from "./model/router.ts";
 import { runBackendJob, type JobSignals } from "./jobs.ts";
 import type { Runner } from "./runner.ts";
 import { resumePoint, streamEvents } from "./sse.ts";
@@ -17,6 +18,7 @@ export interface ApiDeps {
   events: EventLog;
   runner: Runner;
   signals: JobSignals;
+  models: ModelRouter;
   token: string;
   /** How long a file request waits for the worker. */
   fileTimeoutMs?: number;
@@ -49,6 +51,9 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     const body = CreateTaskRequest.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
     if (!store.agent(body.data.agentId)) return bad(reply, `unknown agent ${body.data.agentId}`);
+    if (body.data.modelProfileId && !deps.models.has(body.data.modelProfileId)) {
+      return bad(reply, `unknown model profile ${body.data.modelProfileId}`);
+    }
     const { task, created } = runner.submit(body.data);
     return reply.code(created ? 201 : 200).send({ task, created });
   });
@@ -93,6 +98,11 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     reply.hijack();
     streamEvents(reply.raw, events, { after: resumePoint(req.headers["last-event-id"], req.query.after) });
   });
+
+  app.get("/api/models", async () => ({
+    profiles: deps.models.list(),
+    default: store.agent("agent-01")?.modelProfileId ?? null,
+  }));
 
   app.get("/api/agents", async () => ({
     agents: store.agents(),

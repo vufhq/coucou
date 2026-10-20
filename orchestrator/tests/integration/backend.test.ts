@@ -112,6 +112,22 @@ describe("the vertical slice", () => {
     expect(r.backend.store.approvedDomains("agent-01")).toEqual(["example.org"]);
   });
 
+  it("does not approve or run the same successful operation twice", async () => {
+    const { r, model } = await setup([
+      act("fs.write_artifact", { path: "report.md", content: "saved" }),
+      act("fs.write_artifact", { path: "report.md", content: "saved" }),
+      done("Saved the report."),
+    ]);
+    const task = await submit(r);
+    const events = await taskEnd(r, task.id);
+
+    expect(events.at(-1)).toMatchObject({ type: "task.completed" });
+    expect(events.filter((e) => e.type === "tool.started")).toHaveLength(1);
+    expect(events.filter((e) => e.type === "approval.requested")).toHaveLength(0);
+    expect((await r.api(`/api/tasks/${task.id}`)).body.task.steps).toBe(1);
+    expect(model.calls).toHaveLength(3);
+  });
+
   it("returns the same task when a submit is retried", async () => {
     const { r } = await setup([done("ok")]);
     const body = { prompt: "hello", idempotencyKey: "retry-key-12345" };
@@ -354,5 +370,33 @@ describe("agents", () => {
     expect(agents[0]).toMatchObject({ id: "agent-01", status: "ready" });
     const statusEvents: AgentEvent[] = r.backend.events.after(0).filter((e) => e.type === "agent.status_changed");
     expect(statusEvents[0]?.payload).toEqual({ status: "ready" });
+  });
+});
+
+describe("models", () => {
+  it("runs a task on the model it names, through the same worker and events", async () => {
+    const dataDir = await tempDir("orch-data-");
+    const workspace = await tempDir("orch-ws-");
+    dirs.push(dataDir, workspace);
+    const main = new ScriptedModel([]);
+    const other = new ScriptedModel([act("fs.write_artifact", { path: "a.md", content: "from the other model" }), done("written")]);
+    const r = await startBackend(dataDir, main, undefined, { other });
+    running.push(r);
+    const { worker } = startWorker(workspace, r.workerPort, new FakeBrowser());
+    workers.push(worker);
+
+    const models = await r.api("/api/models");
+    expect(models.body.profiles.map((p: { id: string }) => p.id)).toEqual(["scripted", "other"]);
+    expect((await r.api("/api/tasks", { body: { prompt: "x", idempotencyKey: key(), modelProfileId: "nope" } })).status).toBe(400);
+
+    const task = await submit(r, "write a.md", { modelProfileId: "other" });
+    expect(task.modelProfileId).toBe("other");
+    const events = await taskEnd(r, task.id);
+    expect(events.at(-1)?.type).toBe("task.completed");
+    expect(events.at(-1)?.payload.modelProfileId).toBe("other");
+    expect(events.find((e) => e.type === "task.started")?.payload.modelProfileId).toBe("other");
+    expect(main.calls).toHaveLength(0);
+    expect(other.calls).toHaveLength(2);
+    expect(await readFile(join(workspace, "tasks", task.id, "a.md"), "utf8")).toBe("from the other model");
   });
 });

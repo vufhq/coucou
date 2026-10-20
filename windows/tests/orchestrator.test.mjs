@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
-import { eventLine, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
+import { eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
 
 const AGENT = "agent_agent-01";
 
@@ -102,6 +102,12 @@ test("the Tasks page timeline reads each event, and leaves out the noise", () =>
   assert.equal(eventLine(e("agent.heartbeat")), null);
   assert.equal(statusLabel("waiting_for_approval"), "Waiting for approval");
   assert.equal(statusLabel("succeeded"), "Done");
+});
+
+test("the Tasks page names a model by the subscription it runs on", () => {
+  assert.equal(modelLabel("claude-cli"), "Claude");
+  assert.equal(modelLabel("cursor-cli"), "Cursor");
+  assert.equal(modelLabel("local-llm"), "local-llm");
 });
 
 test("every new task gets its own idempotency key, in the backend's alphabet", () => {

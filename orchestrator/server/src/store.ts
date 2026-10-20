@@ -196,7 +196,7 @@ export class Store {
     this.db
       .prepare(
         `INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES (?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, vm_id = excluded.vm_id`,
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, vm_id = excluded.vm_id, model_profile_id = excluded.model_profile_id`,
       )
       .run(a.id, a.name, a.vmId, a.modelProfileId);
   }

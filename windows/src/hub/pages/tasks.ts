@@ -10,6 +10,7 @@ import {
   ACTIVE,
   OrchestratorBridge,
   eventLine,
+  modelLabel,
   newTaskKey,
   statusLabel,
   type OrchApproval,
@@ -18,7 +19,7 @@ import {
   type OrchTask,
 } from "../../core/orchestrator";
 import type { HubContext } from "../shell";
-import { button, card, row, toggle } from "../ui";
+import { button, card, row, segmented, toggle } from "../ui";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(document.documentElement.lang || undefined, { hour: "2-digit", minute: "2-digit" });
 
@@ -31,6 +32,10 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let files: { path: string; bytes: number }[] | null = null;
   let note = "";
   let pendingKey = newTaskKey();
+  /** What is typed in the box: the page redraws on every event and must not lose it. */
+  let draft = "";
+  let models: string[] = [];
+  let model: string | null = null;
 
   page.append(ctx.hero("tasks", t("Tasks"), t("Give agent-01 a task. It works in its own Linux computer and asks you before anything risky."), [], true));
 
@@ -50,6 +55,11 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       tasks = data?.tasks ?? [];
       approvals = data?.approvals ?? [];
       selected ??= tasks[0]?.id ?? null;
+      if (models.length === 0) {
+        const m = await OrchestratorBridge.models().catch(() => null);
+        models = m?.profiles.map((p) => p.id) ?? [];
+        model ??= m?.default ?? models[0] ?? null;
+      }
       detail = selected ? await OrchestratorBridge.task(selected).catch(() => null) : null;
     }
     draw();
@@ -87,18 +97,24 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   }
 
   function drawComposer() {
+    const hadFocus = composer.contains(document.activeElement);
     clear(composer);
     if (!connected()) return;
     const text = h("textarea", { class: "hub-textarea", placeholder: t("What should agent-01 do?") }) as HTMLTextAreaElement;
+    text.value = draft;
+    text.addEventListener("input", () => {
+      draft = text.value;
+    });
     const start = button(t("Start task"), () => {
       const prompt = text.value.trim();
       if (!prompt) return;
       start.disabled = true;
-      OrchestratorBridge.submit(prompt, pendingKey).then(
+      OrchestratorBridge.submit(prompt, pendingKey, model).then(
         ({ task }) => {
           // A new key for the next task; this one stays with the task just made.
           pendingKey = newTaskKey();
           text.value = "";
+          draft = "";
           note = "";
           selected = task.id;
           void reload();
@@ -111,7 +127,19 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
         },
       );
     }, "primary");
-    composer.append(card(text, h("div", { class: "hub-row" }, h("div", { class: "text" }), start), note ? h("div", { class: "hub-warn", text: note }) : null));
+    // A choice only when there is one: the subscriptions the backend can use.
+    const picker =
+      models.length > 1
+        ? segmented(models.map((id) => [id, modelLabel(id)] as [string, string]), model ?? models[0]!, (id) => {
+            model = id;
+          })
+        : null;
+    const label = picker ? h("div", { class: "text" }, h("div", { class: "detail", text: t("Model") }), picker) : h("div", { class: "text" });
+    composer.append(card(text, h("div", { class: "hub-row" }, label, start), note ? h("div", { class: "hub-warn", text: note }) : null));
+    if (hadFocus) {
+      text.focus();
+      text.setSelectionRange(text.value.length, text.value.length);
+    }
   }
 
   function drawApprovals() {
@@ -140,7 +168,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     for (const task of tasks) {
       const item = h("button", { class: task.id === selected ? "hub-note-item on" : "hub-note-item" },
         h("span", { class: "t", text: task.prompt }),
-        h("span", { class: "m", text: `${statusLabel(task.status)} · ${time(task.createdAt)}` }),
+        h("span", { class: "m", text: `${statusLabel(task.status)} · ${modelLabel(task.modelProfileId)} · ${time(task.createdAt)}` }),
       );
       item.addEventListener("click", () => {
         selected = task.id;
@@ -155,7 +183,10 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     clear(detailEl);
     if (!detail) return;
     const task = detail.task;
-    detailEl.append(h("h2", { text: task.prompt }), h("span", { class: "hub-tag", text: statusLabel(task.status) }));
+    detailEl.append(
+      h("h2", { text: task.prompt }),
+      h("span", { class: "hub-tag", text: `${statusLabel(task.status)} · ${modelLabel(task.modelProfileId)}` }),
+    );
     if (task.result) detailEl.append(h("div", { class: "hub-ok", style: "white-space:pre-wrap", text: task.result.summary }));
     if (task.error) detailEl.append(h("div", { class: "hub-warn", text: task.error.message }));
     if (ACTIVE.has(task.status)) {

@@ -18,6 +18,7 @@ export interface OrchTask {
   id: string;
   agentId: string;
   prompt: string;
+  modelProfileId: string;
   status: TaskStatus;
   steps: number;
   result: { summary: string; artifacts: string[] } | null;
@@ -62,8 +63,9 @@ export const OrchestratorBridge = {
   tasks: () => callOrThrow<{ tasks: OrchTask[] | null; agents: OrchAgent[] | null; approvals: OrchApproval[] | null }>("orchestrator_tasks"),
   task: (taskId: string) =>
     callOrThrow<{ task: OrchTask; approvals: OrchApproval[]; events: OrchEvent[] }>("orchestrator_task", { taskId }),
-  submit: (prompt: string, idempotencyKey: string) =>
-    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", { prompt, idempotencyKey }),
+  submit: (prompt: string, idempotencyKey: string, modelProfileId: string | null) =>
+    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", { prompt, idempotencyKey, modelProfileId }),
+  models: () => callOrThrow<{ profiles: { id: string }[]; default: string | null }>("orchestrator_models"),
   cancel: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_cancel", { taskId }),
   decide: (agentId: string, approvalId: string, approve: boolean) =>
     callOrThrow<unknown>("orchestrator_decide", { agentId, approvalId, approve }),
@@ -72,6 +74,18 @@ export const OrchestratorBridge = {
   saveFile: (agentId: string, taskId: string, path: string) =>
     callOrThrow<string>("orchestrator_save_file", { agentId, taskId, path }),
 };
+
+/** What a model profile is called on the page: the subscription it runs on. */
+export function modelLabel(profileId: string): string {
+  switch (profileId) {
+    case "claude-cli":
+      return "Claude";
+    case "cursor-cli":
+      return "Cursor";
+    default:
+      return profileId;
+  }
+}
 
 /** A fresh idempotency key: a retried click sends the same one and gets the same task. */
 export function newTaskKey(): string {

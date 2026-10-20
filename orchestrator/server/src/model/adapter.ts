@@ -50,17 +50,27 @@ export class ModelError extends Error {
   }
 }
 
-/** Pulls a JSON object out of a model's text: bare, or inside a ``` fence. */
+/**
+ * Pulls a JSON object out of a model's text: the whole answer, a ``` fence
+ * around it, or the outermost braces in some prose. The whole answer is tried
+ * first: a fence inside the JSON (a Markdown report with a code block in its
+ * `content`) must not be mistaken for a fence around it.
+ */
 export function extractJson(text: string): unknown {
   const trimmed = text.trim();
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
-  const candidate = fenced?.[1] ?? trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start < 0 || end < start) throw new ModelError("malformed_output", "no JSON object in the answer");
-  try {
-    return JSON.parse(candidate.slice(start, end + 1));
-  } catch {
-    throw new ModelError("malformed_output", "the answer is not valid JSON");
+  const candidates = [trimmed];
+  for (const m of trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) if (m[1]) candidates.push(m[1].trim());
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) candidates.push(trimmed.slice(start, end + 1));
+  for (const candidate of candidates) {
+    if (!candidate.startsWith("{")) continue;
+    try {
+      const value: unknown = JSON.parse(candidate);
+      if (value && typeof value === "object" && !Array.isArray(value)) return value;
+    } catch {
+      // Try the next reading.
+    }
   }
+  throw new ModelError("malformed_output", start < 0 ? "no JSON object in the answer" : "the answer is not valid JSON");
 }

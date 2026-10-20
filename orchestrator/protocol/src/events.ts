@@ -35,7 +35,7 @@ export type EventType = z.infer<typeof EventType>;
 export const EVENT_PAYLOADS = {
   "task.queued": z.object({ prompt: z.string() }).strict(),
   "task.started": z.object({ prompt: z.string(), modelProfileId: z.string() }).strict(),
-  "task.completed": z.object({ summary: z.string(), artifacts: z.array(z.string()) }).strict(),
+  "task.completed": z.object({ summary: z.string(), artifacts: z.array(z.string()), modelProfileId: z.string().optional() }).strict(),
   "task.failed": z.object({ reason: FailureReason, message: z.string() }).strict(),
   "task.cancelled": z.object({}).strict(),
   "agent.heartbeat": z.object({}).strict(),

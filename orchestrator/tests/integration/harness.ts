@@ -88,6 +88,8 @@ export async function startBackend(
   dataDir: string,
   model: ModelAdapter,
   ports?: { api: number; worker: number },
+  /** More model profiles, by id, beside the default "scripted" one. */
+  extraModels: Record<string, ModelAdapter> = {},
 ): Promise<Running> {
   const config: Config = {
     dataDir,
@@ -105,6 +107,9 @@ export async function startBackend(
     { id: "scripted", provider: "test", model: "script", capabilities: { streaming: false, toolCalling: false, structuredOutput: true } },
     model,
   );
+  for (const [id, adapter] of Object.entries(extraModels)) {
+    models.register({ id, provider: "test", model: id, capabilities: { streaming: false, toolCalling: false, structuredOutput: false } }, adapter);
+  }
   const backend = createBackend(config, { api: API_TOKEN, worker: WORKER_TOKEN }, models, { pollMs: 50 });
   const { apiPort, workerPort } = await backend.listen();
   return {
@@ -152,10 +157,22 @@ export async function readEvents(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 10_000);
   const path = opts.taskId ? `/api/tasks/${opts.taskId}/events` : "/api/events";
-  const res = await fetch(`http://127.0.0.1:${apiPort}${path}`, {
-    headers: { Authorization: `Bearer ${API_TOKEN}`, ...(opts.after ? { "Last-Event-ID": String(opts.after) } : {}) },
-    signal: controller.signal,
-  });
+  let res: Response;
+  // A reconnect can race a just-closed keep-alive socket in Node's fetch
+  // pool. Retry the initial connection within the same test timeout; this
+  // is the same transient failure a real SSE client must tolerate.
+  for (;;) {
+    try {
+      res = await fetch(`http://127.0.0.1:${apiPort}${path}`, {
+        headers: { Authorization: `Bearer ${API_TOKEN}`, ...(opts.after ? { "Last-Event-ID": String(opts.after) } : {}) },
+        signal: controller.signal,
+      });
+      break;
+    } catch (err) {
+      if (controller.signal.aborted) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
   const out: AgentEvent[] = [];
   const decoder = new TextDecoder();
   let buffer = "";

@@ -39,7 +39,7 @@ export function createBackend(
     defaultModelProfile: config.defaultModelProfile,
     ...opts,
   });
-  const api = buildApi({ store, events, runner, signals, token: tokens.api });
+  const api = buildApi({ store, events, runner, signals, models, token: tokens.api });
   const gateway = buildGateway({
     store,
     events,

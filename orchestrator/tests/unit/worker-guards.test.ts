@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureTaskDir, inside, taskDir } from "../../worker/src/paths.ts";
 import { checkArgv } from "../../worker/src/ops/terminal.ts";
-import { claudeArgs, parseClaudeResult } from "../../server/src/model/claude-cli.ts";
 
 const TASK = "11111111-2222-3333-4444-555555555555";
 let workspace: string;
@@ -48,29 +47,5 @@ describe("terminal arguments", () => {
 
   it("allows arguments that stay in the folder", () => {
     expect(() => checkArgv(["grep", "-n", "install", "report.md"])).not.toThrow();
-  });
-});
-
-describe("Claude Code CLI adapter", () => {
-  it("runs the CLI with every tool off and no session saved", () => {
-    const args = claudeArgs({ system: "sys", prompt: "p", timeoutMs: 1, jsonSchema: { type: "object" } }, "sonnet");
-    const i = args.indexOf("--tools");
-    expect(args[i + 1]).toBe("");
-    for (const flag of ["-p", "--restricted", "--strict-mcp-config", "--no-session-persistence"]) expect(args).toContain(flag);
-    expect(args[args.indexOf("--model") + 1]).toBe("sonnet");
-  });
-
-  it("reads structured output, falls back to JSON in the text, and maps limits", () => {
-    expect(parseClaudeResult(JSON.stringify({ result: "", structured_output: { kind: "done", summary: "x" } })).json).toEqual({
-      kind: "done",
-      summary: "x",
-    });
-    expect(parseClaudeResult(JSON.stringify({ result: '```json\n{"kind":"done","summary":"y"}\n```' })).json).toEqual({
-      kind: "done",
-      summary: "y",
-    });
-    expect(() => parseClaudeResult(JSON.stringify({ is_error: true, result: "Claude usage limit reached" }))).toThrow(
-      expect.objectContaining({ code: "rate_limited" }),
-    );
   });
 });

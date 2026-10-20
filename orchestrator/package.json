@@ -4,7 +4,7 @@
   "type": "module",
   "workspaces": ["protocol", "server", "worker"],
   "scripts": {
-    "start": "node server/src/main.ts",
+    "start": "node --env-file-if-exists=.env server/src/main.ts",
     "worker": "node worker/src/main.ts",
     "worker-token": "node server/src/print-token.ts",
     "typecheck": "tsc --noEmit -p .",
