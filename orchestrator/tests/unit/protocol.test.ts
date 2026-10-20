@@ -36,7 +36,26 @@ describe("decisions", () => {
       ok: true,
       decision: { kind: "action", op: { op: "fs.list" } },
     });
-    expect(parseDecision({ kind: "done", summary: "All set" })).toEqual({ ok: true, decision: { kind: "done", summary: "All set" } });
+    expect(parseDecision({ kind: "done", summary: "All set" })).toEqual({
+      ok: true,
+      decision: { kind: "done", summary: "All set", remember: [], goalAchieved: false },
+    });
+  });
+
+  it("parses questions and goal completion metadata within their limits", () => {
+    expect(parseDecision({ kind: "ask", question: "Which format?", options: ["Markdown", "Text"] })).toEqual({
+      ok: true,
+      decision: { kind: "ask", question: "Which format?", options: ["Markdown", "Text"] },
+    });
+    expect(parseDecision({ kind: "ask", question: "" }).ok).toBe(false);
+    expect(parseDecision({ kind: "ask", question: "Pick", options: ["1", "2", "3", "4", "5"] }).ok).toBe(false);
+    expect(
+      parseDecision({ kind: "done", summary: "Finished", remember: ["Uses Markdown"], goalAchieved: true }),
+    ).toMatchObject({
+      ok: true,
+      decision: { remember: ["Uses Markdown"], goalAchieved: true },
+    });
+    expect(DECISION_JSON_SCHEMA.properties.kind.enum).toContain("ask");
   });
 
   it("explains what is wrong, so the model can try again", () => {

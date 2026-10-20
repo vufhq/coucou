@@ -169,10 +169,16 @@ fn segment(raw: &str) -> Result<&str, String> {
 pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
     let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
     let agent = event.get("agentId").and_then(Value::as_str).unwrap_or("");
-    let Some(task) = event.get("taskId").and_then(Value::as_str) else {
-        return Vec::new(); // Agent-level events (status) belong to the Tasks page.
-    };
     let p = event.get("payload").cloned().unwrap_or_else(|| json!({}));
+    if kind == "goal.updated" || kind == "memory.updated" {
+        return vec![(
+            "orchestrator-refresh",
+            json!({ "agentId": agent, "kind": if kind == "goal.updated" { "goals" } else { "memory" } }),
+        )];
+    }
+    let Some(task) = event.get("taskId").and_then(Value::as_str) else {
+        return Vec::new(); // Other agent-level events belong to the Tasks page.
+    };
     let text = |k: &str| p.get(k).and_then(Value::as_str).unwrap_or("").to_string();
     let hook = |name: &str, extra: Value| {
         let mut payload = json!({
@@ -205,6 +211,31 @@ pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
         "approval.resolved" => vec![(
             "orchestrator-approval-resolved",
             json!({ "requestId": format!("{REQUEST_PREFIX}{agent}:{}", text("approvalId")) }),
+        )],
+        // Questions belong in the persistent agent chat. They deliberately do
+        // not become AskUserQuestion: that would open Claude Code's modal card.
+        "task.question" => vec![(
+            "orchestrator-task-state",
+            json!({ "agentId": agent, "taskId": task, "state": "question" }),
+        )],
+        "task.answered" | "task.resumed" => vec![(
+            "orchestrator-task-state",
+            json!({ "agentId": agent, "taskId": task, "state": "working" }),
+        )],
+        "task.paused" => vec![(
+            "orchestrator-task-state",
+            json!({ "agentId": agent, "taskId": task, "state": "idle" }),
+        )],
+        "goal.checkin" => vec![(
+            "orchestrator-goal-checkin",
+            json!({
+                "agentId": agent,
+                "taskId": task,
+                "goalId": p.get("goalId"),
+                "title": p.get("title"),
+                "summary": p.get("summary"),
+                "achieved": p.get("achieved"),
+            }),
         )],
         "task.completed" => vec![hook("Stop", json!({ "last_assistant_message": text("summary") }))],
         "task.failed" => vec![hook("StopFailure", json!({ "message": text("message") }))],
@@ -262,6 +293,24 @@ async fn restore(app: &AppHandle, tasks: &[Value]) {
             });
             deliver_island_only(app, &event);
         }
+        if task.get("status").and_then(Value::as_str) == Some("waiting_for_answer") {
+            if let Some(question) = task.get("question") {
+                let event = json!({
+                    "type": "task.question", "taskId": id, "agentId": agent,
+                    "payload": {
+                        "questionId": question.get("id"),
+                        "question": question.get("text"),
+                        "options": question.get("options"),
+                    },
+                });
+                deliver(app, &event);
+            }
+        } else if task.get("status").and_then(Value::as_str) == Some("paused") {
+            let event = json!({
+                "type": "task.paused", "taskId": id, "agentId": agent, "payload": {},
+            });
+            deliver(app, &event);
+        }
     }
 }
 
@@ -278,7 +327,10 @@ async fn push_agents(app: &AppHandle) {
 
 /// Agent-level events change the agents' pills, not a task's.
 pub fn is_agent_event(event: &Value) -> bool {
-    event.get("type").and_then(Value::as_str).is_some_and(|k| k.starts_with("agent.") && k != "agent.heartbeat")
+    event.get("type").and_then(Value::as_str).is_some_and(|k| {
+        (k.starts_with("agent.") && k != "agent.heartbeat")
+            || matches!(k, "goal.updated" | "goal.checkin" | "memory.updated")
+    })
 }
 
 fn deliver_island_only(app: &AppHandle, event: &Value) {
@@ -462,6 +514,7 @@ pub async fn orchestrator_submit(
     model_profile_id: Option<String>,
     agent_id: Option<String>,
     context: Option<String>,
+    source: Option<String>,
 ) -> Result<Value, String> {
     let mut body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)? });
     if let Some(profile) = model_profile_id {
@@ -474,6 +527,12 @@ pub async fn orchestrator_submit(
     // The chat it comes from: background for the model (the backend caps it).
     if let Some(context) = context.filter(|c| !c.trim().is_empty()) {
         body["context"] = json!(context);
+    }
+    if let Some(source) = source {
+        if source != "user" && source != "chat" {
+            return Err("invalid source".into());
+        }
+        body["source"] = json!(source);
     }
     api(&app, Method::POST, "/api/tasks", Some(body)).await
 }
@@ -506,6 +565,151 @@ pub async fn orchestrator_update_agent(app: AppHandle, agent_id: String, identit
 #[tauri::command]
 pub async fn orchestrator_cancel(app: AppHandle, task_id: String) -> Result<Value, String> {
     api(&app, Method::POST, &format!("/api/tasks/{}/cancel", segment(&task_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_answer(app: AppHandle, task_id: String, question_id: String, answer: String) -> Result<Value, String> {
+    let body = json!({ "questionId": segment(&question_id)?, "answer": answer });
+    api(&app, Method::POST, &format!("/api/tasks/{}/answer", segment(&task_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_pause_task(app: AppHandle, task_id: String) -> Result<Value, String> {
+    api(&app, Method::POST, &format!("/api/tasks/{}/pause", segment(&task_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_resume_task(app: AppHandle, task_id: String) -> Result<Value, String> {
+    api(&app, Method::POST, &format!("/api/tasks/{}/resume", segment(&task_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_pause_agent(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    api(&app, Method::POST, &format!("/api/agents/{}/pause", segment(&agent_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_resume_agent(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    api(&app, Method::POST, &format!("/api/agents/{}/resume", segment(&agent_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_set_limits(
+    app: AppHandle,
+    agent_id: String,
+    tasks_per_day: u32,
+    steps_per_day: u32,
+) -> Result<Value, String> {
+    let body = json!({ "tasksPerDay": tasks_per_day, "stepsPerDay": steps_per_day });
+    api(&app, Method::PUT, &format!("/api/agents/{}/limits", segment(&agent_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_chat_history(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    let path = format!("/api/tasks?agentId={}&source=chat&limit=50", segment(&agent_id)?);
+    api(&app, Method::GET, &path, None).await
+}
+
+fn schedule(raw: &Value) -> Result<Value, String> {
+    let kind = raw.get("kind").and_then(Value::as_str).ok_or("invalid schedule")?;
+    match kind {
+        "manual" => Ok(json!({ "kind": "manual" })),
+        "every" => raw
+            .get("hours")
+            .and_then(Value::as_u64)
+            .map(|hours| json!({ "kind": "every", "hours": hours }))
+            .ok_or_else(|| "invalid schedule".into()),
+        "daily" | "weekdays" => raw
+            .get("time")
+            .and_then(Value::as_str)
+            .map(|time| json!({ "kind": kind, "time": time }))
+            .ok_or_else(|| "invalid schedule".into()),
+        _ => Err("invalid schedule".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn orchestrator_goals(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    api(&app, Method::GET, &format!("/api/goals?agentId={}", segment(&agent_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_create_goal(
+    app: AppHandle,
+    agent_id: String,
+    title: String,
+    instructions: String,
+    schedule: Value,
+    model_profile_id: Option<String>,
+) -> Result<Value, String> {
+    let mut body = json!({
+        "agentId": segment(&agent_id)?,
+        "title": title,
+        "instructions": instructions,
+        "schedule": self::schedule(&schedule)?,
+    });
+    if let Some(profile) = model_profile_id {
+        body["modelProfileId"] = json!(segment(&profile)?);
+    }
+    api(&app, Method::POST, "/api/goals", Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_update_goal(app: AppHandle, goal_id: String, changes: Value) -> Result<Value, String> {
+    let mut body = serde_json::Map::new();
+    for key in ["title", "instructions", "modelProfileId", "status"] {
+        if let Some(value) = changes.get(key) {
+            body.insert(key.to_string(), value.clone());
+        }
+    }
+    if let Some(value) = changes.get("schedule") {
+        body.insert("schedule".into(), schedule(value)?);
+    }
+    api(
+        &app,
+        Method::PATCH,
+        &format!("/api/goals/{}", segment(&goal_id)?),
+        Some(Value::Object(body)),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn orchestrator_delete_goal(app: AppHandle, goal_id: String) -> Result<Value, String> {
+    api(&app, Method::DELETE, &format!("/api/goals/{}", segment(&goal_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_run_goal(app: AppHandle, goal_id: String, idempotency_key: String) -> Result<Value, String> {
+    let body = json!({ "idempotencyKey": segment(&idempotency_key)? });
+    api(&app, Method::POST, &format!("/api/goals/{}/run", segment(&goal_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_memory(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    api(&app, Method::GET, &format!("/api/agents/{}/memory", segment(&agent_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_add_memory(app: AppHandle, agent_id: String, text: String) -> Result<Value, String> {
+    api(
+        &app,
+        Method::POST,
+        &format!("/api/agents/{}/memory", segment(&agent_id)?),
+        Some(json!({ "text": text })),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn orchestrator_delete_memory(app: AppHandle, agent_id: String, note_id: String) -> Result<Value, String> {
+    api(
+        &app,
+        Method::DELETE,
+        &format!("/api/agents/{}/memory/{}", segment(&agent_id)?, segment(&note_id)?),
+        None,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -604,8 +808,61 @@ mod tests {
         let of = |kind: &str| json!({ "type": kind, "taskId": null, "agentId": "agent-01", "payload": {} });
         assert!(is_agent_event(&of("agent.status_changed")));
         assert!(is_agent_event(&of("agent.updated")));
+        assert!(is_agent_event(&of("goal.updated")));
+        assert!(is_agent_event(&of("goal.checkin")));
+        assert!(is_agent_event(&of("memory.updated")));
         assert!(!is_agent_event(&of("agent.heartbeat")));
         assert!(!is_agent_event(&of("task.started")));
+    }
+
+    #[test]
+    fn a_question_stays_in_the_agent_chat_instead_of_opening_a_hook_card() {
+        let asked = translate(&event(
+            "task.question",
+            json!({ "questionId": "q-1", "question": "Which format?", "options": ["PDF", "Markdown"] }),
+        ));
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].0, "orchestrator-task-state");
+        assert_eq!(asked[0].1["state"], "question");
+        assert!(asked.iter().all(|(_, payload)| payload["hook_event_name"] != "PermissionRequest"));
+
+        let answered = translate(&event("task.answered", json!({ "questionId": "q-1" })));
+        assert_eq!(answered[0].1["state"], "working");
+        let paused = translate(&event("task.paused", json!({})));
+        assert_eq!(paused[0].1["state"], "idle");
+    }
+
+    #[test]
+    fn goal_and_memory_events_tell_the_views_what_to_refresh() {
+        let goal = json!({
+            "type": "goal.updated", "taskId": null, "agentId": "agent-01",
+            "payload": { "goalId": "g-1" },
+        });
+        let memory = json!({
+            "type": "memory.updated", "taskId": null, "agentId": "agent-01",
+            "payload": {},
+        });
+        assert_eq!(translate(&goal)[0].1["kind"], "goals");
+        assert_eq!(translate(&memory)[0].1["kind"], "memory");
+        let checkin = translate(&event(
+            "goal.checkin",
+            json!({ "goalId": "g-1", "title": "Track docs", "summary": "No changes", "achieved": false }),
+        ));
+        assert_eq!(checkin[0].0, "orchestrator-goal-checkin");
+        assert_eq!(checkin[0].1["title"], "Track docs");
+    }
+
+    #[test]
+    fn schedules_forward_only_the_contract_fields() {
+        assert_eq!(
+            schedule(&json!({ "kind": "every", "hours": 12, "extra": "no" })).unwrap(),
+            json!({ "kind": "every", "hours": 12 }),
+        );
+        assert_eq!(
+            schedule(&json!({ "kind": "weekdays", "time": "09:30", "other": true })).unwrap(),
+            json!({ "kind": "weekdays", "time": "09:30" }),
+        );
+        assert!(schedule(&json!({ "kind": "monthly" })).is_err());
     }
 
     #[test]

@@ -99,6 +99,46 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
 Keep `npm start` running. Closing Coucou does not stop a task. Stopping the
 backend pauses tasks, and they carry on when it starts again.
 
+## Goals and schedules
+
+Each agent can have durable goals. A goal has a title, background instructions,
+an optional model profile, and one of four schedules: manual, every 1–168 hours,
+daily at a local `HH:MM`, or weekdays at a local `HH:MM`. Scheduled times use
+the backend PC's local time. After downtime the backend starts one catch-up run,
+not every missed run, and a goal never runs twice at once.
+
+Goal runs are ordinary tasks, visible in the same activity stream and marked
+with `source: "goal"`. Their prompt includes the previous check-in and the
+agent's memory as fenced background. Each completed run updates the goal's
+check-in; the model can mark the goal achieved, which stops its schedule.
+Goals can also be paused, resumed, run manually, edited, or archived without
+removing their past tasks.
+
+## Questions, pause and limits
+
+An agent can ask up to three questions during a task. The task waits without
+using a parallel slot or its timeout budget, then continues from the answer.
+An unanswered question fails after 24 hours.
+
+A task can be paused while queued or waiting. If it is working, pause takes
+effect after the current step: the backend never kills a step just to pause it.
+Pausing an agent applies the same boundary to its running tasks and leaves its
+queue waiting until the agent is resumed. Time paused does not use the task's
+timeout budget.
+
+Agents default to 30 task starts and 300 steps per local day. Coucou can change
+both limits per agent. Once either limit is reached, queued work remains visible
+with `waitingReason: "daily_limit"` and starts after local midnight; a running
+step is allowed to finish first.
+
+## Memory
+
+Agents can keep up to 50 short notes, and the user can add or remove notes in
+Coucou. A task may remember up to three facts when it finishes. Notes are
+redacted before storage, and every prompt receives them inside a `<memory>`
+block explicitly labelled as background, never instructions. When the limit is
+reached, the oldest agent-written notes are removed first.
+
 ## Models
 
 Each task runs on one model profile, picked on the Tasks page (or `modelProfileId` in `POST /api/tasks`).

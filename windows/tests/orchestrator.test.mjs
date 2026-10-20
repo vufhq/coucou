@@ -36,6 +36,9 @@ beforeEach(() => {
   State.paused = false;
   State.isPinned = false;
   State.pendingApproval = null;
+  State.agentChats.clear();
+  State.agentQuestions.clear();
+  State.agentRuns.clear();
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
 });
@@ -101,6 +104,8 @@ test("the Tasks page timeline reads each event, and leaves out the noise", () =>
   assert.equal(eventLine(e("tool.output", { text: "…" })), null);
   assert.equal(eventLine(e("agent.heartbeat")), null);
   assert.equal(statusLabel("waiting_for_approval"), "Waiting for approval");
+  assert.equal(statusLabel("waiting_for_answer"), "Waiting for answer");
+  assert.equal(statusLabel("paused"), "Paused");
   assert.equal(statusLabel("succeeded"), "Done");
 });
 
@@ -128,11 +133,25 @@ test("an agent's line says its state, then what is wrong with its computer", () 
     agentLine({ id: "agent-01", name: "Agent 01", status: "ready", problems: ["low_disk", "no_browser"] }),
     "Ready · Its disk is almost full. · Chromium is missing: web steps will fail.",
   );
+  assert.equal(
+    agentLine({ id: "agent-01", name: "Agent 01", status: "ready", paused: true, problems: ["daily_limit"] }),
+    "Paused · Daily limit reached",
+  );
 });
 
 // ── Agents that stay in the island, like ChatGPT's dots ──────────────────────
 
-const agentInfo = (id, extra = {}) => ({ agentId: id, name: id, color: "#4ADE80", status: "ready", problems: [], ...extra });
+const agentInfo = (id, extra = {}) => ({
+  agentId: id,
+  name: id,
+  color: "#4ADE80",
+  status: "ready",
+  problems: [],
+  paused: false,
+  limits: { tasksPerDay: 30, stepsPerDay: 300 },
+  usage: { tasksToday: 0, stepsToday: 0 },
+  ...extra,
+});
 
 test("the backend's agents get pills that stay, after the catalog's", () => {
   emit("orchestrator-agents", {
@@ -147,7 +166,15 @@ test("the backend's agents get pills that stay, after the catalog's", () => {
   const one = State.tasks.find((t) => t.id === "agent_agent-01");
   assert.equal(one.name, "Scout");
   assert.equal(one.color, "#38BDF8");
-  assert.deepEqual(one.orchestrator, { agentId: "agent-01", status: "ready", problems: [], last: null });
+  assert.deepEqual(one.orchestrator, {
+    agentId: "agent-01",
+    status: "ready",
+    problems: [],
+    paused: false,
+    limits: { tasksPerDay: 30, stepsPerDay: 300 },
+    usage: { tasksToday: 0, stepsToday: 0 },
+    last: null,
+  });
   const two = State.tasks.find((t) => t.id === "agent_agent-02");
   assert.equal(two.orchestrator.status, "offline");
   assert.match(two.color, /^#[0-9A-F]{6}$/i); // the default colour for that id
@@ -193,7 +220,12 @@ test("renaming an agent renames its pill in place", () => {
 // ── Chatting with an agent in the island's chat ──────────────────────────────
 
 import { internals } from "./tauri.mjs";
-import { agentHistory, conversationContext, sendToAgent } from "../src/island/agent-chat.ts";
+import {
+  agentHistory,
+  conversationContext,
+  loadAgentHistory,
+  sendToAgent,
+} from "../src/island/agent-chat.ts";
 
 test("a message to an agent is a task for it, with the conversation so far, and its answer comes back", async () => {
   State.agentChats.clear();
@@ -213,6 +245,7 @@ test("a message to an agent is a task for it, with the conversation so far, and 
   const [submitted] = sent("orchestrator_submit");
   assert.equal(submitted.prompt, "now make it shorter");
   assert.equal(submitted.agentId, "agent-01");
+  assert.equal(submitted.source, "chat");
   assert.equal(submitted.context, "User: summarise the httpx docs\nYou (agent): Saved report.md.");
   assert.equal(State.agentRuns.get("agent-01").taskId, "t-9");
 
@@ -248,4 +281,109 @@ test("the conversation sent along keeps the newest turns, each cut short", () =>
   assert.ok(context.length <= 6_000);
   assert.match(context, /^You \(agent\): 9 x+…$/m);
   assert.doesNotMatch(context, /: 0 x/);
+});
+
+test("an agent chat is rebuilt from its backend chat tasks", async () => {
+  const invoke = internals.invoke;
+  internals.invoke = async (cmd, args) => {
+    if (cmd !== "orchestrator_chat_history") return invoke(cmd, args);
+    calls.push([cmd, args]);
+    return {
+      tasks: [
+        {
+          id: "t-3",
+          prompt: "third",
+          result: null,
+          error: null,
+          question: { id: "q-3", text: "Which audience?", options: ["Team", "Customers"] },
+        },
+        {
+          id: "t-2",
+          prompt: "second",
+          result: null,
+          error: { message: "could not finish" },
+          question: null,
+        },
+        {
+          id: "t-1",
+          prompt: "first",
+          result: { summary: "first answer" },
+          error: null,
+          question: null,
+        },
+      ],
+    };
+  };
+  try {
+    await loadAgentHistory("agent-01", true);
+  } finally {
+    internals.invoke = invoke;
+  }
+  assert.deepEqual(
+    agentHistory("agent-01").map(({ role, content }) => ({ role, content })),
+    [
+      { role: "user", content: "first" },
+      { role: "assistant", content: "first answer" },
+      { role: "user", content: "second" },
+      { role: "assistant", content: "could not finish" },
+      { role: "user", content: "third" },
+      { role: "assistant", content: "Which audience?" },
+    ],
+  );
+  assert.deepEqual(State.agentQuestions.get("agent-01"), {
+    taskId: "t-3",
+    questionId: "q-3",
+    text: "Which audience?",
+    options: ["Team", "Customers"],
+  });
+  assert.deepEqual(sent("orchestrator_chat_history"), [{ agentId: "agent-01" }]);
+});
+
+test("a question goes into the agent chat and the next message answers it", async () => {
+  State.syncOrchestratorAgents([agentInfo("agent-01")]);
+  emit("orchestrator-event", {
+    seq: 8,
+    taskId: "t-question",
+    agentId: "agent-01",
+    type: "task.question",
+    timestamp: "",
+    payload: { questionId: "q-1", question: "Which format?", options: ["PDF", "Markdown"] },
+  });
+  assert.equal(task().state, "question");
+  assert.equal(agentHistory("agent-01").at(-1).content, "Which format?");
+  assert.deepEqual(State.agentQuestions.get("agent-01").options, ["PDF", "Markdown"]);
+
+  const invoke = internals.invoke;
+  internals.invoke = async (cmd, args) => {
+    if (cmd === "orchestrator_answer") {
+      calls.push([cmd, args]);
+      return { task: { id: "t-question" } };
+    }
+    return invoke(cmd, args);
+  };
+  try {
+    await sendToAgent("agent-01", "Markdown");
+  } finally {
+    internals.invoke = invoke;
+  }
+  assert.deepEqual(sent("orchestrator_answer"), [{
+    taskId: "t-question",
+    questionId: "q-1",
+    answer: "Markdown",
+  }]);
+  assert.equal(sent("orchestrator_submit").length, 0);
+  assert.equal(State.agentQuestions.has("agent-01"), false);
+  assert.equal(agentHistory("agent-01").at(-1).content, "Markdown");
+});
+
+test("a goal check-in is labelled and appended to its agent chat", () => {
+  emit("orchestrator-event", {
+    seq: 9,
+    taskId: "t-goal",
+    agentId: "agent-02",
+    type: "goal.checkin",
+    timestamp: "",
+    payload: { goalId: "g-1", title: "Watch releases", summary: "Version 2 shipped.", achieved: false },
+  });
+  assert.equal(agentHistory("agent-02").at(-1).content, "Goal: Watch releases\n\nVersion 2 shipped.");
 });

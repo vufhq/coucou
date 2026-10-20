@@ -11,6 +11,8 @@ export const TASK_STATUSES = [
   "starting",
   "running",
   "waiting_for_approval",
+  "waiting_for_answer",
+  "paused",
   "succeeded",
   "failed",
   "cancelled",
@@ -32,6 +34,7 @@ export const DEFAULT_BUDGET: Budget = { maxSteps: 20, timeoutMs: 10 * 60_000, op
 
 export const CreateTaskRequest = z.object({
   prompt: z.string().trim().min(1).max(8_000),
+  source: z.enum(["user", "chat"]).optional().default("user"),
   /** Which agent runs it. Left out, the backend picks one (an idle one first). */
   agentId: AgentId.optional(),
   /**
@@ -61,15 +64,27 @@ export const FailureReason = z.enum([
   "policy_denied",
   "rejected",
   "operation_failed",
+  "unanswered",
   "internal",
 ]);
 export type FailureReason = z.infer<typeof FailureReason>;
+
+export const TaskQuestion = z.object({
+  id: z.string(),
+  text: z.string(),
+  options: z.array(z.string()),
+});
+export type TaskQuestion = z.infer<typeof TaskQuestion>;
 
 export const Task = z.object({
   id: z.string(),
   agentId: AgentId,
   prompt: z.string(),
   status: TaskStatus,
+  source: z.enum(["user", "chat", "goal"]),
+  goalId: z.string().nullable(),
+  question: TaskQuestion.nullable(),
+  waitingReason: z.enum(["agent_paused", "daily_limit"]).nullable(),
   modelProfileId: z.string(),
   workspace: z.string(),
   budget: Budget,
@@ -87,6 +102,15 @@ export const Agent = z.object({
   name: z.string(),
   vmId: z.string(),
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
+  paused: z.boolean(),
+  limits: z.object({
+    tasksPerDay: z.number().int(),
+    stepsPerDay: z.number().int(),
+  }),
+  usage: z.object({
+    tasksToday: z.number().int(),
+    stepsToday: z.number().int(),
+  }),
   /** The colour the user gave it (#RRGGBB), or null for Coucou's default. */
   color: z.string().nullable(),
   modelProfileId: z.string(),
@@ -111,8 +135,24 @@ export type Agent = z.infer<typeof Agent>;
  * - low_disk: under 1 GiB free in the workspace
  * - no_browser: Chromium is missing, browser steps will fail
  */
-export const AgentProblem = z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser"]);
+export const AgentProblem = z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser", "daily_limit"]);
 export type AgentProblem = z.infer<typeof AgentProblem>;
+
+export const AgentLimits = z
+  .object({
+    tasksPerDay: z.number().int().min(1).max(500),
+    stepsPerDay: z.number().int().min(10).max(5_000),
+  })
+  .strict();
+export type AgentLimits = z.infer<typeof AgentLimits>;
+
+export const TaskAnswer = z
+  .object({
+    questionId: z.string().min(1),
+    answer: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
+export type TaskAnswer = z.infer<typeof TaskAnswer>;
 
 /** What the user may change about an agent: its name and colour. Null puts the default back. */
 export const AgentIdentity = z

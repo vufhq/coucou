@@ -7,8 +7,9 @@
 import { h, dot, svg } from "./dom";
 import { ICONS } from "./icons";
 import type { AgentTask } from "../core/state";
-import { agentLine, type AgentProblem } from "../core/orchestrator";
+import { OrchestratorBridge, agentLine, type AgentProblem } from "../core/orchestrator";
 import { t } from "../i18n/i18n";
+import { loadAgentHistory } from "../island/agent-chat";
 
 export interface AgentCardHost {
   el: HTMLElement;
@@ -25,6 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function buildAgentCard(task: AgentTask, openChat: (agentId: string) => void): AgentCardHost {
   const agentId = task.orchestrator!.agentId;
+  let currentTask = task;
   const nameEl = h("b", { text: task.name });
   const headDot = h("span", {});
   const head = h("div", { class: "int-head" }, headDot, nameEl, h("span", { text: t("Agent") }));
@@ -33,22 +35,51 @@ export function buildAgentCard(task: AgentTask, openChat: (agentId: string) => v
   const status = h("div", { class: "int-status" }, statusDot, statusText);
 
   const chatLabel = h("span", {});
-  const chat = h("button", { class: "agent-chat-btn", onclick: () => openChat(agentId) }, svg(ICONS.bubble, 11), chatLabel);
-  const el = h("div", { class: "int-card agent-card" }, head, status, chat);
+  const chat = h("button", {
+    class: "agent-chat-btn",
+    onclick: () => {
+      void loadAgentHistory(agentId, true);
+      openChat(agentId);
+    },
+  }, svg(ICONS.bubble, 11), chatLabel);
+  const pause = h("button", { class: "agent-chat-btn" });
+  pause.addEventListener("click", () => {
+    pause.setAttribute("disabled", "");
+    const current = currentTask.orchestrator;
+    const action = current?.paused ? OrchestratorBridge.resumeAgent(agentId) : OrchestratorBridge.pauseAgent(agentId);
+    void action.then(({ agent }) => {
+      if (currentTask.orchestrator) currentTask.orchestrator.paused = agent.paused;
+    }, () => {
+      // The backend's next agent update remains the source of truth.
+    }).finally(() => pause.removeAttribute("disabled"));
+  });
+  const actions = h("div", { class: "agent-actions" }, chat, pause);
+  const el = h("div", { class: "int-card agent-card" }, head, status, actions);
 
   return {
     el,
     sync(current) {
+      currentTask = current;
       const o = current.orchestrator;
       if (!o) return;
       nameEl.textContent = current.name;
       headDot.replaceChildren(dot(current.color, 7));
       statusDot.replaceChildren(dot(STATUS_COLORS[o.status] ?? STATUS_COLORS.offline, 5));
-      const line = agentLine({ id: o.agentId, name: current.name, status: o.status, problems: o.problems as AgentProblem[] });
+      const line = agentLine({
+        id: o.agentId,
+        name: current.name,
+        status: o.status,
+        problems: o.problems as AgentProblem[],
+        paused: o.paused,
+        limits: o.limits,
+        usage: o.usage,
+      });
       // What is wrong comes first; how the last task ended when nothing is.
       statusText.textContent = o.last && o.problems.length === 0 ? `${line} · ${t("Last: {text}", { text: o.last })}` : line;
       chatLabel.textContent = t("Chat with {name}", { name: current.name });
       chat.style.setProperty("--accent", current.color);
+      pause.textContent = o.paused ? t("Resume") : t("Pause");
+      pause.style.setProperty("--accent", current.color);
     },
   };
 }

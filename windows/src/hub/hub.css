@@ -808,6 +808,28 @@ button.hub-icon svg {
   white-space: nowrap;
 }
 
+.tasks-management {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tasks-agent-title {
+  margin: 16px 2px 0;
+  font: 700 17px var(--font);
+}
+
+.tasks-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tasks-actions .hub-input {
+  flex: 1 1 180px;
+}
+
 .hub-note-item .m {
   color: var(--hub-muted);
   font-size: 12px;

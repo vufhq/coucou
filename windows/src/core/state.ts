@@ -52,6 +52,9 @@ export interface OrchestratorPill {
   status: "offline" | "starting" | "ready" | "busy" | "error";
   /** What is wrong with its computer, as codes (AgentProblem). */
   problems: string[];
+  paused: boolean;
+  limits: { tasksPerDay: number; stepsPerDay: number };
+  usage: { tasksToday: number; stepsToday: number };
   /** The last task's final line, kept once the pill is back to rest. */
   last: string | null;
 }
@@ -63,6 +66,9 @@ export interface OrchestratorAgentInfo {
   color: string;
   status: OrchestratorPill["status"];
   problems: string[];
+  paused: boolean;
+  limits: OrchestratorPill["limits"];
+  usage: OrchestratorPill["usage"];
 }
 
 export interface ApprovalInfo {
@@ -87,6 +93,13 @@ export interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
+}
+
+export interface AgentQuestion {
+  taskId: string;
+  questionId: string;
+  text: string;
+  options: string[];
 }
 
 export type PromptContext =
@@ -256,6 +269,8 @@ class AppState {
   chatAgent: string | null = null;
   /** Each agent's conversation, kept apart from the model chat's. */
   agentChats = new Map<string, ChatMessage[]>();
+  /** The pending question in each agent chat; a typed message or chip answers it. */
+  agentQuestions = new Map<string, AgentQuestion>();
   /** An agent's task started from the chat and not finished: what it is doing now. */
   agentRuns = new Map<string, { taskId: string | null; line: string }>();
   pendingApproval: ApprovalInfo | null = null;
@@ -463,7 +478,15 @@ class AppState {
       }
       t.name = a.name;
       t.color = a.color;
-      t.orchestrator = { agentId: a.agentId, status: a.status, problems: a.problems, last: t.orchestrator?.last ?? null };
+      t.orchestrator = {
+        agentId: a.agentId,
+        status: a.status,
+        problems: a.problems,
+        paused: a.paused,
+        limits: a.limits,
+        usage: a.usage,
+        last: t.orchestrator?.last ?? null,
+      };
     }
     this.tasks = orderPills(this.tasks, this.mainPillId);
     if (!this.focusId || !this.tasks.some((t) => t.id === this.focusId)) this.focusId = this.tasks[0]?.id ?? this.mainPillId;

@@ -8,9 +8,15 @@ import { createHash } from "node:crypto";
 import {
   AgentId,
   AgentIdentity,
+  AgentLimits,
   ApprovalDecision,
+  CreateGoalRequest,
+  CreateNoteRequest,
   CreateTaskRequest,
+  GoalRunRequest,
   RelPath,
+  TaskAnswer,
+  UpdateGoalRequest,
   type Agent,
   type AgentProblem,
 } from "@coucou-orchestrator/protocol";
@@ -21,6 +27,7 @@ import { redactText } from "./redact.ts";
 import type { Runner } from "./runner.ts";
 import { resumePoint, streamEvents } from "./sse.ts";
 import type { Store } from "./store.ts";
+import { nextScheduleTime } from "./scheduler.ts";
 import { bearerMatches } from "./tokens.ts";
 import type { VmProbe } from "./vm.ts";
 
@@ -40,6 +47,9 @@ export interface ApiDeps {
 const TaskQuery = z.object({
   active: z.enum(["0", "1"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
+  agentId: AgentId.optional(),
+  source: z.enum(["user", "chat", "goal"]).optional(),
+  goalId: z.string().min(1).optional(),
 });
 
 /** Below this, the agent's disk is reported as nearly full. */
@@ -68,11 +78,20 @@ const BINARY_TYPES: Record<string, string> = {
 
 /** What is wrong with an agent's computer, from its status, its last health report and the VM check. */
 export function agentProblems(agent: Agent, vmRunning: boolean | null): AgentProblem[] {
-  if (agent.status === "offline") return [vmRunning === false ? "vm_stopped" : "worker_down"];
   const problems: AgentProblem[] = [];
-  const h = agent.health;
-  if (h && h.diskTotalBytes > 0 && h.diskFreeBytes < LOW_DISK_BYTES) problems.push("low_disk");
-  if (h && !h.browserReady) problems.push("no_browser");
+  if (agent.status === "offline") {
+    problems.push(vmRunning === false ? "vm_stopped" : "worker_down");
+  } else {
+    const h = agent.health;
+    if (h && h.diskTotalBytes > 0 && h.diskFreeBytes < LOW_DISK_BYTES) problems.push("low_disk");
+    if (h && !h.browserReady) problems.push("no_browser");
+  }
+  if (
+    agent.usage.tasksToday >= agent.limits.tasksPerDay ||
+    agent.usage.stepsToday >= agent.limits.stepsPerDay
+  ) {
+    problems.push("daily_limit");
+  }
   return problems;
 }
 
@@ -119,7 +138,16 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     if (!q.success) return bad(reply, q.error);
     // Read together, so a client can stream from `lastSeq` and miss nothing.
     const lastSeq = Number((store.db.prepare("SELECT COALESCE(MAX(seq), 0) AS s FROM events").get() as { s: number }).s);
-    return { tasks: store.tasks({ active: q.data.active === "1", limit: q.data.limit }), lastSeq };
+    return {
+      tasks: store.tasks({
+        active: q.data.active === "1",
+        limit: q.data.limit,
+        agentId: q.data.agentId,
+        source: q.data.source,
+        goalId: q.data.goalId,
+      }),
+      lastSeq,
+    };
   });
 
   app.get<{ Params: { id: string } }>("/api/tasks/:id", async (req, reply) => {
@@ -138,6 +166,30 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   app.post<{ Params: { id: string } }>("/api/tasks/:id/cancel", async (req, reply) => {
     const task = runner.cancel(req.params.id);
     if (!task) return reply.code(404).send({ error: "not_found" });
+    return { task };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/tasks/:id/answer", async (req, reply) => {
+    const body = TaskAnswer.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.task(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    if (!runner.answer(req.params.id, body.data.questionId, body.data.answer)) {
+      return reply.code(409).send({ error: "no_pending_question" });
+    }
+    return { task: store.task(req.params.id) };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/tasks/:id/pause", async (req, reply) => {
+    const task = runner.pause(req.params.id);
+    if (task === null) return reply.code(404).send({ error: "not_found" });
+    if (task === "not_pausable") return reply.code(409).send({ error: "not_pausable" });
+    return { task };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/tasks/:id/resume", async (req, reply) => {
+    const task = runner.resume(req.params.id);
+    if (task === null) return reply.code(404).send({ error: "not_found" });
+    if (task === "not_paused") return reply.code(409).send({ error: "not_paused" });
     return { task };
   });
 
@@ -180,6 +232,48 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     return { agent: store.agent(req.params.id) };
   });
 
+  app.post<{ Params: { id: string } }>("/api/agents/:id/pause", async (req, reply) => {
+    if (!runner.pauseAgent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    return { agent: store.agent(req.params.id) };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/agents/:id/resume", async (req, reply) => {
+    if (!runner.resumeAgent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    return { agent: store.agent(req.params.id) };
+  });
+
+  app.put<{ Params: { id: string } }>("/api/agents/:id/limits", async (req, reply) => {
+    const body = AgentLimits.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    store.setAgentLimits(req.params.id, body.data);
+    events.emit("agent.updated", req.params.id, null, {});
+    runner.pump(req.params.id);
+    return { agent: store.agent(req.params.id) };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/agents/:id/memory", async (req, reply) => {
+    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    return { notes: store.notes(req.params.id) };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/agents/:id/memory", async (req, reply) => {
+    const body = CreateNoteRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    const note = runner.remember(req.params.id, body.data.text, "user");
+    if (!note) return bad(reply, "note is empty after removing control characters");
+    return reply.code(201).send({ note });
+  });
+
+  app.delete<{ Params: { id: string; noteId: string } }>("/api/agents/:id/memory/:noteId", async (req, reply) => {
+    if (!store.agent(req.params.id) || !store.deleteNote(req.params.id, req.params.noteId)) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+    events.emit("memory.updated", req.params.id, null, {});
+    return { ok: true };
+  });
+
   app.post<{ Params: { id: string } }>("/api/agents/:id/approval", async (req, reply) => {
     const body = ApprovalDecision.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
@@ -188,6 +282,65 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     const applied = runner.resolveApproval(approval.id, body.data.decision);
     if (!applied) return reply.code(409).send({ error: "already_decided", status: store.approval(approval.id)?.status });
     return { approval: store.approval(approval.id) };
+  });
+
+  app.get("/api/goals", async (req, reply) => {
+    const query = z.object({ agentId: AgentId.optional() }).safeParse(req.query);
+    if (!query.success) return bad(reply, query.error);
+    return { goals: store.goals(query.data.agentId) };
+  });
+
+  app.post("/api/goals", async (req, reply) => {
+    const body = CreateGoalRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.agent(body.data.agentId)) return bad(reply, `unknown agent ${body.data.agentId}`);
+    if (body.data.modelProfileId && !deps.models.has(body.data.modelProfileId)) {
+      return bad(reply, `unknown model profile ${body.data.modelProfileId}`);
+    }
+    const goal = store.createGoal({
+      ...body.data,
+      nextRunAt: nextScheduleTime(body.data.schedule, new Date())?.toISOString() ?? null,
+    });
+    events.emit("goal.updated", goal.agentId, null, { goalId: goal.id });
+    return reply.code(201).send({ goal });
+  });
+
+  app.patch<{ Params: { id: string } }>("/api/goals/:id", async (req, reply) => {
+    const body = UpdateGoalRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    const current = store.goal(req.params.id);
+    if (!current) return reply.code(404).send({ error: "not_found" });
+    if (body.data.modelProfileId && !deps.models.has(body.data.modelProfileId)) {
+      return bad(reply, `unknown model profile ${body.data.modelProfileId}`);
+    }
+    const schedule = body.data.schedule ?? current.schedule;
+    const status = body.data.status ?? current.status;
+    const rescheduled = body.data.schedule !== undefined || body.data.status !== undefined;
+    const nextRunAt = rescheduled && status === "active"
+      ? nextScheduleTime(schedule, new Date())?.toISOString() ?? null
+      : status === "paused"
+        ? null
+        : current.nextRunAt;
+    const goal = store.updateGoal(current.id, { ...body.data, nextRunAt })!;
+    events.emit("goal.updated", goal.agentId, null, { goalId: goal.id });
+    return { goal };
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/goals/:id", async (req, reply) => {
+    const goal = store.goal(req.params.id);
+    if (!goal) return reply.code(404).send({ error: "not_found" });
+    store.archiveGoal(goal.id);
+    events.emit("goal.updated", goal.agentId, null, { goalId: goal.id });
+    return { ok: true };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/goals/:id/run", async (req, reply) => {
+    const body = GoalRunRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    const result = runner.runGoal(req.params.id, body.data.idempotencyKey);
+    if (result === "not_found") return reply.code(404).send({ error: "not_found" });
+    if (result === "already_running") return reply.code(409).send({ error: "already_running" });
+    return { task: result.task, created: result.created };
   });
 
   // Files live in the VM; the worker lists and reads them for us.
