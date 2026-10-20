@@ -1,0 +1,32 @@
+[Unit]
+Description=Coucou orchestrator worker (agent-01)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=agent
+Group=agent
+WorkingDirectory=/opt/coucou-worker
+Environment=ORCH_AGENT_ID=agent-01
+Environment=ORCH_WORKSPACE=/workspace
+Environment=HOME=/workspace/.coucou/home
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/coucou-worker/browsers
+# The token file is root-only; systemd hands this service a private copy.
+LoadCredential=worker-token:/etc/coucou-worker/worker-token
+ExecStart=/usr/local/bin/node worker/src/main.ts
+Restart=always
+RestartSec=3
+
+# The worker and everything it runs may write to /workspace and nowhere else.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/workspace
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

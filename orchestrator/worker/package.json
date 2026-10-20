@@ -1,0 +1,10 @@
+{
+  "name": "@coucou-orchestrator/worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@coucou-orchestrator/protocol": "*",
+    "playwright": "1.63.0",
+    "zod": "4.6.5"
+  }
+}

@@ -71,6 +71,8 @@ pub const INTERNAL_KEYS: &[&str] = &[
     "phone-relay-room",
     "phone-relay-key",
     "phone-relay-access",
+    // Written by the orchestrator backend on its first start (orchestrator.rs).
+    "orchestrator-token",
 ];
 
 /// Whether the keystore would accept this key through `get_internal` / `set_internal`.

@@ -1,0 +1,202 @@
+// The worker loop: say hello (with the journal), claim a job, validate it
+// again, run it under its deadline while heartbeats keep its lease, report
+// the outcome until the backend has it, repeat. One job at a time.
+//
+// The backend is allowed to vanish at any moment: the job carries on, its
+// outcome waits in the journal, and the next hello hands it over.
+
+import { setTimeout as sleep } from "node:timers/promises";
+import {
+  OP_NAMES,
+  parseOperation,
+  type Job,
+  type JobOutcome,
+  type OpArgs,
+  type WorkerEvent,
+} from "@coucou-orchestrator/protocol";
+import { BackendError, type BackendClient } from "./client.ts";
+import type { Journal } from "./journal.ts";
+import { PathError, ensureTaskDir } from "./paths.ts";
+import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } from "./ops/browser.ts";
+import { listFiles, readText, writeArtifact } from "./ops/fs.ts";
+import { CommandError, runCommand } from "./ops/terminal.ts";
+
+export const WORKER_VERSION = "0.1.0";
+
+export interface OpContext {
+  taskId: string;
+  jobId: string;
+  /** The task's folder, real path. */
+  dir: string;
+  deadlineMs: number;
+  signal: AbortSignal;
+  report(type: WorkerEvent["type"], payload: Record<string, unknown>): void;
+}
+
+export interface OpResult {
+  result: string;
+  /** The operation ran but did not succeed (a command's non-zero exit). */
+  failed?: boolean;
+}
+
+export interface WorkerOptions {
+  client: BackendClient;
+  journal: Journal;
+  browser: BrowserDriver;
+  workspace: string;
+  /** How often a running job's lease is renewed. */
+  heartbeatMs?: number;
+  claimWaitMs?: number;
+  log?: (line: string) => void;
+}
+
+export class Worker {
+  private readonly o: Required<WorkerOptions>;
+  private stopped = false;
+  private current: AbortController | null = null;
+
+  constructor(options: WorkerOptions) {
+    this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, ...options };
+  }
+
+  stop(): void {
+    this.stopped = true;
+    this.current?.abort();
+  }
+
+  async run(): Promise<void> {
+    let backoff = 500;
+    let greeted = false;
+    while (!this.stopped) {
+      try {
+        if (!greeted) {
+          await this.o.client.hello({
+            agentId: this.o.client.agentId,
+            version: WORKER_VERSION,
+            capabilities: OP_NAMES,
+            journal: await this.o.journal.entries(),
+          });
+          greeted = true;
+          this.o.log("connected to the backend");
+        }
+        const claim = await this.o.client.claim(this.o.claimWaitMs);
+        backoff = 500;
+        if (claim.job) await this.handle(claim.job);
+      } catch (err) {
+        if (this.stopped) break;
+        greeted = false;
+        this.o.log(`backend unreachable (${err instanceof Error ? err.message : String(err)}); retrying`);
+        await sleep(backoff);
+        backoff = Math.min(backoff * 2, 15_000);
+      }
+    }
+  }
+
+  /** Runs one job and makes sure its outcome reaches the backend. */
+  async handle(job: Job): Promise<JobOutcome> {
+    const known = await this.o.journal.has(job.id);
+    let outcome: JobOutcome;
+    if (known?.state === "finished" && known.outcome) {
+      outcome = known.outcome; // Already ran; only the report was lost.
+    } else if (known?.state === "started") {
+      outcome = { status: "failed", error: { code: "interrupted", message: "this job was interrupted by a worker restart" } };
+    } else {
+      await this.o.journal.started(job.id);
+      outcome = await this.execute(job);
+      await this.o.journal.finished(job.id, outcome);
+    }
+    await this.deliver(job.id, outcome);
+    return outcome;
+  }
+
+  private async deliver(jobId: string, outcome: JobOutcome): Promise<void> {
+    let backoff = 500;
+    while (!this.stopped) {
+      try {
+        await this.o.client.complete(jobId, outcome);
+        return;
+      } catch (err) {
+        // 404: the backend no longer knows the job (its database was reset); nothing to deliver to.
+        if (err instanceof BackendError && err.status === 404) return;
+        await sleep(backoff);
+        backoff = Math.min(backoff * 2, 15_000);
+      }
+    }
+  }
+
+  private async execute(job: Job): Promise<JobOutcome> {
+    const parsed = parseOperation(job.op, job.args);
+    if (!parsed.ok) return { status: "failed", error: { code: "invalid", message: parsed.error } };
+
+    const controller = new AbortController();
+    this.current = controller;
+    const deadline = setTimeout(() => controller.abort(new Error("deadline")), job.deadlineMs);
+    let cancelled = false;
+
+    // Events go out in order, in the background; losing one never fails the job.
+    let outbox: Promise<void> = Promise.resolve();
+    const report = (type: WorkerEvent["type"], payload: Record<string, unknown>) => {
+      outbox = outbox.then(() => this.o.client.events(job.id, [{ type, payload }]).catch(() => {}));
+    };
+    const heartbeat = setInterval(() => {
+      this.o.client
+        .heartbeat([job.id])
+        .then((cancel) => {
+          if (cancel.includes(job.id)) {
+            cancelled = true;
+            controller.abort(new Error("cancelled"));
+          }
+        })
+        .catch(() => {});
+    }, this.o.heartbeatMs);
+
+    try {
+      const dir = await ensureTaskDir(this.o.workspace, job.taskId);
+      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, deadlineMs: job.deadlineMs, signal: controller.signal, report };
+      const run = this.dispatch(ctx, parsed.op.op, parsed.op.args);
+      const aborted = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
+      });
+      const out = await Promise.race([run, aborted]);
+      await outbox;
+      return out.failed
+        ? { status: "failed", result: out.result, error: { code: "failed", message: out.result.split("\n")[0] ?? "failed" } }
+        : { status: "succeeded", result: out.result };
+    } catch (err) {
+      await outbox;
+      if (cancelled) return { status: "cancelled", error: { code: "cancelled", message: "cancelled by the backend" } };
+      if (controller.signal.aborted) {
+        return { status: "failed", error: { code: "timeout", message: `no result within ${Math.round(job.deadlineMs / 1000)} s` } };
+      }
+      const refused = err instanceof PathError || err instanceof CommandError || err instanceof BrowserError;
+      const message = err instanceof Error ? err.message : String(err);
+      return { status: "failed", error: { code: refused ? "refused" : "failed", message: message.slice(0, 1_000) } };
+    } finally {
+      clearTimeout(deadline);
+      clearInterval(heartbeat);
+      this.current = null;
+    }
+  }
+
+  private dispatch(ctx: OpContext, op: string, args: Record<string, unknown>): Promise<OpResult> {
+    const b = this.o.browser;
+    switch (op) {
+      case "browser.navigate":
+        return navigate(ctx, args as OpArgs<"browser.navigate">, b);
+      case "browser.extract_text":
+        return extractText(ctx, args as OpArgs<"browser.extract_text">, b);
+      case "browser.screenshot":
+        return screenshot(ctx, args as OpArgs<"browser.screenshot">, b);
+      case "fs.write_artifact":
+        return writeArtifact(ctx, args as OpArgs<"fs.write_artifact">);
+      case "fs.list":
+        return listFiles(ctx);
+      case "fs.read":
+        return readText(ctx, args as OpArgs<"fs.read">);
+      case "terminal.run":
+        return runCommand(ctx, args as OpArgs<"terminal.run">);
+      default:
+        return Promise.reject(new CommandError(`unsupported operation ${op}`));
+    }
+  }
+}
