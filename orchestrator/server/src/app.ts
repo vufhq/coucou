@@ -50,7 +50,10 @@ export function createBackend(
   } = {},
 ): Backend {
   const store = new Store(join(config.dataDir, "orchestrator.db"));
-  for (const agent of config.agents) store.ensureAgent({ ...agent, modelProfileId: config.defaultModelProfile });
+  for (const computer of config.agents) store.ensureComputer(computer);
+  const firstComputer = config.agents[0];
+  if (!firstComputer) throw new Error("at least one computer is required");
+  store.ensureChief({ ...firstComputer, modelProfileId: config.defaultModelProfile });
   const events = new EventLog(store);
   const signals = new JobSignals();
   const downloads = new Downloads();

@@ -9,8 +9,10 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import {
   DEFAULT_BUDGET,
   type Agent,
+  type AgentOutfit,
   type AgentLimits,
   type Budget,
+  type Computer,
   type CreateTaskRequest,
   type FailureReason,
   type Goal,
@@ -21,10 +23,25 @@ import {
   type Task,
   type TaskQuestion,
   type TaskStatus,
+  type Team,
+  type WorkerOpName,
   type WorkerHealth,
 } from "@coucou-orchestrator/protocol";
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS computers (
+  id TEXT PRIMARY KEY,
+  vm_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'offline',
+  last_seen_at TEXT,
+  health TEXT
+);
+CREATE TABLE IF NOT EXISTS teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS agents (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -38,8 +55,18 @@ CREATE TABLE IF NOT EXISTS agents (
   color TEXT,
   paused INTEGER NOT NULL DEFAULT 0,
   tasks_per_day INTEGER NOT NULL DEFAULT 30,
-  steps_per_day INTEGER NOT NULL DEFAULT 300
+  steps_per_day INTEGER NOT NULL DEFAULT 300,
+  kind TEXT NOT NULL DEFAULT 'coworker',
+  role TEXT,
+  outfit TEXT,
+  team_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  computer_id TEXT,
+  created_by TEXT NOT NULL DEFAULT 'system',
+  persona TEXT,
+  retired_at TEXT
 );
+CREATE INDEX IF NOT EXISTS agents_by_computer ON agents(computer_id, retired_at);
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES agents(id),
@@ -58,6 +85,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TEXT NOT NULL,
   started_at TEXT,
   source TEXT NOT NULL DEFAULT 'user',
+  parent_task_id TEXT,
   goal_id TEXT,
   question TEXT,
   question_count INTEGER NOT NULL DEFAULT 0,
@@ -71,6 +99,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   inactive_since TEXT
 );
 CREATE INDEX IF NOT EXISTS tasks_by_status ON tasks(agent_id, status, created_at);
+CREATE INDEX IF NOT EXISTS tasks_by_parent ON tasks(parent_task_id, created_at);
 CREATE TABLE IF NOT EXISTS steps (
   task_id TEXT NOT NULL REFERENCES tasks(id),
   n INTEGER NOT NULL,
@@ -80,6 +109,7 @@ CREATE TABLE IF NOT EXISTS steps (
   approval_id TEXT,
   job_id TEXT,
   outcome TEXT,
+  management_state TEXT,
   created_at TEXT NOT NULL,
   PRIMARY KEY (task_id, n)
 );
@@ -162,8 +192,18 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "agents", column: "paused", ddl: "ALTER TABLE agents ADD COLUMN paused INTEGER NOT NULL DEFAULT 0" },
   { table: "agents", column: "tasks_per_day", ddl: "ALTER TABLE agents ADD COLUMN tasks_per_day INTEGER NOT NULL DEFAULT 30" },
   { table: "agents", column: "steps_per_day", ddl: "ALTER TABLE agents ADD COLUMN steps_per_day INTEGER NOT NULL DEFAULT 300" },
+  { table: "agents", column: "kind", ddl: "ALTER TABLE agents ADD COLUMN kind TEXT NOT NULL DEFAULT 'coworker'" },
+  { table: "agents", column: "role", ddl: "ALTER TABLE agents ADD COLUMN role TEXT" },
+  { table: "agents", column: "outfit", ddl: "ALTER TABLE agents ADD COLUMN outfit TEXT" },
+  { table: "agents", column: "team_id", ddl: "ALTER TABLE agents ADD COLUMN team_id TEXT" },
+  { table: "agents", column: "sort_order", ddl: "ALTER TABLE agents ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0" },
+  { table: "agents", column: "computer_id", ddl: "ALTER TABLE agents ADD COLUMN computer_id TEXT" },
+  { table: "agents", column: "created_by", ddl: "ALTER TABLE agents ADD COLUMN created_by TEXT NOT NULL DEFAULT 'system'" },
+  { table: "agents", column: "persona", ddl: "ALTER TABLE agents ADD COLUMN persona TEXT" },
+  { table: "agents", column: "retired_at", ddl: "ALTER TABLE agents ADD COLUMN retired_at TEXT" },
   { table: "tasks", column: "context", ddl: "ALTER TABLE tasks ADD COLUMN context TEXT" },
   { table: "tasks", column: "source", ddl: "ALTER TABLE tasks ADD COLUMN source TEXT NOT NULL DEFAULT 'user'" },
+  { table: "tasks", column: "parent_task_id", ddl: "ALTER TABLE tasks ADD COLUMN parent_task_id TEXT" },
   { table: "tasks", column: "goal_id", ddl: "ALTER TABLE tasks ADD COLUMN goal_id TEXT" },
   { table: "tasks", column: "question", ddl: "ALTER TABLE tasks ADD COLUMN question TEXT" },
   { table: "tasks", column: "question_count", ddl: "ALTER TABLE tasks ADD COLUMN question_count INTEGER NOT NULL DEFAULT 0" },
@@ -175,6 +215,7 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "tasks", column: "paused_from_status", ddl: "ALTER TABLE tasks ADD COLUMN paused_from_status TEXT" },
   { table: "tasks", column: "inactive_ms", ddl: "ALTER TABLE tasks ADD COLUMN inactive_ms INTEGER NOT NULL DEFAULT 0" },
   { table: "tasks", column: "inactive_since", ddl: "ALTER TABLE tasks ADD COLUMN inactive_since TEXT" },
+  { table: "steps", column: "management_state", ddl: "ALTER TABLE steps ADD COLUMN management_state TEXT" },
 ];
 
 export type JobStatus = "queued" | "claimed" | "succeeded" | "failed" | "cancelled";
@@ -189,13 +230,14 @@ export interface Step {
   approvalId: string | null;
   jobId: string | null;
   outcome: JobOutcome | null;
+  managementState: Record<string, unknown> | null;
 }
 
 export interface JobRow {
   id: string;
   taskId: string;
   agentId: string;
-  op: OpName;
+  op: WorkerOpName;
   args: Record<string, unknown>;
   status: JobStatus;
   attempts: number;
@@ -234,6 +276,15 @@ export interface AnswerRow {
   answer: string;
 }
 
+export interface ComputerRow {
+  id: string;
+  vmId: string;
+  status: Computer["status"];
+  lastSeenAt: string | null;
+  health: Agent["health"];
+  agentIds: string[];
+}
+
 type Row = Record<string, SQLInputValue>;
 
 const now = () => new Date().toISOString();
@@ -249,6 +300,21 @@ function parse<T>(v: unknown): T {
 function parseOrNull<T>(v: unknown): T | null {
   return v == null ? null : parse<T>(v);
 }
+
+export const AGENT_COLORS = [
+  "#FF6B6B",
+  "#4ECDC4",
+  "#45B7D1",
+  "#F7B731",
+  "#A55EEA",
+  "#26DE81",
+  "#FD9644",
+  "#2BCBBA",
+  "#5F27CD",
+  "#EC407A",
+  "#7E57C2",
+  "#42A5F5",
+] as const;
 
 export class Store {
   readonly db: DatabaseSync;
@@ -266,6 +332,15 @@ export class Store {
       const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as Row[];
       if (cols.length > 0 && !cols.some((c) => c.name === column)) this.db.exec(ddl);
     }
+    const agents = this.db.prepare("PRAGMA table_info(agents)").all() as Row[];
+    if (agents.length > 0) {
+      this.db.exec(`
+        UPDATE agents SET computer_id = id WHERE computer_id IS NULL;
+        CREATE INDEX IF NOT EXISTS agents_by_computer ON agents(computer_id, retired_at);
+      `);
+    }
+    const tasks = this.db.prepare("PRAGMA table_info(tasks)").all() as Row[];
+    if (tasks.length > 0) this.db.exec("CREATE INDEX IF NOT EXISTS tasks_by_parent ON tasks(parent_task_id, created_at)");
   }
 
   close(): void {
@@ -287,37 +362,248 @@ export class Store {
 
   // ── Agents ────────────────────────────────────────────────────────────────
 
-  ensureAgent(a: { id: string; name: string; vmId: string; modelProfileId: string }): void {
+  ensureComputer(computer: { id: string; vmId: string }): void {
     this.db
       .prepare(
-        `INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES (?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, vm_id = excluded.vm_id, model_profile_id = excluded.model_profile_id`,
+        `INSERT INTO computers (id, vm_id) VALUES (?, ?)
+         ON CONFLICT(id) DO UPDATE SET vm_id = excluded.vm_id`,
       )
-      .run(a.id, a.name, a.vmId, a.modelProfileId);
+      .run(computer.id, computer.vmId);
+  }
+
+  computer(id: string): ComputerRow | null {
+    const row = this.db.prepare("SELECT * FROM computers WHERE id = ?").get(id) as Row | undefined;
+    if (!row) return null;
+    const ids = this.db
+      .prepare("SELECT id FROM agents WHERE computer_id = ? AND retired_at IS NULL ORDER BY sort_order, id")
+      .all(id) as Row[];
+    return {
+      id,
+      vmId: String(row.vm_id),
+      status: String(row.status) as Computer["status"],
+      lastSeenAt: (row.last_seen_at as string | null) ?? null,
+      health: parseOrNull(row.health),
+      agentIds: ids.map((item) => String(item.id)),
+    };
+  }
+
+  computers(): ComputerRow[] {
+    return (this.db.prepare("SELECT id FROM computers ORDER BY rowid").all() as Row[])
+      .map((row) => this.computer(String(row.id)))
+      .filter((computer): computer is ComputerRow => computer !== null);
+  }
+
+  setComputerStatus(id: string, status: Computer["status"]): boolean {
+    const result = this.db.prepare("UPDATE computers SET status = ? WHERE id = ? AND status != ?").run(status, id, status);
+    return Number(result.changes) > 0;
+  }
+
+  setComputerHealth(id: string, health: WorkerHealth): void {
+    this.db.prepare("UPDATE computers SET health = ? WHERE id = ?").run(json({ ...health, checkedAt: now() }), id);
+  }
+
+  touchComputer(id: string): void {
+    this.db.prepare("UPDATE computers SET last_seen_at = ? WHERE id = ?").run(now(), id);
+  }
+
+  /**
+   * Compatibility helper for old tests and migrations. New startup code only
+   * ensures computers and then one chief.
+   */
+  ensureAgent(a: { id: string; name: string; vmId: string; modelProfileId: string }): void {
+    this.ensureComputer({ id: a.id, vmId: a.vmId });
+    const color = this.nextColor();
+    this.db
+      .prepare(
+        `INSERT INTO agents (
+           id, name, vm_id, model_profile_id, computer_id, color, created_by
+         ) VALUES (?, ?, ?, ?, ?, ?, 'system')
+         ON CONFLICT(id) DO UPDATE SET model_profile_id = excluded.model_profile_id`,
+      )
+      .run(a.id, a.name, a.vmId, a.modelProfileId, a.id, color);
+  }
+
+  ensureChief(input: { id: string; vmId: string; modelProfileId: string }): Agent {
+    const existing = this.db.prepare("SELECT id FROM agents WHERE id = ?").get(input.id) as Row | undefined;
+    if (!existing) {
+      this.db
+        .prepare(
+          `INSERT INTO agents (
+             id, name, vm_id, model_profile_id, kind, computer_id, color, created_by
+           ) VALUES (?, 'Mochi', ?, ?, 'chief', ?, ?, 'system')`,
+        )
+        .run(input.id, input.vmId, input.modelProfileId, input.id, this.nextColor());
+    }
+    this.db.prepare("UPDATE agents SET kind = 'coworker' WHERE kind = 'chief' AND id != ?").run(input.id);
+    this.db
+      .prepare(
+        `UPDATE agents
+         SET kind = 'chief', retired_at = NULL,
+             computer_id = CASE WHEN computer_id IN (SELECT id FROM computers) THEN computer_id ELSE ? END
+         WHERE id = ?`,
+      )
+      .run(input.id, input.id);
+    this.assignMissingColors();
+    return this.agent(input.id)!;
   }
 
   agents(): Agent[] {
-    return (this.db.prepare("SELECT * FROM agents ORDER BY id").all() as Row[]).map((row) =>
-      toAgent(row, this.agentUsage(String(row.id))),
+    return (this.db.prepare("SELECT * FROM agents WHERE retired_at IS NULL ORDER BY sort_order, id").all() as Row[]).map(
+      (row) => this.agentFromRow(row),
     );
   }
 
+  agentsIncludingRetired(): Agent[] {
+    return (this.db.prepare("SELECT * FROM agents ORDER BY rowid").all() as Row[]).map((row) => this.agentFromRow(row));
+  }
+
   agent(id: string): Agent | null {
+    const row = this.db.prepare("SELECT * FROM agents WHERE id = ? AND retired_at IS NULL").get(id) as Row | undefined;
+    return row ? this.agentFromRow(row) : null;
+  }
+
+  agentIncludingRetired(id: string): Agent | null {
     const row = this.db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as Row | undefined;
-    return row ? toAgent(row, this.agentUsage(id)) : null;
+    return row ? this.agentFromRow(row) : null;
   }
 
-  setAgentStatus(id: string, status: Agent["status"]): boolean {
-    const r = this.db.prepare("UPDATE agents SET status = ? WHERE id = ? AND status != ?").run(status, id, status);
-    return Number(r.changes) > 0;
+  agentsOnComputer(computerId: string): Agent[] {
+    return (this.db
+      .prepare("SELECT * FROM agents WHERE computer_id = ? AND retired_at IS NULL ORDER BY sort_order, id")
+      .all(computerId) as Row[]).map((row) => this.agentFromRow(row));
   }
 
-  /** The user's name and colour for an agent; null puts the default back, undefined leaves it. */
-  setAgentIdentity(id: string, identity: { name?: string | null; color?: string | null }): void {
+  private agentFromRow(row: Row): Agent {
+    const id = String(row.id);
+    const computer = this.computer(String(row.computer_id ?? id));
+    const computerStatus = computer?.status ?? "offline";
+    const status: Agent["status"] =
+      computerStatus === "offline" || computerStatus === "starting" || computerStatus === "error"
+        ? computerStatus
+        : this.agentBusy(id)
+          ? "busy"
+          : "ready";
+    return toAgent(row, this.agentUsage(id), computer, status);
+  }
+
+  private nextColor(requested?: string | null, exceptId?: string): string {
+    const used = new Set(
+      (this.db
+        .prepare("SELECT id, color FROM agents WHERE retired_at IS NULL AND color IS NOT NULL")
+        .all() as Row[])
+        .filter((row) => String(row.id) !== exceptId)
+        .map((row) => String(row.color).toUpperCase()),
+    );
+    const wanted = requested?.toUpperCase();
+    if (wanted && !used.has(wanted)) return wanted;
+    return AGENT_COLORS.find((color) => !used.has(color)) ?? AGENT_COLORS[0];
+  }
+
+  private assignMissingColors(): void {
+    const rows = this.db
+      .prepare("SELECT id, color FROM agents WHERE retired_at IS NULL ORDER BY rowid")
+      .all() as Row[];
+    const used = new Set<string>();
+    for (const row of rows) {
+      const existing = row.color ? String(row.color).toUpperCase() : null;
+      const color = existing && !used.has(existing) ? existing : AGENT_COLORS.find((item) => !used.has(item)) ?? AGENT_COLORS[0];
+      used.add(color);
+      if (color !== existing) this.db.prepare("UPDATE agents SET color = ? WHERE id = ?").run(color, String(row.id));
+    }
+  }
+
+  makeAgentId(name: string): string {
+    const base =
+      name
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 24)
+        .replace(/-+$/g, "") || "agent";
+    const safe = base === "claude" ? "claude-agent" : base;
+    let candidate = safe;
+    for (let suffix = 2; this.db.prepare("SELECT 1 FROM agents WHERE id = ?").get(candidate); suffix++) {
+      const tail = `-${suffix}`;
+      candidate = `${safe.slice(0, 24 - tail.length).replace(/-+$/g, "")}${tail}`;
+    }
+    return candidate;
+  }
+
+  createAgent(input: {
+    name: string;
+    role?: string | null;
+    color?: string | null;
+    outfit?: AgentOutfit | null;
+    teamId?: string | null;
+    computerId: string;
+    persona?: string | null;
+    createdBy: Agent["createdBy"];
+    modelProfileId: string;
+  }): Agent {
+    const id = this.makeAgentId(input.name);
+    const computer = this.computer(input.computerId);
+    if (!computer) throw new Error("unknown computer");
+    if (input.teamId && !this.team(input.teamId)) throw new Error("unknown team");
+    this.db
+      .prepare(
+        `INSERT INTO agents (
+           id, name, vm_id, model_profile_id, kind, role, outfit, team_id,
+           sort_order, computer_id, color, created_by, persona
+         ) VALUES (?, ?, ?, ?, 'coworker', ?, ?, ?, 0, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        input.name,
+        computer.vmId,
+        input.modelProfileId,
+        input.role ?? null,
+        input.outfit ?? null,
+        input.teamId ?? null,
+        input.computerId,
+        this.nextColor(input.color),
+        input.createdBy,
+        input.persona ?? null,
+      );
+    return this.agent(id)!;
+  }
+
+  setAgentIdentity(
+    id: string,
+    identity: {
+      name?: string | null;
+      color?: string | null;
+      role?: string | null;
+      outfit?: AgentOutfit | null;
+      teamId?: string | null;
+      order?: number;
+      computerId?: string;
+      persona?: string | null;
+    },
+  ): void {
     if (identity.name !== undefined) this.db.prepare("UPDATE agents SET custom_name = ? WHERE id = ?").run(identity.name, id);
     if (identity.color !== undefined) {
-      this.db.prepare("UPDATE agents SET color = ? WHERE id = ?").run(identity.color?.toUpperCase() ?? null, id);
+      this.db.prepare("UPDATE agents SET color = ? WHERE id = ?").run(this.nextColor(identity.color, id), id);
     }
+    if (identity.role !== undefined) this.db.prepare("UPDATE agents SET role = ? WHERE id = ?").run(identity.role, id);
+    if (identity.outfit !== undefined) this.db.prepare("UPDATE agents SET outfit = ? WHERE id = ?").run(identity.outfit, id);
+    if (identity.teamId !== undefined) this.db.prepare("UPDATE agents SET team_id = ? WHERE id = ?").run(identity.teamId, id);
+    if (identity.order !== undefined) this.db.prepare("UPDATE agents SET sort_order = ? WHERE id = ?").run(identity.order, id);
+    if (identity.computerId !== undefined) {
+      const computer = this.computer(identity.computerId);
+      this.db
+        .prepare("UPDATE agents SET computer_id = ?, vm_id = ? WHERE id = ?")
+        .run(identity.computerId, computer?.vmId ?? "", id);
+    }
+    if (identity.persona !== undefined) this.db.prepare("UPDATE agents SET persona = ? WHERE id = ?").run(identity.persona, id);
+  }
+
+  retireAgent(id: string): boolean {
+    const result = this.db
+      .prepare("UPDATE agents SET retired_at = ?, team_id = NULL WHERE id = ? AND retired_at IS NULL AND kind != 'chief'")
+      .run(now(), id);
+    return Number(result.changes) > 0;
   }
 
   setAgentPaused(id: string, paused: boolean): void {
@@ -346,11 +632,17 @@ export class Store {
   }
 
   setAgentHealth(id: string, health: WorkerHealth): void {
-    this.db.prepare("UPDATE agents SET health = ? WHERE id = ?").run(json({ ...health, checkedAt: now() }), id);
+    const agent = this.agent(id);
+    if (!agent) return;
+    if (this.computer(agent.computerId)) this.setComputerHealth(agent.computerId, health);
+    else this.db.prepare("UPDATE agents SET health = ? WHERE id = ?").run(json({ ...health, checkedAt: now() }), id);
   }
 
   touchAgent(id: string): void {
-    this.db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(now(), id);
+    const agent = this.agent(id);
+    if (!agent) return;
+    if (this.computer(agent.computerId)) this.touchComputer(agent.computerId);
+    else this.db.prepare("UPDATE agents SET last_seen_at = ? WHERE id = ?").run(now(), id);
   }
 
   approvedDomains(id: string): string[] {
@@ -364,6 +656,47 @@ export class Store {
     this.db.prepare("UPDATE agents SET approved_domains = ? WHERE id = ?").run(json([...domains].sort()), id);
   }
 
+  // ── Teams ─────────────────────────────────────────────────────────────────
+
+  teams(): Team[] {
+    return (this.db.prepare("SELECT * FROM teams ORDER BY sort_order, created_at").all() as Row[]).map(toTeam);
+  }
+
+  team(id: string): Team | null {
+    const row = this.db.prepare("SELECT * FROM teams WHERE id = ?").get(id) as Row | undefined;
+    return row ? toTeam(row) : null;
+  }
+
+  createTeam(name: string): Team {
+    const base =
+      name
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 32) || "team";
+    let id = base;
+    for (let suffix = 2; this.team(id); suffix++) id = `${base.slice(0, 28)}-${suffix}`;
+    const order = Number((this.db.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM teams").get() as Row).n);
+    this.db.prepare("INSERT INTO teams (id, name, sort_order, created_at) VALUES (?, ?, ?, ?)").run(id, name, order, now());
+    return this.team(id)!;
+  }
+
+  updateTeam(id: string, patch: { name?: string; order?: number }): Team | null {
+    if (!this.team(id)) return null;
+    if (patch.name !== undefined) this.db.prepare("UPDATE teams SET name = ? WHERE id = ?").run(patch.name, id);
+    if (patch.order !== undefined) this.db.prepare("UPDATE teams SET sort_order = ? WHERE id = ?").run(patch.order, id);
+    return this.team(id);
+  }
+
+  deleteTeam(id: string): boolean {
+    return this.tx(() => {
+      this.db.prepare("UPDATE agents SET team_id = NULL WHERE team_id = ?").run(id);
+      return Number(this.db.prepare("DELETE FROM teams WHERE id = ?").run(id).changes) > 0;
+    });
+  }
+
   // ── Tasks ─────────────────────────────────────────────────────────────────
 
   /**
@@ -373,7 +706,8 @@ export class Store {
   createTask(
     req: Omit<CreateTaskRequest, "agentId" | "source"> & {
       agentId: string;
-      source?: "user" | "chat" | "goal";
+      source?: Task["source"];
+      parentTaskId?: string | null;
       goalId?: string | null;
     },
     modelProfileId: string,
@@ -389,12 +723,12 @@ export class Store {
       this.db
         .prepare(
           `INSERT INTO tasks (
-             id, agent_id, prompt, status, source, goal_id, model_profile_id, workspace,
+             id, agent_id, prompt, status, source, parent_task_id, goal_id, model_profile_id, workspace,
              budget, idempotency_key, context, created_at, updated_at
-           ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          id, req.agentId, req.prompt, req.source ?? "user", req.goalId ?? null, modelProfileId,
+          id, req.agentId, req.prompt, req.source ?? "user", req.parentTaskId ?? null, req.goalId ?? null, modelProfileId,
           `/workspace/tasks/${id}`, json(budget), req.idempotencyKey,
           req.context?.trim() || null, t, t,
         );
@@ -418,7 +752,16 @@ export class Store {
     return (row?.started_at as string | null) ?? null;
   }
 
-  tasks(filter: { active?: boolean; limit?: number; agentId?: string; source?: Task["source"]; goalId?: string } = {}): Task[] {
+  tasks(
+    filter: {
+      active?: boolean;
+      limit?: number;
+      agentId?: string;
+      source?: Task["source"] | Task["source"][];
+      goalId?: string;
+      parentTaskId?: string;
+    } = {},
+  ): Task[] {
     const clauses: string[] = [];
     const values: SQLInputValue[] = [];
     if (filter.active) clauses.push("status NOT IN ('succeeded','failed','cancelled')");
@@ -427,12 +770,17 @@ export class Store {
       values.push(filter.agentId);
     }
     if (filter.source) {
-      clauses.push("source = ?");
-      values.push(filter.source);
+      const sources = Array.isArray(filter.source) ? filter.source : [filter.source];
+      clauses.push(`source IN (${sources.map(() => "?").join(",")})`);
+      values.push(...sources);
     }
     if (filter.goalId) {
       clauses.push("goal_id = ?");
       values.push(filter.goalId);
+    }
+    if (filter.parentTaskId) {
+      clauses.push("parent_task_id = ?");
+      values.push(filter.parentTaskId);
     }
     const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = this.db
@@ -446,7 +794,7 @@ export class Store {
     return (
       this.db
         .prepare(
-          "SELECT * FROM tasks WHERE status IN ('starting','running','waiting_for_approval','waiting_for_answer') ORDER BY created_at",
+          "SELECT * FROM tasks WHERE status IN ('starting','running','waiting_for_approval','waiting_for_answer','waiting_for_agents') ORDER BY created_at",
         )
         .all() as Row[]
     ).map(toTask);
@@ -473,6 +821,19 @@ export class Store {
     return row ? toTask(row) : null;
   }
 
+  computerBusy(computerId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1
+         FROM tasks JOIN agents ON agents.id = tasks.agent_id
+         WHERE agents.computer_id = ?
+           AND tasks.status IN ('starting','running','waiting_for_approval')
+         LIMIT 1`,
+      )
+      .get(computerId);
+    return row !== undefined;
+  }
+
   agentBusy(agentId: string): boolean {
     const row = this.db
       .prepare(
@@ -488,8 +849,8 @@ export class Store {
       .get(id) as Row | undefined;
     if (!row) return;
     const t = now();
-    const wasInactive = row.status === "paused" || row.status === "waiting_for_answer";
-    const isInactive = status === "paused" || status === "waiting_for_answer";
+    const wasInactive = row.status === "paused" || row.status === "waiting_for_answer" || row.status === "waiting_for_agents";
+    const isInactive = status === "paused" || status === "waiting_for_answer" || status === "waiting_for_agents";
     let inactiveMs = Number(row.inactive_ms ?? 0);
     if (wasInactive && !isInactive && row.inactive_since) {
       inactiveMs += Math.max(0, Date.parse(t) - Date.parse(String(row.inactive_since)));
@@ -564,8 +925,13 @@ export class Store {
   }
 
   resumeTask(id: string): TaskStatus {
-    const row = this.db.prepare("SELECT question FROM tasks WHERE id = ?").get(id) as Row;
-    const restore = row.question != null ? "waiting_for_answer" : "queued";
+    const row = this.db.prepare("SELECT question, paused_from_status FROM tasks WHERE id = ?").get(id) as Row;
+    const restore =
+      row.question != null
+        ? "waiting_for_answer"
+        : row.paused_from_status === "waiting_for_agents"
+          ? "waiting_for_agents"
+          : "queued";
     this.db
       .prepare(
         "UPDATE tasks SET pause_requested = 0, paused_by_agent = 0, paused_from_status = NULL, waiting_reason = NULL WHERE id = ?",
@@ -606,6 +972,12 @@ export class Store {
         )
         .all(agentId) as Row[]
     ).map(toTask);
+  }
+
+  childTasks(parentTaskId: string): Task[] {
+    return (this.db
+      .prepare("SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY created_at")
+      .all(parentTaskId) as Row[]).map(toTask);
   }
 
   tasksWithPendingQuestions(): Task[] {
@@ -736,9 +1108,13 @@ export class Store {
     this.db.prepare("UPDATE steps SET outcome = ? WHERE task_id = ? AND n = ?").run(json(outcome), taskId, n);
   }
 
+  setStepManagementState(taskId: string, n: number, state: Record<string, unknown>): void {
+    this.db.prepare("UPDATE steps SET management_state = ? WHERE task_id = ? AND n = ?").run(json(state), taskId, n);
+  }
+
   // ── Jobs ──────────────────────────────────────────────────────────────────
 
-  createJob(j: { taskId: string; agentId: string; op: OpName; args: Record<string, unknown>; deadlineMs: number }): JobRow {
+  createJob(j: { taskId: string; agentId: string; op: WorkerOpName; args: Record<string, unknown>; deadlineMs: number }): JobRow {
     const id = randomUUID();
     const t = now();
     this.db
@@ -929,6 +1305,15 @@ export class Store {
     return Number(r.changes) > 0;
   }
 
+  archiveGoalsForAgent(agentId: string): number {
+    const result = this.db
+      .prepare(
+        "UPDATE goals SET archived = 1, next_run_at = NULL, updated_at = ? WHERE agent_id = ? AND archived = 0",
+      )
+      .run(now(), agentId);
+    return Number(result.changes);
+  }
+
   dueGoals(at = new Date()): Goal[] {
     return (
       this.db
@@ -1080,12 +1465,20 @@ export class Store {
   }
 }
 
-function toAgent(r: Row, usage: Agent["usage"]): Agent {
+function toAgent(r: Row, usage: Agent["usage"], computer: ComputerRow | null, status: Agent["status"]): Agent {
   return {
     id: String(r.id),
     name: String(r.custom_name ?? r.name),
-    vmId: String(r.vm_id),
-    status: String(r.status) as Agent["status"],
+    vmId: computer?.vmId ?? String(r.vm_id),
+    kind: String(r.kind ?? "coworker") as Agent["kind"],
+    role: (r.role as string | null) ?? null,
+    outfit: (r.outfit as AgentOutfit | null) ?? null,
+    teamId: (r.team_id as string | null) ?? null,
+    order: Number(r.sort_order ?? 0),
+    computerId: String(r.computer_id ?? r.id),
+    createdBy: String(r.created_by ?? "system") as Agent["createdBy"],
+    persona: (r.persona as string | null) ?? null,
+    status,
     paused: Number(r.paused ?? 0) === 1,
     limits: {
       tasksPerDay: Number(r.tasks_per_day ?? 30),
@@ -1094,8 +1487,17 @@ function toAgent(r: Row, usage: Agent["usage"]): Agent {
     usage,
     color: (r.color as string | null) ?? null,
     modelProfileId: String(r.model_profile_id),
-    lastSeenAt: (r.last_seen_at as string | null) ?? null,
-    health: parseOrNull(r.health),
+    lastSeenAt: computer?.lastSeenAt ?? (r.last_seen_at as string | null) ?? null,
+    health: computer?.health ?? parseOrNull(r.health),
+  };
+}
+
+function toTeam(r: Row): Team {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    order: Number(r.sort_order),
+    createdAt: String(r.created_at),
   };
 }
 
@@ -1106,6 +1508,7 @@ function toTask(r: Row): Task {
     prompt: String(r.prompt),
     status: String(r.status) as TaskStatus,
     source: String(r.source ?? "user") as Task["source"],
+    parentTaskId: (r.parent_task_id as string | null) ?? null,
     goalId: (r.goal_id as string | null) ?? null,
     question: parseOrNull(r.question),
     waitingReason: (r.waiting_reason as Task["waitingReason"]) ?? null,
@@ -1160,6 +1563,7 @@ function toStep(r: Row): Step {
     approvalId: (r.approval_id as string | null) ?? null,
     jobId: (r.job_id as string | null) ?? null,
     outcome: parseOrNull(r.outcome),
+    managementState: parseOrNull(r.management_state),
   };
 }
 
@@ -1168,7 +1572,7 @@ function toJob(r: Row): JobRow {
     id: String(r.id),
     taskId: String(r.task_id),
     agentId: String(r.agent_id),
-    op: String(r.op) as OpName,
+    op: String(r.op) as WorkerOpName,
     args: parse(r.args),
     status: String(r.status) as JobStatus,
     attempts: Number(r.attempts),

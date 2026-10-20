@@ -485,7 +485,7 @@ describe("agents", () => {
     expect(r.backend.events.after(0).filter((e) => e.type === "agent.updated")).toHaveLength(1);
 
     // Null puts the default back; a missing field is left alone.
-    expect((await patch({ name: null })).body.agent).toMatchObject({ name: "agent-01", color: "#22C55E" });
+    expect((await patch({ name: null })).body.agent).toMatchObject({ name: "Mochi", color: "#22C55E" });
     for (const bad of [{ name: "" }, { name: "x".repeat(25) }, { name: "ab" }, { color: "green" }, { color: "#22C55E", extra: 1 }]) {
       expect((await patch(bad)).status).toBe(400);
     }
@@ -565,6 +565,10 @@ describe("several agents", () => {
     dirs.push(dataDir);
     const r = await startBackend(dataDir, model, undefined, {}, options);
     running.push(r);
+    for (const id of options.agents.slice(1)) {
+      const created = await r.api("/api/agents", { body: { name: id, computerId: id } });
+      expect(created).toMatchObject({ status: 201, body: { agent: { id, computerId: id } } });
+    }
     const spaces: Record<string, string> = {};
     for (const id of options.online ?? options.agents) {
       spaces[id] = await tempDir(`orch-ws-${id}-`);

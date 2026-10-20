@@ -22,9 +22,9 @@ export interface Config {
   retentionDays: number;
   /** The model profile used when a task names none. */
   defaultModelProfile: string;
-  /** Agents the backend knows about, each with its own WSL distro of the same name. */
+  /** Provisioned computers, each with its own WSL distro of the same name. */
   agents: { id: string; name: string; vmId: string }[];
-  /** How many agents may work at the same time; the others' tasks wait. */
+  /** How many computers may work at the same time; the others' tasks wait. */
   maxParallel: number;
 }
 

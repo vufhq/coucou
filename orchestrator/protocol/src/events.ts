@@ -19,6 +19,7 @@ export const EVENT_TYPES = [
   "task.cancelled",
   "task.question",
   "task.answered",
+  "task.waiting_for_agents",
   "task.paused",
   "task.resumed",
   "goal.updated",
@@ -27,6 +28,9 @@ export const EVENT_TYPES = [
   "agent.heartbeat",
   "agent.status_changed",
   "agent.updated",
+  "agent.delegated",
+  "agent.reported",
+  "team.updated",
   "tool.started",
   "tool.output",
   "tool.completed",
@@ -57,6 +61,7 @@ export const EVENT_PAYLOADS = {
     .object({ questionId: z.string(), question: z.string(), options: z.array(z.string()) })
     .strict(),
   "task.answered": z.object({ questionId: z.string() }).strict(),
+  "task.waiting_for_agents": z.object({ childTaskIds: z.array(z.string()) }).strict(),
   "task.paused": z.object({}).strict(),
   "task.resumed": z.object({}).strict(),
   "goal.updated": z.object({ goalId: z.string() }).strict(),
@@ -68,6 +73,18 @@ export const EVENT_PAYLOADS = {
   "agent.status_changed": z.object({ status: z.enum(["offline", "starting", "ready", "busy", "error"]) }).strict(),
   /** The user renamed or recoloured the agent; read it again from /api/agents. */
   "agent.updated": z.object({}).strict(),
+  "agent.delegated": z
+    .object({ toAgentId: AgentId, childTaskId: z.string(), message: z.string().max(4_000) })
+    .strict(),
+  "agent.reported": z
+    .object({
+      fromAgentId: AgentId,
+      childTaskId: z.string(),
+      status: z.enum(["succeeded", "failed", "cancelled", "waiting_for_answer"]),
+      summary: z.string().max(4_000),
+    })
+    .strict(),
+  "team.updated": z.object({}).strict(),
   "tool.started": z.object({ jobId: z.string(), op: OpName, target: z.string() }).strict(),
   "tool.output": z.object({ jobId: z.string(), text: z.string().max(4_096) }).strict(),
   "tool.completed": z
@@ -111,6 +128,7 @@ export const STATUS_AFTER: Partial<Record<EventType, TaskStatus>> = {
   "task.failed": "failed",
   "task.cancelled": "cancelled",
   "task.question": "waiting_for_answer",
+  "task.waiting_for_agents": "waiting_for_agents",
   "task.paused": "paused",
   "approval.requested": "waiting_for_approval",
 };

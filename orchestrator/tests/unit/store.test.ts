@@ -142,7 +142,9 @@ describe("retention", () => {
       cancel_requested INTEGER NOT NULL DEFAULT 0, idempotency_key TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT
     )`);
-    db.exec(`INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES ('agent-01', 'Agent 01', 'wsl:agent-01', 'scripted')`);
+    db.exec(`INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES
+      ('agent-01', 'Old Mochi name', 'wsl:agent-01', 'scripted'),
+      ('agent-02', 'Old coworker', 'wsl:agent-02', 'scripted')`);
     db.exec(`INSERT INTO tasks (
       id, agent_id, prompt, status, model_profile_id, workspace, budget,
       idempotency_key, created_at, updated_at
@@ -151,20 +153,51 @@ describe("retention", () => {
       '{"maxSteps":20,"timeoutMs":600000,"opTimeoutMs":60000}',
       'old-task-key', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
     )`);
+    db.exec(`CREATE TABLE goals (
+      id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, title TEXT NOT NULL, instructions TEXT NOT NULL,
+      schedule TEXT NOT NULL, model_profile_id TEXT, status TEXT NOT NULL, next_run_at TEXT,
+      last_run_at TEXT, last_task_id TEXT, last_summary TEXT, archived INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )`);
+    db.exec(`INSERT INTO goals VALUES (
+      'old-goal', 'agent-02', 'Keep this goal', 'Still here', '{"kind":"manual"}', NULL,
+      'active', NULL, NULL, NULL, NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+    )`);
+    db.exec(`CREATE TABLE notes (
+      id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
+      task_id TEXT, created_at TEXT NOT NULL
+    )`);
+    db.exec(`INSERT INTO notes VALUES (
+      'old-note', 'agent-02', 'Keep this note', 'user', NULL, '2026-01-01T00:00:00.000Z'
+    )`);
     db.close();
     const migrated = new Store(path);
     try {
+      migrated.ensureComputer({ id: "agent-01", vmId: "wsl:agent-01" });
+      migrated.ensureComputer({ id: "agent-02", vmId: "wsl:agent-02" });
+      migrated.ensureChief({ id: "agent-01", vmId: "wsl:agent-01", modelProfileId: "scripted" });
       expect(migrated.agent("agent-01")?.health).toBeNull();
       expect(migrated.agent("agent-01")).toMatchObject({
+        name: "Old Mochi name",
+        kind: "chief",
+        computerId: "agent-01",
         paused: false,
         limits: { tasksPerDay: 30, stepsPerDay: 300 },
+      });
+      expect(migrated.agent("agent-02")).toMatchObject({
+        name: "Old coworker",
+        kind: "coworker",
+        computerId: "agent-02",
       });
       expect(migrated.task("old-task")).toMatchObject({
         prompt: "keep me",
         source: "user",
+        parentTaskId: null,
         goalId: null,
         question: null,
       });
+      expect(migrated.goal("old-goal")?.title).toBe("Keep this goal");
+      expect(migrated.notes("agent-02")[0]?.text).toBe("Keep this note");
       migrated.setAgentHealth("agent-01", { diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
       expect(migrated.agent("agent-01")?.health).toMatchObject({ diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
     } finally {

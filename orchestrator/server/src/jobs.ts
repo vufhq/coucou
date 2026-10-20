@@ -3,7 +3,7 @@
 // runner owns those.
 
 import { EventEmitter } from "node:events";
-import type { JobOutcome, OpName } from "@coucou-orchestrator/protocol";
+import type { JobOutcome, WorkerOpName } from "@coucou-orchestrator/protocol";
 import type { Store } from "./store.ts";
 
 export class JobSignals {
@@ -63,7 +63,7 @@ export class Downloads {
 export async function runBackendJob(
   store: Store,
   signals: JobSignals,
-  job: { taskId: string; agentId: string; op: OpName; args: Record<string, unknown> },
+  job: { taskId: string; agentId: string; op: WorkerOpName; args: Record<string, unknown> },
   timeoutMs: number,
 ): Promise<(JobOutcome & { jobId: string }) | null> {
   const row = store.createJob({ ...job, deadlineMs: timeoutMs });

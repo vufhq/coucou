@@ -12,6 +12,7 @@ export const TASK_STATUSES = [
   "running",
   "waiting_for_approval",
   "waiting_for_answer",
+  "waiting_for_agents",
   "paused",
   "succeeded",
   "failed",
@@ -81,7 +82,8 @@ export const Task = z.object({
   agentId: AgentId,
   prompt: z.string(),
   status: TaskStatus,
-  source: z.enum(["user", "chat", "goal"]),
+  source: z.enum(["user", "chat", "goal", "delegated"]),
+  parentTaskId: z.string().nullable(),
   goalId: z.string().nullable(),
   question: TaskQuestion.nullable(),
   waitingReason: z.enum(["agent_paused", "daily_limit"]).nullable(),
@@ -101,6 +103,29 @@ export const Agent = z.object({
   id: AgentId,
   name: z.string(),
   vmId: z.string(),
+  kind: z.enum(["chief", "coworker"]),
+  role: z.string().nullable(),
+  outfit: z
+    .enum([
+      "none",
+      "partyHat",
+      "beanie",
+      "crown",
+      "sunglasses",
+      "roundGlasses",
+      "bow",
+      "scarf",
+      "witchHat",
+      "pumpkin",
+      "santaHat",
+      "bunnyEars",
+    ])
+    .nullable(),
+  teamId: z.string().nullable(),
+  order: z.number(),
+  computerId: AgentId,
+  createdBy: z.enum(["system", "user", "chief"]),
+  persona: z.string().nullable(),
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
   paused: z.boolean(),
   limits: z.object({
@@ -126,6 +151,28 @@ export const Agent = z.object({
     .nullable(),
 });
 export type Agent = z.infer<typeof Agent>;
+
+export const AgentOutfit = Agent.shape.outfit.unwrap();
+export type AgentOutfit = z.infer<typeof AgentOutfit>;
+
+export const Team = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(40),
+  order: z.number(),
+  createdAt: z.string(),
+});
+export type Team = z.infer<typeof Team>;
+
+export const Computer = z.object({
+  id: AgentId,
+  vmId: z.string(),
+  status: z.enum(["offline", "starting", "ready", "busy", "error"]),
+  lastSeenAt: z.string().nullable(),
+  health: Agent.shape.health,
+  problems: z.array(z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser"])),
+  agentIds: z.array(AgentId),
+});
+export type Computer = z.infer<typeof Computer>;
 
 /**
  * What is wrong with an agent's computer, if anything, as a code Coucou
@@ -154,25 +201,52 @@ export const TaskAnswer = z
   .strict();
 export type TaskAnswer = z.infer<typeof TaskAnswer>;
 
-/** What the user may change about an agent: its name and colour. Null puts the default back. */
+const AgentName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(24)
+  .regex(/^[^\p{Cc}\p{Cf}]+$/u, "no control characters");
+const AgentColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "a colour like #22C55E");
+const AgentRole = z.string().trim().min(1).max(60);
+const AgentPersona = z.string().trim().min(1).max(1_000);
+
+/** What the user may change about an agent. Null puts the default back. */
 export const AgentIdentity = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1)
-      .max(24)
-      .regex(/^[^\p{Cc}\p{Cf}]+$/u, "no control characters")
-      .nullable()
-      .optional(),
-    color: z
-      .string()
-      .regex(/^#[0-9A-Fa-f]{6}$/, "a colour like #22C55E")
-      .nullable()
-      .optional(),
+    name: AgentName.nullable().optional(),
+    color: AgentColor.nullable().optional(),
+    role: AgentRole.nullable().optional(),
+    outfit: AgentOutfit.nullable().optional(),
+    teamId: z.string().min(1).nullable().optional(),
+    order: z.number().int().min(0).optional(),
+    computerId: AgentId.optional(),
+    persona: AgentPersona.nullable().optional(),
   })
   .strict();
 export type AgentIdentity = z.infer<typeof AgentIdentity>;
+
+export const CreateAgentRequest = z
+  .object({
+    name: AgentName,
+    role: AgentRole.optional(),
+    color: AgentColor.optional(),
+    outfit: AgentOutfit.optional(),
+    teamId: z.string().min(1).optional(),
+    computerId: AgentId.optional(),
+    persona: AgentPersona.optional(),
+  })
+  .strict();
+export type CreateAgentRequest = z.infer<typeof CreateAgentRequest>;
+
+export const CreateTeamRequest = z.object({ name: z.string().trim().min(1).max(40) }).strict();
+export const UpdateTeamRequest = z
+  .object({
+    name: z.string().trim().min(1).max(40).optional(),
+    order: z.number().int().min(0).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "at least one field is required");
 
 export const ApprovalDecision = z.object({
   approvalId: z.string().min(1).max(64),

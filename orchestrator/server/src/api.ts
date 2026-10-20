@@ -10,12 +10,15 @@ import {
   AgentIdentity,
   AgentLimits,
   ApprovalDecision,
+  CreateAgentRequest,
   CreateGoalRequest,
   CreateNoteRequest,
+  CreateTeamRequest,
   CreateTaskRequest,
   GoalRunRequest,
   RelPath,
   TaskAnswer,
+  UpdateTeamRequest,
   UpdateGoalRequest,
   type Agent,
   type AgentProblem,
@@ -48,8 +51,13 @@ const TaskQuery = z.object({
   active: z.enum(["0", "1"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   agentId: AgentId.optional(),
-  source: z.enum(["user", "chat", "goal"]).optional(),
+  source: z
+    .string()
+    .transform((value) => value.split(","))
+    .pipe(z.array(z.enum(["user", "chat", "goal", "delegated"])).min(1))
+    .optional(),
   goalId: z.string().min(1).optional(),
+  parentTaskId: z.string().min(1).optional(),
 });
 
 /** Below this, the agent's disk is reported as nearly full. */
@@ -113,6 +121,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     return running;
   };
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
+  const chiefId = () => store.agents().find((agent) => agent.kind === "chief")!.id;
 
   app.addHook("onRequest", async (req, reply) => {
     if (!bearerMatches(req.headers.authorization, deps.token)) {
@@ -145,6 +154,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
         agentId: q.data.agentId,
         source: q.data.source,
         goalId: q.data.goalId,
+        parentTaskId: q.data.parentTaskId,
       }),
       lastSeq,
     };
@@ -160,7 +170,13 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
       op: s.op,
       status: s.outcome?.status ?? (s.approvalId && !s.jobId ? "waiting_for_approval" : "running"),
     }));
-    return { task, steps, approvals, events: events.after(0, { taskId: task.id, limit: 500 }) };
+    return {
+      task,
+      children: store.childTasks(task.id),
+      steps,
+      approvals,
+      events: events.after(0, { taskId: task.id, limit: 500 }),
+    };
   });
 
   app.post<{ Params: { id: string } }>("/api/tasks/:id/cancel", async (req, reply) => {
@@ -219,17 +235,85 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
         problems: agentProblems(agent, agent.status === "offline" ? await vmRunning(agent.vmId) : null),
       })),
     );
-    return { agents, approvals: store.pendingApprovals() };
+    const computers = await Promise.all(
+      store.computers().map(async (computer) => {
+        const probe = computer.status === "offline" ? await vmRunning(computer.vmId) : null;
+        const problems: AgentProblem[] = [];
+        if (computer.status === "offline") problems.push(probe === false ? "vm_stopped" : "worker_down");
+        if (computer.status !== "offline" && computer.health?.diskTotalBytes &&
+            computer.health.diskFreeBytes < LOW_DISK_BYTES) problems.push("low_disk");
+        if (computer.status !== "offline" && computer.health && !computer.health.browserReady) problems.push("no_browser");
+        return { ...computer, problems };
+      }),
+    );
+    return { agents, teams: store.teams(), computers, approvals: store.pendingApprovals() };
   });
 
   // The user renames or recolours an agent; every window hears it.
   app.patch<{ Params: { id: string } }>("/api/agents/:id", async (req, reply) => {
     const body = AgentIdentity.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
-    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    const current = store.agent(req.params.id);
+    if (!current) return reply.code(404).send({ error: "not_found" });
+    if (body.data.teamId && !store.team(body.data.teamId)) return bad(reply, `unknown team ${body.data.teamId}`);
+    if (body.data.computerId && !store.computer(body.data.computerId)) {
+      return bad(reply, `unknown computer ${body.data.computerId}`);
+    }
     store.setAgentIdentity(req.params.id, body.data);
     events.emit("agent.updated", req.params.id, null, {});
     return { agent: store.agent(req.params.id) };
+  });
+
+  app.post("/api/agents", async (req, reply) => {
+    const body = CreateAgentRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (store.agents().length >= 12) return reply.code(409).send({ error: "too_many_agents" });
+    if (body.data.teamId && !store.team(body.data.teamId)) return bad(reply, `unknown team ${body.data.teamId}`);
+    const computerId =
+      body.data.computerId ??
+      store.computers().sort((a, b) => a.agentIds.length - b.agentIds.length || a.id.localeCompare(b.id))[0]?.id;
+    if (!computerId || !store.computer(computerId)) return bad(reply, `unknown computer ${String(computerId)}`);
+    const agent = store.createAgent({
+      ...body.data,
+      computerId,
+      createdBy: "user",
+      modelProfileId: store.agents()[0]?.modelProfileId ?? "",
+    });
+    events.emit("agent.updated", agent.id, null, {});
+    return reply.code(201).send({ agent });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/agents/:id", async (req, reply) => {
+    const agent = store.agent(req.params.id);
+    if (!agent) return reply.code(404).send({ error: "not_found" });
+    if (agent.kind === "chief") return reply.code(409).send({ error: "chief" });
+    runner.retireAgent(agent.id);
+    return { ok: true };
+  });
+
+  app.post("/api/teams", async (req, reply) => {
+    const body = CreateTeamRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    const team = store.createTeam(body.data.name);
+    events.emit("team.updated", chiefId(), null, {});
+    return reply.code(201).send({ team });
+  });
+
+  app.patch<{ Params: { id: string } }>("/api/teams/:id", async (req, reply) => {
+    const body = UpdateTeamRequest.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    const team = store.updateTeam(req.params.id, body.data);
+    if (!team) return reply.code(404).send({ error: "not_found" });
+    events.emit("team.updated", chiefId(), null, {});
+    return { team };
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/teams/:id", async (req, reply) => {
+    const members = store.agents().filter((agent) => agent.teamId === req.params.id);
+    if (!store.deleteTeam(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    for (const member of members) events.emit("agent.updated", member.id, null, {});
+    events.emit("team.updated", chiefId(), null, {});
+    return { ok: true };
   });
 
   app.post<{ Params: { id: string } }>("/api/agents/:id/pause", async (req, reply) => {
@@ -348,7 +432,9 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     const agentId = AgentId.safeParse(req.params.id);
     const task = req.query.taskId ? store.task(req.query.taskId) : null;
     if (!agentId.success || !task || task.agentId !== agentId.data) return reply.code(404).send({ error: "not_found" });
-    const outcome = await runBackendJob(store, signals, { taskId: task.id, agentId: task.agentId, op: "fs.list", args: {} }, fileTimeoutMs);
+    const computerId = store.agent(task.agentId)?.computerId;
+    if (!computerId) return reply.code(404).send({ error: "not_found" });
+    const outcome = await runBackendJob(store, signals, { taskId: task.id, agentId: computerId, op: "fs.list", args: {} }, fileTimeoutMs);
     if (!outcome) return reply.code(504).send({ error: "worker_unavailable" });
     if (outcome.status !== "succeeded") return reply.code(502).send({ error: "failed", message: outcome.error?.message });
     return { taskId: task.id, files: JSON.parse(outcome.result ?? "[]") as unknown };
@@ -365,7 +451,12 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
       const ext = name.includes(".") ? (name.split(".").pop() ?? "").toLowerCase() : "";
       const disposition = `attachment; filename="${name.replace(/"/g, "")}"`;
       const job = (op: "fs.fetch" | "fs.read") =>
-        runBackendJob(store, signals, { taskId: task.id, agentId: task.agentId, op, args: { path: path.data } }, fileTimeoutMs);
+        runBackendJob(
+          store,
+          signals,
+          { taskId: task.id, agentId: store.agent(task.agentId)?.computerId ?? "", op, args: { path: path.data } },
+          fileTimeoutMs,
+        );
 
       let outcome = await job("fs.fetch");
       if (outcome?.status === "failed" && outcome.error?.code === "invalid") {

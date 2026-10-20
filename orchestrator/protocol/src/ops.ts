@@ -3,6 +3,7 @@
 // before touching anything: a bug on either side cannot widen the set.
 
 import { z } from "zod";
+import { AgentId, AgentOutfit } from "./tasks.ts";
 
 /**
  * A path inside the task's own folder: relative, forward slashes, no `..`,
@@ -17,7 +18,7 @@ export const RelPath = z
 
 export const HttpUrl = z.url({ protocol: /^https?$/, error: "http or https URL" }).max(2_000);
 
-export const OPS = {
+export const WORKER_OPS = {
   "browser.navigate": z.object({ url: HttpUrl }).strict(),
   "browser.extract_text": z.object({ maxChars: z.number().int().min(100).max(50_000).optional() }).strict(),
   "browser.screenshot": z.object({ name: RelPath.refine((p) => p.endsWith(".png"), "must end in .png") }).strict(),
@@ -30,9 +31,78 @@ export const OPS = {
   "terminal.run": z.object({ argv: z.array(z.string().min(1).max(1_000)).min(1).max(32) }).strict(),
 } as const;
 
+const Member = z
+  .object({
+    name: z.string().trim().min(1).max(40),
+    role: z.string().trim().min(1).max(60),
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    outfit: AgentOutfit.optional(),
+    persona: z.string().trim().min(1).max(1_000),
+    computerId: AgentId.optional(),
+  })
+  .strict();
+
+const OrganizeChange = z.union([
+  z.object({ renameTeam: z.object({ teamId: z.string().min(1), name: z.string().trim().min(1).max(40) }).strict() }).strict(),
+  z
+    .object({
+      moveAgent: z.object({ agentId: AgentId, teamId: z.string().min(1).nullable(), order: z.number().int().min(0).optional() }).strict(),
+    })
+    .strict(),
+  z.object({ setRole: z.object({ agentId: AgentId, role: z.string().trim().min(1).max(60) }).strict() }).strict(),
+  z.object({ renameAgent: z.object({ agentId: AgentId, name: z.string().trim().min(1).max(40) }).strict() }).strict(),
+  z
+    .object({
+      restyle: z
+        .object({
+          agentId: AgentId,
+          color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+          outfit: AgentOutfit.optional(),
+        })
+        .strict()
+        .refine((value) => value.color !== undefined || value.outfit !== undefined, "color or outfit is required"),
+    })
+    .strict(),
+]);
+
+export const MANAGEMENT_OPS = {
+  "team.propose": z
+    .object({
+      team: z.union([
+        z.object({ name: z.string().trim().min(1).max(40) }).strict(),
+        z.object({ id: z.string().min(1) }).strict(),
+      ]),
+      members: z.array(Member).min(1).max(8),
+    })
+    .strict(),
+  "team.organize": z.object({ changes: z.array(OrganizeChange).min(1).max(20) }).strict(),
+  "team.retire": z.object({ agentId: AgentId }).strict(),
+  "agent.delegate": z
+    .object({
+      assignments: z
+        .array(z.object({ agentId: AgentId, message: z.string().trim().min(1).max(4_000) }).strict())
+        .min(1)
+        .max(6),
+    })
+    .strict(),
+  "agent.answer": z.object({ taskId: z.string().min(1), answer: z.string().trim().min(1).max(2_000) }).strict(),
+  "agent.wait": z.object({ taskIds: z.array(z.string().min(1)).max(12).optional() }).strict(),
+} as const;
+
+export const OPS = { ...WORKER_OPS, ...MANAGEMENT_OPS } as const;
+
+export type WorkerOpName = keyof typeof WORKER_OPS;
+/** Kept worker-only: existing workers send this list in hello unchanged. */
+export const OP_NAMES = Object.keys(WORKER_OPS) as WorkerOpName[];
+export const WorkerOpName = z.enum(OP_NAMES as [WorkerOpName, ...WorkerOpName[]]);
+
+export type ManagementOpName = keyof typeof MANAGEMENT_OPS;
+export const MANAGEMENT_OP_NAMES = Object.keys(MANAGEMENT_OPS) as ManagementOpName[];
+export const MANAGEMENT_OP_SET: ReadonlySet<OpName> = new Set(MANAGEMENT_OP_NAMES);
+
 export type OpName = keyof typeof OPS;
-export const OP_NAMES = Object.keys(OPS) as OpName[];
-export const OpName = z.enum(OP_NAMES as [OpName, ...OpName[]]);
+export const ALL_OP_NAMES = Object.keys(OPS) as OpName[];
+export const OpName = z.enum(ALL_OP_NAMES as [OpName, ...OpName[]]);
 
 export type OpArgs<N extends OpName> = z.infer<(typeof OPS)[N]>;
 
@@ -42,7 +112,7 @@ export interface Operation {
 }
 
 /** Operations that change nothing: safe to run again after a lost worker. */
-export const READ_ONLY_OPS: ReadonlySet<OpName> = new Set([
+export const READ_ONLY_OPS: ReadonlySet<WorkerOpName> = new Set([
   "browser.navigate",
   "browser.extract_text",
   "fs.list",
@@ -57,7 +127,7 @@ export const READ_ONLY_OPS: ReadonlySet<OpName> = new Set([
 export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch"]);
 
 /** What a model may propose. */
-export const MODEL_OP_NAMES = OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op));
+export const MODEL_OP_NAMES = ALL_OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op));
 
 export type ParsedOp = { ok: true; op: Operation } | { ok: false; error: string };
 
