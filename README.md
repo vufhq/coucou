@@ -216,6 +216,15 @@ Everything else, troubleshooting included, is in [docs/IPHONE.md](docs/IPHONE.md
 
 Everything else, troubleshooting included, is in [`android/README.md`](android/README.md).
 
+### Homebrew (macOS)
+
+```bash
+brew tap louis-cfm/coucou https://github.com/Louis-CFM/coucou
+brew install --cask coucou
+```
+
+It installs the same signed and notarized GitHub build as the download below. Coucou then updates itself from the notch; `brew upgrade --cask --greedy coucou` works too.
+
 ### Download for macOS
 
 1. Grab the latest `Coucou.zip` from [Releases](https://github.com/Louis-CFM/coucou/releases).

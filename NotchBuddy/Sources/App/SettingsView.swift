@@ -436,6 +436,10 @@ struct SettingsView: View {
                 .padding(6)
         }
 
+        #if !APPSTORE
+        UpdateSettingsSection()
+        #endif
+
         GroupBox(String(localized: "Weekly recap")) {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(String(localized: "Keep a history of my coding sessions"), isOn: $state.recapEnabled)

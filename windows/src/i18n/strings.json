@@ -827,6 +827,17 @@
    "ru": "Чат — другие провайдеры",
    "id": "Chat — penyedia lain"
   },
+  "Check now": {
+   "zh-Hans": "立即检查",
+   "hi": "अभी जाँचें",
+   "es": "Comprobar ahora",
+   "ar": "التحقق الآن",
+   "fr": "Vérifier maintenant",
+   "bn": "এখনই দেখুন",
+   "pt-BR": "Verificar agora",
+   "ru": "Проверить сейчас",
+   "id": "Periksa sekarang"
+  },
   "Checking for new messages every 20 s.": {
    "zh-Hans": "每 20 秒检查一次新消息。",
    "hi": "हर 20 सेकंड में नए संदेश जाँचे जा रहे हैं।",
@@ -848,6 +859,17 @@
    "pt-BR": "Verificando o download…",
    "ru": "Проверка загрузки…",
    "id": "Memeriksa unduhan…"
+  },
+  "Checking the signature…": {
+   "zh-Hans": "正在验证签名…",
+   "hi": "सिग्नेचर जाँचा जा रहा है…",
+   "es": "Comprobando la firma…",
+   "ar": "جارٍ التحقق من التوقيع…",
+   "fr": "Vérification de la signature…",
+   "bn": "স্বাক্ষর যাচাই হচ্ছে…",
+   "pt-BR": "Verificando a assinatura…",
+   "ru": "Проверка подписи…",
+   "id": "Memeriksa tanda tangan…"
   },
   "Choose the tools you use. Coucou only shows what you declare here.": {
    "zh-Hans": "选择你使用的工具。Coucou 只显示你在这里声明的内容。",
@@ -1443,6 +1465,17 @@
    "ru": "Coucou скачивает GOWA, шлюз с открытым кодом, с его страницы на GitHub (около 15 МБ, один раз), проверяет и запускает. Затем отсканируйте QR-код телефоном. Терминал не нужен.",
    "id": "Coucou mengunduh GOWA, gateway open source, dari halaman GitHub-nya (sekitar 15 MB, sekali saja), memeriksanya lalu menjalankannya. Lalu pindai kode QR dengan ponselmu. Tanpa Terminal."
   },
+  "Coucou is up to date": {
+   "zh-Hans": "Coucou 已是最新版本",
+   "hi": "Coucou अप-टू-डेट है",
+   "es": "Coucou está actualizado",
+   "ar": "Coucou محدَّث",
+   "fr": "Coucou est à jour",
+   "bn": "Coucou হালনাগাদ আছে",
+   "pt-BR": "O Coucou está atualizado",
+   "ru": "Coucou обновлён",
+   "id": "Coucou sudah terbaru"
+  },
   "Coucou is writing the transcript, person by person…": {
    "zh-Hans": "Coucou 正在按人逐句写转写…",
    "hi": "Coucou हर व्यक्ति के हिसाब से ट्रांसक्रिप्ट लिख रहा है…",
@@ -1453,6 +1486,28 @@
    "pt-BR": "O Coucou está escrevendo a transcrição, pessoa por pessoa…",
    "ru": "Coucou составляет расшифровку по участникам…",
    "id": "Coucou sedang menulis transkrip, per orang…"
+  },
+  "Coucou isn’t in your Applications folder, so it can’t replace itself: get the new version on GitHub.": {
+   "zh-Hans": "Coucou 不在“应用程序”文件夹中，无法自行替换：请在 GitHub 上获取新版本。",
+   "hi": "Coucou आपके Applications फ़ोल्डर में नहीं है, इसलिए खुद को बदल नहीं सकता: नया वर्ज़न GitHub से लें।",
+   "es": "Coucou no está en tu carpeta Aplicaciones, así que no puede reemplazarse: descarga la nueva versión en GitHub.",
+   "ar": "Coucou ليس في مجلد التطبيقات، لذا لا يمكنه استبدال نفسه: احصل على الإصدار الجديد من GitHub.",
+   "fr": "Coucou n’est pas dans ton dossier Applications, il ne peut donc pas se remplacer : récupère la nouvelle version sur GitHub.",
+   "bn": "Coucou আপনার Applications ফোল্ডারে নেই, তাই নিজেকে বদলাতে পারে না: নতুন সংস্করণ GitHub থেকে নিন।",
+   "pt-BR": "O Coucou não está na sua pasta Aplicativos, então não pode se substituir: baixe a nova versão no GitHub.",
+   "ru": "Coucou не в папке «Программы», поэтому не может заменить себя: скачайте новую версию на GitHub.",
+   "id": "Coucou tidak ada di folder Aplikasi, jadi tidak bisa mengganti dirinya: ambil versi baru di GitHub."
+  },
+  "Coucou looks at its own releases on GitHub a few times a day. An update is installed only after your click, once Apple’s signature and notarization check out.": {
+   "zh-Hans": "Coucou 每天会在 GitHub 上查看几次自己的版本。只有在你点击后、并验证 Apple 签名和公证后才会安装更新。",
+   "hi": "Coucou दिन में कुछ बार GitHub पर अपने रिलीज़ देखता है। अपडेट सिर्फ़ आपके क्लिक के बाद, Apple का सिग्नेचर और नोटराइज़ेशन जाँचकर ही इंस्टॉल होता है।",
+   "es": "Coucou revisa sus propias versiones en GitHub unas veces al día. Una actualización solo se instala tras tu clic, después de verificar la firma y la notarización de Apple.",
+   "ar": "يتحقق Coucou من إصداراته على GitHub بضع مرات يوميًا. لا يُثبَّت أي تحديث إلا بعد نقرتك، وبعد التحقق من توقيع Apple وتوثيقها.",
+   "fr": "Coucou regarde ses propres versions sur GitHub quelques fois par jour. Une mise à jour ne s’installe qu’après ton clic, une fois la signature et la notarisation Apple vérifiées.",
+   "bn": "Coucou দিনে কয়েকবার GitHub-এ নিজের রিলিজ দেখে। আপনার ক্লিকের পরে, Apple-এর স্বাক্ষর ও নোটারাইজেশন যাচাই করেই কেবল আপডেট ইনস্টল হয়।",
+   "pt-BR": "O Coucou verifica as próprias versões no GitHub algumas vezes por dia. Uma atualização só é instalada depois do seu clique, após conferir a assinatura e a notarização da Apple.",
+   "ru": "Coucou несколько раз в день проверяет свои релизы на GitHub. Обновление устанавливается только после вашего нажатия и проверки подписи и нотаризации Apple.",
+   "id": "Coucou memeriksa rilisnya sendiri di GitHub beberapa kali sehari. Pembaruan hanya dipasang setelah kamu klik, setelah tanda tangan dan notarisasi Apple diperiksa."
   },
   "Coucou only talks to the gateway on this Mac. Messages stay in memory, are never logged or saved, and are forgotten when Coucou quits. No photo or media is ever downloaded.": {
    "zh-Hans": "Coucou 只与这台 Mac 上的网关通信。消息只保存在内存中，从不记录或保存，退出 Coucou 时即被清除。从不下载任何照片或媒体。",
@@ -1509,6 +1564,17 @@
    "ru": "Coucou записывает звонки текстом прямо на Mac с помощью Parakeet и различает голоса второй небольшой моделью. Обе скачиваются один раз (около 650 МБ), дальше всё работает без сети.",
    "id": "Coucou menulis panggilanmu di Mac dengan Parakeet, dan membedakan suara dengan model kecil kedua. Keduanya diunduh sekali (sekitar 650 MB), lalu semuanya bekerja luring."
   },
+  "Coucou {0} is out": {
+   "zh-Hans": "Coucou {0} 已发布",
+   "hi": "Coucou {0} आ गया है",
+   "es": "Ya salió Coucou {0}",
+   "ar": "صدر Coucou {0}",
+   "fr": "Coucou {0} est sorti",
+   "bn": "Coucou {0} এসে গেছে",
+   "pt-BR": "Saiu o Coucou {0}",
+   "ru": "Вышел Coucou {0}",
+   "id": "Coucou {0} sudah rilis"
+  },
   "Coucou’s webhook port": {
    "zh-Hans": "Coucou 的 Webhook 端口",
    "hi": "Coucou का वेबहुक पोर्ट",
@@ -1519,6 +1585,17 @@
    "pt-BR": "Porta do webhook do Coucou",
    "ru": "Порт вебхука Coucou",
    "id": "Port webhook Coucou"
+  },
+  "Couldn’t reach GitHub": {
+   "zh-Hans": "无法连接 GitHub",
+   "hi": "GitHub से संपर्क नहीं हो सका",
+   "es": "No se pudo contactar con GitHub",
+   "ar": "تعذّر الوصول إلى GitHub",
+   "fr": "GitHub ne répond pas",
+   "bn": "GitHub-এ পৌঁছানো যায়নি",
+   "pt-BR": "Não foi possível acessar o GitHub",
+   "ru": "Не удалось связаться с GitHub",
+   "id": "Tidak dapat menghubungi GitHub"
   },
   "Counted on your Mac, never sent anywhere.": {
    "zh-Hans": "在你的 Mac 上统计，从不发送。",
@@ -1827,6 +1904,17 @@
    "pt-BR": "Baixando ({0} MB)…",
    "ru": "Загрузка ({0} МБ)…",
    "id": "Mengunduh ({0} MB)…"
+  },
+  "Downloading from GitHub…": {
+   "zh-Hans": "正在从 GitHub 下载…",
+   "hi": "GitHub से डाउनलोड हो रहा है…",
+   "es": "Descargando desde GitHub…",
+   "ar": "جارٍ التنزيل من GitHub…",
+   "fr": "Téléchargement depuis GitHub…",
+   "bn": "GitHub থেকে ডাউনলোড হচ্ছে…",
+   "pt-BR": "Baixando do GitHub…",
+   "ru": "Загрузка с GitHub…",
+   "id": "Mengunduh dari GitHub…"
   },
   "Draft": {
    "zh-Hans": "草稿",
@@ -2223,6 +2311,28 @@
    "pt-BR": "Baixar o Spotify",
    "ru": "Скачать Spotify",
    "id": "Dapatkan Spotify"
+  },
+  "Get it on GitHub": {
+   "zh-Hans": "前往 GitHub",
+   "hi": "GitHub खोलें",
+   "es": "Abrir GitHub",
+   "ar": "فتح GitHub",
+   "fr": "Ouvrir GitHub",
+   "bn": "GitHub খুলুন",
+   "pt-BR": "Abrir o GitHub",
+   "ru": "Открыть GitHub",
+   "id": "Buka GitHub"
+  },
+  "Get new versions from the notch?": {
+   "zh-Hans": "在刘海里获取新版本？",
+   "hi": "नए वर्ज़न नॉच में पाएँ?",
+   "es": "¿Recibir las nuevas versiones en el notch?",
+   "ar": "هل تريد تلقي الإصدارات الجديدة في النوتش؟",
+   "fr": "Recevoir les nouvelles versions dans le notch ?",
+   "bn": "নতুন সংস্করণ নচে পেতে চান?",
+   "pt-BR": "Receber as novas versões no notch?",
+   "ru": "Получать новые версии прямо в вырезе?",
+   "id": "Dapatkan versi baru dari notch?"
   },
   "GitHub Copilot CLI hooks": {
    "zh-Hans": "GitHub Copilot CLI 钩子",
@@ -2708,6 +2818,17 @@
    "ru": "Установить ретранслятор",
    "id": "Pasang relay"
   },
+  "Install {0}": {
+   "zh-Hans": "安装 {0}",
+   "hi": "{0} इंस्टॉल करें",
+   "es": "Instalar la {0}",
+   "ar": "تثبيت {0}",
+   "fr": "Installer la {0}",
+   "bn": "{0} ইনস্টল করুন",
+   "pt-BR": "Instalar a {0}",
+   "ru": "Установить {0}",
+   "id": "Pasang {0}"
+  },
   "Installed": {
    "zh-Hans": "已安装",
    "hi": "इंस्टॉल है",
@@ -2719,6 +2840,17 @@
    "ru": "Установлен",
    "id": "Terpasang"
   },
+  "Installed: quit and reopen Coucou to use the new version.": {
+   "zh-Hans": "已安装：退出并重新打开 Coucou 即可使用新版本。",
+   "hi": "इंस्टॉल हो गया: नया वर्ज़न इस्तेमाल करने के लिए Coucou बंद करके फिर खोलें।",
+   "es": "Instalada: cierra y vuelve a abrir Coucou para usar la nueva versión.",
+   "ar": "تم التثبيت: أغلق Coucou وأعد فتحه لاستخدام الإصدار الجديد.",
+   "fr": "Installée : quitte et rouvre Coucou pour utiliser la nouvelle version.",
+   "bn": "ইনস্টল হয়েছে: নতুন সংস্করণ ব্যবহার করতে Coucou বন্ধ করে আবার খুলুন।",
+   "pt-BR": "Instalada: feche e abra o Coucou de novo para usar a nova versão.",
+   "ru": "Установлено: перезапустите Coucou, чтобы использовать новую версию.",
+   "id": "Terpasang: tutup lalu buka lagi Coucou untuk memakai versi baru."
+  },
   "Installing and starting…": {
    "zh-Hans": "正在安装并启动…",
    "hi": "इंस्टॉल और चालू हो रहा है…",
@@ -2729,6 +2861,17 @@
    "pt-BR": "Instalando e iniciando…",
    "ru": "Установка и запуск…",
    "id": "Memasang dan menjalankan…"
+  },
+  "Installing…": {
+   "zh-Hans": "正在安装…",
+   "hi": "इंस्टॉल हो रहा है…",
+   "es": "Instalando…",
+   "ar": "جارٍ التثبيت…",
+   "fr": "Installation…",
+   "bn": "ইনস্টল হচ্ছে…",
+   "pt-BR": "Instalando…",
+   "ru": "Установка…",
+   "id": "Memasang…"
   },
   "Integrations": {
    "zh-Hans": "集成",
@@ -2872,6 +3015,17 @@
    "pt-BR": "Último ditado colado",
    "ru": "Последняя диктовка вставлена",
    "id": "Dikte terakhir ditempel"
+  },
+  "Later": {
+   "zh-Hans": "稍后",
+   "hi": "बाद में",
+   "es": "Más tarde",
+   "ar": "لاحقًا",
+   "fr": "Plus tard",
+   "bn": "পরে",
+   "pt-BR": "Depois",
+   "ru": "Позже",
+   "id": "Nanti"
   },
   "Launch at Mac startup": {
    "zh-Hans": "在 Mac 启动时自动启动",
@@ -3247,6 +3401,17 @@
    "ru": "Мочи и ваш Mac",
    "id": "Mochi dan Mac-mu"
   },
+  "Mochi checks Coucou’s releases on GitHub a few times a day and tells you when one is out. Nothing about you is sent.": {
+   "zh-Hans": "Mochi 每天会在 GitHub 上查看几次 Coucou 的版本，有新版本时告诉你。不会发送任何关于你的信息。",
+   "hi": "Mochi दिन में कुछ बार GitHub पर Coucou के रिलीज़ देखता है और नया आने पर बताता है। आपके बारे में कुछ नहीं भेजा जाता।",
+   "es": "Mochi revisa las versiones de Coucou en GitHub unas veces al día y te avisa cuando sale una. No se envía nada sobre ti.",
+   "ar": "يتحقق Mochi من إصدارات Coucou على GitHub بضع مرات يوميًا ويخبرك عند صدور إصدار جديد. لا يُرسَل أي شيء عنك.",
+   "fr": "Mochi regarde les versions de Coucou sur GitHub quelques fois par jour et te prévient quand il y en a une. Rien sur toi n’est envoyé.",
+   "bn": "Mochi দিনে কয়েকবার GitHub-এ Coucou-র রিলিজ দেখে এবং নতুন এলে জানায়। আপনার সম্পর্কে কিছুই পাঠানো হয় না।",
+   "pt-BR": "O Mochi verifica as versões do Coucou no GitHub algumas vezes por dia e avisa quando sai uma. Nada sobre você é enviado.",
+   "ru": "Mochi несколько раз в день проверяет релизы Coucou на GitHub и сообщает о новых. О вас ничего не отправляется.",
+   "id": "Mochi memeriksa rilis Coucou di GitHub beberapa kali sehari dan memberi tahu saat ada yang baru. Tidak ada data tentangmu yang dikirim."
+  },
   "Mochi reacts to your Mac": {
    "zh-Hans": "Mochi 会对你的 Mac 做出反应",
    "hi": "मोची आपके Mac पर प्रतिक्रिया देता है",
@@ -3422,6 +3587,17 @@
    "pt-BR": "Requer Apple silicon",
    "ru": "Нужен Mac с Apple silicon",
    "id": "Perlu Apple silicon"
+  },
+  "Needs input": {
+   "zh-Hans": "需要输入",
+   "hi": "इनपुट चाहिए",
+   "es": "Necesita una respuesta",
+   "ar": "يحتاج إلى إدخال",
+   "fr": "Réponse attendue",
+   "bn": "ইনপুট প্রয়োজন",
+   "pt-BR": "Aguardando resposta",
+   "ru": "Нужен ответ",
+   "id": "Perlu masukan"
   },
   "New conversation": {
    "zh-Hans": "新建对话",
@@ -3697,6 +3873,17 @@
    "pt-BR": "Sem campo de texto aqui? Suas palavras foram copiadas: clique onde quiser e pressione ⌘V.",
    "ru": "Здесь нет текстового поля? Слова скопированы: щёлкните, куда нужно, и нажмите ⌘V.",
    "id": "Tidak ada kolom teks di sini? Kata-katamu sudah disalin: klik di tempat yang kamu mau lalu tekan ⌘V."
+  },
+  "No thanks": {
+   "zh-Hans": "不用了",
+   "hi": "नहीं, धन्यवाद",
+   "es": "No, gracias",
+   "ar": "لا، شكرًا",
+   "fr": "Non merci",
+   "bn": "না, ধন্যবাদ",
+   "pt-BR": "Não, obrigado",
+   "ru": "Нет, спасибо",
+   "id": "Tidak, terima kasih"
   },
   "No word yet. Add the names, brands and jargon Coucou gets wrong.": {
    "zh-Hans": "还没有词语。添加 Coucou 写错的名字、品牌和术语。",
@@ -5073,6 +5260,17 @@
    "ru": "Перезапустить Coucou",
    "id": "Mulai ulang Coucou"
   },
+  "Restarting Coucou…": {
+   "zh-Hans": "正在重启 Coucou…",
+   "hi": "Coucou फिर से शुरू हो रहा है…",
+   "es": "Reiniciando Coucou…",
+   "ar": "جارٍ إعادة تشغيل Coucou…",
+   "fr": "Redémarrage de Coucou…",
+   "bn": "Coucou আবার চালু হচ্ছে…",
+   "pt-BR": "Reiniciando o Coucou…",
+   "ru": "Перезапуск Coucou…",
+   "id": "Memulai ulang Coucou…"
+  },
   "Retry": {
    "zh-Hans": "重试",
    "hi": "पुनः प्रयास",
@@ -5887,6 +6085,17 @@
    "ru": "Задачи",
    "id": "Tugas"
   },
+  "Tell me when a new version is out": {
+   "zh-Hans": "有新版本时提醒我",
+   "hi": "नया वर्ज़न आने पर बताएँ",
+   "es": "Avisarme cuando salga una nueva versión",
+   "ar": "أخبرني عند صدور إصدار جديد",
+   "fr": "Me prévenir quand une nouvelle version sort",
+   "bn": "নতুন সংস্করণ এলে জানাও",
+   "pt-BR": "Me avisar quando sair uma nova versão",
+   "ru": "Сообщать о выходе новой версии",
+   "id": "Beri tahu saya saat ada versi baru"
+  },
   "Test connection": {
    "zh-Hans": "测试连接",
    "hi": "कनेक्शन जाँचें",
@@ -5986,6 +6195,17 @@
    "ru": "Не удалось распаковать загрузку. Попробуйте снова.",
    "id": "Unduhan tidak bisa diekstrak. Coba lagi."
   },
+  "The download couldn’t be opened. Nothing was changed.": {
+   "zh-Hans": "无法打开下载的文件。未做任何更改。",
+   "hi": "डाउनलोड खुल नहीं सका। कुछ नहीं बदला गया।",
+   "es": "No se pudo abrir la descarga. No se cambió nada.",
+   "ar": "تعذّر فتح الملف المنزَّل. لم يتغير شيء.",
+   "fr": "Le téléchargement n’a pas pu être ouvert. Rien n’a été modifié.",
+   "bn": "ডাউনলোড খোলা যায়নি। কিছুই বদলানো হয়নি।",
+   "pt-BR": "Não foi possível abrir o download. Nada foi alterado.",
+   "ru": "Не удалось открыть загрузку. Ничего не изменено.",
+   "id": "Unduhan tidak bisa dibuka. Tidak ada yang diubah."
+  },
   "The download didn't go through. Check your connection and try again.": {
    "zh-Hans": "下载未完成。请检查网络后重试。",
    "hi": "डाउनलोड पूरा नहीं हुआ। कनेक्शन जाँचकर फिर कोशिश करें।",
@@ -6007,6 +6227,39 @@
    "pt-BR": "O download não corresponde ao arquivo publicado pelo GOWA: foi apagado, nada foi instalado.",
    "ru": "Загрузка не совпадает с файлом, опубликованным GOWA: она удалена, ничего не установлено.",
    "id": "Unduhan tidak cocok dengan file dari GOWA: sudah dihapus, tidak ada yang dipasang."
+  },
+  "The download failed. Try again, or get it on GitHub.": {
+   "zh-Hans": "下载失败。请重试，或前往 GitHub 获取。",
+   "hi": "डाउनलोड नहीं हुआ। फिर कोशिश करें, या GitHub से लें।",
+   "es": "La descarga falló. Inténtalo de nuevo o descárgala en GitHub.",
+   "ar": "فشل التنزيل. حاول مجددًا أو احصل عليه من GitHub.",
+   "fr": "Le téléchargement a échoué. Réessaie, ou récupère-la sur GitHub.",
+   "bn": "ডাউনলোড ব্যর্থ। আবার চেষ্টা করুন, অথবা GitHub থেকে নিন।",
+   "pt-BR": "O download falhou. Tente de novo ou baixe no GitHub.",
+   "ru": "Загрузка не удалась. Попробуйте снова или скачайте на GitHub.",
+   "id": "Unduhan gagal. Coba lagi, atau ambil di GitHub."
+  },
+  "The download isn’t signed and notarized by Coucou’s developer, so it wasn’t installed.": {
+   "zh-Hans": "下载的文件未经 Coucou 开发者签名和公证，因此未安装。",
+   "hi": "डाउनलोड पर Coucou के डेवलपर का सिग्नेचर और नोटराइज़ेशन नहीं है, इसलिए इंस्टॉल नहीं किया गया।",
+   "es": "La descarga no está firmada y notarizada por el desarrollador de Coucou, así que no se instaló.",
+   "ar": "الملف المنزَّل غير موقَّع وموثَّق من مطوّر Coucou، لذا لم يُثبَّت.",
+   "fr": "Le téléchargement n’est pas signé et notarisé par le développeur de Coucou : il n’a pas été installé.",
+   "bn": "ডাউনলোডটি Coucou-র ডেভেলপারের স্বাক্ষরিত ও নোটারাইজড নয়, তাই ইনস্টল করা হয়নি।",
+   "pt-BR": "O download não está assinado e notarizado pelo desenvolvedor do Coucou, então não foi instalado.",
+   "ru": "Загрузка не подписана и не нотаризована разработчиком Coucou, поэтому не установлена.",
+   "id": "Unduhan tidak ditandatangani dan dinotarisasi oleh pengembang Coucou, jadi tidak dipasang."
+  },
+  "The download isn’t the announced version of Coucou. Nothing was changed.": {
+   "zh-Hans": "下载的不是公布的 Coucou 版本。未做任何更改。",
+   "hi": "डाउनलोड Coucou का घोषित वर्ज़न नहीं है। कुछ नहीं बदला गया।",
+   "es": "La descarga no es la versión anunciada de Coucou. No se cambió nada.",
+   "ar": "الملف المنزَّل ليس إصدار Coucou المُعلَن. لم يتغير شيء.",
+   "fr": "Le téléchargement n’est pas la version de Coucou annoncée. Rien n’a été modifié.",
+   "bn": "ডাউনলোডটি ঘোষিত Coucou সংস্করণ নয়। কিছুই বদলানো হয়নি।",
+   "pt-BR": "O download não é a versão anunciada do Coucou. Nada foi alterado.",
+   "ru": "Загрузка — не объявленная версия Coucou. Ничего не изменено.",
+   "id": "Unduhan bukan versi Coucou yang diumumkan. Tidak ada yang diubah."
   },
   "The gateway URL isn’t valid (http://…)": {
    "zh-Hans": "网关地址无效（http://…）",
@@ -6161,6 +6414,17 @@
    "pt-BR": "Não foi possível escrever a transcrição.",
    "ru": "Не удалось составить расшифровку.",
    "id": "Transkrip tidak dapat ditulis."
+  },
+  "The update didn’t go through": {
+   "zh-Hans": "更新未完成",
+   "hi": "अपडेट पूरा नहीं हुआ",
+   "es": "La actualización no se completó",
+   "ar": "لم يكتمل التحديث",
+   "fr": "La mise à jour n’a pas abouti",
+   "bn": "আপডেট সম্পন্ন হয়নি",
+   "pt-BR": "A atualização não foi concluída",
+   "ru": "Обновление не удалось",
+   "id": "Pembaruan tidak berhasil"
   },
   "The words show up here as people speak.": {
    "zh-Hans": "大家说话时，文字会显示在这里。",
@@ -6448,6 +6712,17 @@
    "ru": "Обновить",
    "id": "Perbarui"
   },
+  "Update Coucou to {0}…": {
+   "zh-Hans": "将 Coucou 更新到 {0}…",
+   "hi": "Coucou को {0} पर अपडेट करें…",
+   "es": "Actualizar Coucou a la {0}…",
+   "ar": "تحديث Coucou إلى {0}…",
+   "fr": "Mettre à jour Coucou vers la {0}…",
+   "bn": "Coucou {0}-এ আপডেট করুন…",
+   "pt-BR": "Atualizar o Coucou para a {0}…",
+   "ru": "Обновить Coucou до {0}…",
+   "id": "Perbarui Coucou ke {0}…"
+  },
   "Update hooks": {
    "zh-Hans": "更新 Hooks",
    "hi": "हुक अपडेट करें",
@@ -6458,6 +6733,28 @@
    "pt-BR": "Atualizar hooks",
    "ru": "Обновить хуки",
    "id": "Perbarui hooks"
+  },
+  "Update now": {
+   "zh-Hans": "立即更新",
+   "hi": "अभी अपडेट करें",
+   "es": "Actualizar ahora",
+   "ar": "التحديث الآن",
+   "fr": "Mettre à jour",
+   "bn": "এখনই আপডেট",
+   "pt-BR": "Atualizar agora",
+   "ru": "Обновить",
+   "id": "Perbarui sekarang"
+  },
+  "Updates": {
+   "zh-Hans": "更新",
+   "hi": "अपडेट",
+   "es": "Actualizaciones",
+   "ar": "التحديثات",
+   "fr": "Mises à jour",
+   "bn": "আপডেট",
+   "pt-BR": "Atualizações",
+   "ru": "Обновления",
+   "id": "Pembaruan"
   },
   "Uploading {name}": {
    "zh-Hans": "正在上传 {name}",
@@ -6711,6 +7008,17 @@
    "pt-BR": "WhatsApp (experimental)",
    "ru": "WhatsApp (экспериментально)",
    "id": "WhatsApp (eksperimental)"
+  },
+  "What’s new": {
+   "zh-Hans": "新功能",
+   "hi": "क्या नया है",
+   "es": "Novedades",
+   "ar": "ما الجديد",
+   "fr": "Nouveautés",
+   "bn": "নতুন কী",
+   "pt-BR": "Novidades",
+   "ru": "Что нового",
+   "id": "Yang baru"
   },
   "When Coucou hears the words on the left, it writes the ones on the right.": {
    "zh-Hans": "Coucou 听到左边的词时，会写成右边的词。",
@@ -6976,6 +7284,17 @@
    "ru": "Пишется, напр. Claude Code",
    "id": "Ditulis, mis. Claude Code"
   },
+  "Yes, tell me": {
+   "zh-Hans": "好的，提醒我",
+   "hi": "हाँ, बताओ",
+   "es": "Sí, avísame",
+   "ar": "نعم، أخبرني",
+   "fr": "Oui, préviens-moi",
+   "bn": "হ্যাঁ, জানাও",
+   "pt-BR": "Sim, me avise",
+   "ru": "Да, сообщать",
+   "id": "Ya, beri tahu saya"
+  },
   "Yesterday": {
    "zh-Hans": "昨天",
    "hi": "कल",
@@ -6997,6 +7316,17 @@
    "pt-BR": "Você",
    "ru": "Вы",
    "id": "Kamu"
+  },
+  "You have {0}": {
+   "zh-Hans": "当前版本 {0}",
+   "hi": "आपके पास {0} है",
+   "es": "Tienes la {0}",
+   "ar": "لديك {0}",
+   "fr": "Tu as la {0}",
+   "bn": "আপনার কাছে {0}",
+   "pt-BR": "Você tem a {0}",
+   "ru": "У вас {0}",
+   "id": "Kamu punya {0}"
   },
   "You say": {
    "zh-Hans": "你说",
