@@ -8,6 +8,7 @@ import { t } from "../../i18n/i18n";
 import { onEvent } from "../../core/bridge";
 import {
   ACTIVE,
+  PAUSABLE,
   OrchestratorBridge,
   agentLine,
   eventLine,
@@ -17,11 +18,14 @@ import {
   type OrchAgent,
   type OrchApproval,
   type OrchEvent,
+  type OrchGoal,
   type OrchStatus,
   type OrchTask,
+  type GoalSchedule,
+  type MemoryNote,
 } from "../../core/orchestrator";
 import type { HubContext } from "../shell";
-import { button, card, row, segmented, toggle } from "../ui";
+import { button, card, divider, label, row, segmented, toggle } from "../ui";
 import { colorDot } from "../../settings/colors";
 import { agentColor } from "../../island/agents";
 
@@ -34,6 +38,21 @@ export function showAgentTasks(agentId: string | null) {
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(document.documentElement.lang || undefined, { hour: "2-digit", minute: "2-digit" });
+const dateTime = (iso: string) => new Date(iso).toLocaleString(document.documentElement.lang || undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+interface GoalDraft {
+  agentId: string;
+  goalId: string | null;
+  title: string;
+  instructions: string;
+  kind: GoalSchedule["kind"];
+  hours: number;
+  time: string;
+  modelProfileId: string | null;
+}
 
 export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let status: OrchStatus | null = await OrchestratorBridge.status().catch(() => null);
@@ -49,6 +68,10 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let draft = "";
   let models: string[] = [];
   let model: string | null = null;
+  const goals = new Map<string, OrchGoal[]>();
+  const memories = new Map<string, MemoryNote[]>();
+  const memoryDrafts = new Map<string, string>();
+  let goalDraft: GoalDraft | null = null;
   /** The agent picked for the next task; null lets the backend choose a free one. */
   let agentChoice: string | null = null;
   /** An agent's name, for the task list once there is more than one. */
@@ -58,20 +81,29 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
 
   const connection = h("div", {});
   const composer = h("div", {});
+  const management = h("div", { class: "tasks-management" });
   const approvalsEl = h("div", {});
   const listEl = h("div", { class: "hub-notes-list" });
   const detailEl = h("div", { class: "hub-note-detail" });
-  page.append(connection, composer, approvalsEl, h("div", { class: "hub-notes" }, listEl, detailEl));
+  page.append(connection, composer, management, approvalsEl, h("div", { class: "hub-notes" }, listEl, detailEl));
 
   const connected = () => status?.status.state === "connected";
 
-  async function reload() {
+  async function reload(refreshExtras = false) {
     status = await OrchestratorBridge.status().catch(() => status);
     if (connected()) {
       const data = await OrchestratorBridge.tasks().catch(() => null);
       tasks = data?.tasks ?? [];
       approvals = data?.approvals ?? [];
       agents = data?.agents ?? [];
+      await Promise.all(agents.flatMap((agent) => [
+        refreshExtras || !goals.has(agent.id)
+          ? OrchestratorBridge.goals(agent.id).then((r) => goals.set(agent.id, r.goals ?? []), () => goals.set(agent.id, []))
+          : Promise.resolve(),
+        refreshExtras || !memories.has(agent.id)
+          ? OrchestratorBridge.memory(agent.id).then((r) => memories.set(agent.id, r.notes ?? []), () => memories.set(agent.id, []))
+          : Promise.resolve(),
+      ]));
       selected ??= tasks[0]?.id ?? null;
       if (models.length === 0) {
         const m = await OrchestratorBridge.models().catch(() => null);
@@ -86,6 +118,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   function draw() {
     drawConnection();
     drawComposer();
+    drawManagement();
     drawApprovals();
     drawList();
     drawDetail();
@@ -106,7 +139,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
               ? t("Start the orchestrator backend once: it creates the key Coucou needs.")
               : (s.status.error ?? t("The backend stopped answering."));
     const sw = toggle(enabled, (on) => {
-      void OrchestratorBridge.setPrefs(on, s?.prefs.url ?? "").then(reload, (err) => {
+      void OrchestratorBridge.setPrefs(on, s?.prefs.url ?? "").then(() => reload(true), (err) => {
         note = String(err);
         draw();
       });
@@ -129,7 +162,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       const next = name.value.trim();
       if (next === agent.name) return;
       // Empty: back to the agent's own id.
-      OrchestratorBridge.updateAgent(agent.id, { name: next || null }).then(reload, (err) => {
+      OrchestratorBridge.updateAgent(agent.id, { name: next || null }).then(() => reload(), (err) => {
         note = String(err);
         void reload();
       });
@@ -144,13 +177,23 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       "width:14px;height:14px",
       () => (agent.color ? { [pillId]: agent.color } : {}),
       (next) => {
-        OrchestratorBridge.updateAgent(agent.id, { color: next[pillId] ?? null }).then(reload, (err) => {
+        OrchestratorBridge.updateAgent(agent.id, { color: next[pillId] ?? null }).then(() => reload(), (err) => {
           note = String(err);
           void reload();
         });
       },
     );
-    return row(agent.name, agentLine(agent), name, color);
+    const pause = button(agent.paused ? t("Resume") : t("Pause"), () => {
+      const action = agent.paused
+        ? OrchestratorBridge.resumeAgent(agent.id)
+        : OrchestratorBridge.pauseAgent(agent.id);
+      pause.disabled = true;
+      void action.then(() => reload(), (err) => {
+        note = String(err);
+        void reload();
+      });
+    }, "", true);
+    return row(agent.name, agentLine(agent), name, color, pause);
   }
 
   function drawComposer() {
@@ -218,6 +261,269 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     }
   }
 
+  function goalStatus(goal: OrchGoal): string {
+    if (goal.status === "achieved") return t("Achieved");
+    return goal.status === "paused" ? t("Paused") : t("Active");
+  }
+
+  function scheduleLabel(schedule: GoalSchedule): string {
+    switch (schedule.kind) {
+      case "manual":
+        return t("Manual");
+      case "every":
+        return t("Every {hours} hours", { hours: schedule.hours });
+      case "daily":
+        return t("Daily at {time}", { time: schedule.time });
+      case "weekdays":
+        return t("Weekdays at {time}", { time: schedule.time });
+    }
+  }
+
+  function scheduleFromDraft(draft: GoalDraft): GoalSchedule {
+    if (draft.kind === "every") return { kind: "every", hours: draft.hours };
+    if (draft.kind === "daily") return { kind: "daily", time: draft.time };
+    if (draft.kind === "weekdays") return { kind: "weekdays", time: draft.time };
+    return { kind: "manual" };
+  }
+
+  function editGoal(agentId: string, goal?: OrchGoal) {
+    const schedule = goal?.schedule ?? { kind: "manual" };
+    goalDraft = {
+      agentId,
+      goalId: goal?.id ?? null,
+      title: goal?.title ?? "",
+      instructions: goal?.instructions ?? "",
+      kind: schedule.kind,
+      hours: schedule.kind === "every" ? schedule.hours : 24,
+      time: schedule.kind === "daily" || schedule.kind === "weekdays" ? schedule.time : "09:00",
+      modelProfileId: goal?.modelProfileId ?? model,
+    };
+    drawManagement();
+  }
+
+  function goalForm(draft: GoalDraft): HTMLElement {
+    const title = h("input", {
+      class: "hub-input",
+      placeholder: t("Goal title"),
+      maxlength: "80",
+    }) as HTMLInputElement;
+    title.value = draft.title;
+    title.addEventListener("input", () => (draft.title = title.value));
+    const instructions = h("textarea", {
+      class: "hub-textarea",
+      placeholder: t("What should the agent keep working toward?"),
+      maxlength: "4000",
+    }) as HTMLTextAreaElement;
+    instructions.value = draft.instructions;
+    instructions.addEventListener("input", () => (draft.instructions = instructions.value));
+    const kinds: [GoalSchedule["kind"], string][] = [
+      ["manual", t("Manual")],
+      ["every", t("Every N hours")],
+      ["daily", t("Daily at")],
+      ["weekdays", t("Weekdays at")],
+    ];
+    const schedulePicker = segmented(kinds, draft.kind, (kind) => {
+      draft.kind = kind;
+      drawManagement();
+    });
+    let scheduleValue: HTMLElement | null = null;
+    if (draft.kind === "every") {
+      const hours = h("input", {
+        class: "hub-input",
+        type: "number",
+        min: "1",
+        max: "168",
+        value: String(draft.hours),
+        style: "width:90px",
+      }) as HTMLInputElement;
+      hours.addEventListener("input", () => (draft.hours = Number(hours.value)));
+      scheduleValue = row(t("Hours"), t("From 1 to 168"), hours);
+    } else if (draft.kind === "daily" || draft.kind === "weekdays") {
+      const at = h("input", {
+        class: "hub-input",
+        type: "time",
+        value: draft.time,
+      }) as HTMLInputElement;
+      at.addEventListener("input", () => (draft.time = at.value));
+      scheduleValue = row(t("Time"), null, at);
+    }
+    const save = button(t("Save"), () => {
+      const body = {
+        title: draft.title.trim(),
+        instructions: draft.instructions.trim(),
+        schedule: scheduleFromDraft(draft),
+        modelProfileId: draft.modelProfileId,
+      };
+      if (!body.title || !body.instructions) return;
+      save.disabled = true;
+      const action = draft.goalId
+        ? OrchestratorBridge.updateGoal(draft.goalId, body)
+        : OrchestratorBridge.createGoal(
+            draft.agentId,
+            body.title,
+            body.instructions,
+            body.schedule,
+            body.modelProfileId,
+          );
+      void action.then(() => {
+        goalDraft = null;
+        void reload(true);
+      }, (err) => {
+        note = String(err);
+        save.disabled = false;
+        drawManagement();
+      });
+    }, "primary");
+    const cancel = button(t("Cancel"), () => {
+      goalDraft = null;
+      drawManagement();
+    });
+    const controls = h("div", { class: "hub-row" }, schedulePicker);
+    if (models.length > 1) {
+      controls.append(segmented(models.map((id) => [id, modelLabel(id)] as [string, string]), draft.modelProfileId ?? models[0]!, (id) => {
+        draft.modelProfileId = id;
+      }));
+    }
+    return card(
+      title,
+      instructions,
+      controls,
+      scheduleValue,
+      h("div", { class: "hub-row tasks-actions" }, save, cancel),
+    );
+  }
+
+  function drawManagement() {
+    clear(management);
+    if (!connected()) return;
+    for (const agent of agents) {
+      const heading = agents.length > 1 ? h("h2", { class: "tasks-agent-title", text: agent.name }) : null;
+      if (heading) management.append(heading);
+
+      management.append(label(t("Goals")));
+      if (goalDraft?.agentId === agent.id) {
+        management.append(goalForm(goalDraft));
+      } else {
+        const goalsCard = card();
+        const list = goals.get(agent.id) ?? [];
+        for (const [index, goal] of list.entries()) {
+          if (index) goalsCard.append(divider());
+          const next = goal.nextRunAt
+            ? t("Next: {date}", { date: dateTime(goal.nextRunAt) })
+            : t("No next run");
+          const edit = button(t("Edit"), () => editGoal(agent.id, goal), "", true);
+          const pause = goal.status === "achieved"
+            ? null
+            : button(goal.status === "paused" ? t("Resume") : t("Pause"), () => {
+                void OrchestratorBridge.updateGoal(goal.id, {
+                  status: goal.status === "paused" ? "active" : "paused",
+                }).then(() => reload(true), (err) => {
+                  note = String(err);
+                  drawManagement();
+                });
+              }, "", true);
+          const run = button(t("Run now"), () => {
+            void OrchestratorBridge.runGoal(goal.id, newTaskKey()).then(({ task }) => {
+              selected = task.id;
+              void reload();
+            }, (err) => {
+              note = String(err);
+              drawManagement();
+            });
+          }, "", true);
+          const remove = button(t("Delete"), () => {
+            void OrchestratorBridge.deleteGoal(goal.id).then(() => reload(true), (err) => {
+              note = String(err);
+              drawManagement();
+            });
+          }, "danger", true);
+          goalsCard.append(row(
+            goal.title,
+            `${goalStatus(goal)} · ${scheduleLabel(goal.schedule)} · ${next}`,
+            edit,
+            pause,
+            run,
+            remove,
+          ));
+        }
+        if (list.length === 0) goalsCard.append(h("div", { class: "hub-note", text: t("No goal yet.") }));
+        goalsCard.append(button(t("Create goal"), () => editGoal(agent.id), "primary", true));
+        management.append(goalsCard);
+      }
+
+      management.append(label(t("Memory")));
+      const memoryCard = card();
+      const notes = memories.get(agent.id) ?? [];
+      for (const [index, memory] of notes.entries()) {
+        if (index) memoryCard.append(divider());
+        memoryCard.append(row(
+          memory.text,
+          memory.source === "agent" ? t("Remembered by the agent") : t("Added by you"),
+          button(t("Delete"), () => {
+            void OrchestratorBridge.deleteMemory(agent.id, memory.id).then(() => reload(true), (err) => {
+              note = String(err);
+              drawManagement();
+            });
+          }, "danger", true),
+        ));
+      }
+      if (notes.length === 0) memoryCard.append(h("div", { class: "hub-note", text: t("No memory note yet.") }));
+      const memoryInput = h("input", {
+        class: "hub-input",
+        placeholder: t("Add a note for this agent"),
+        maxlength: "300",
+      }) as HTMLInputElement;
+      memoryInput.value = memoryDrafts.get(agent.id) ?? "";
+      memoryInput.addEventListener("input", () => memoryDrafts.set(agent.id, memoryInput.value));
+      const add = button(t("Add note"), () => {
+        const text = memoryInput.value.trim();
+        if (!text) return;
+        add.disabled = true;
+        void OrchestratorBridge.addMemory(agent.id, text).then(() => {
+          memoryDrafts.delete(agent.id);
+          void reload(true);
+        }, (err) => {
+          note = String(err);
+          add.disabled = false;
+        });
+      }, "primary", true);
+      memoryCard.append(h("div", { class: "hub-row" }, memoryInput, add));
+      management.append(memoryCard);
+
+      management.append(label(t("Daily limits")));
+      const tasksLimit = h("input", {
+        class: "hub-input",
+        type: "number",
+        min: "1",
+        max: "500",
+        value: String(agent.limits.tasksPerDay),
+        style: "width:90px",
+      }) as HTMLInputElement;
+      const stepsLimit = h("input", {
+        class: "hub-input",
+        type: "number",
+        min: "10",
+        max: "5000",
+        value: String(agent.limits.stepsPerDay),
+        style: "width:90px",
+      }) as HTMLInputElement;
+      const limitsCard = card(
+        row(t("Tasks per day"), t("Used today: {count}", { count: agent.usage.tasksToday }), tasksLimit),
+        divider(),
+        row(t("Steps per day"), t("Used today: {count}", { count: agent.usage.stepsToday }), stepsLimit),
+        button(t("Save limits"), () => {
+          const tasksPerDay = Number(tasksLimit.value);
+          const stepsPerDay = Number(stepsLimit.value);
+          void OrchestratorBridge.setLimits(agent.id, tasksPerDay, stepsPerDay).then(() => reload(), (err) => {
+            note = String(err);
+            drawManagement();
+          });
+        }, "primary", true),
+      );
+      management.append(limitsCard);
+    }
+  }
+
   function drawApprovals() {
     clear(approvalsEl);
     for (const a of approvals) {
@@ -228,7 +534,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   }
 
   function decide(a: OrchApproval, approve: boolean) {
-    OrchestratorBridge.decide(a.agentId, a.id, approve).then(reload, (err) => {
+    OrchestratorBridge.decide(a.agentId, a.id, approve).then(() => reload(), (err) => {
       note = String(err);
       void reload();
     });
@@ -274,15 +580,58 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     clear(detailEl);
     if (!detail) return;
     const task = detail.task;
+    const waiting = task.waitingReason === "daily_limit"
+      ? t("Daily limit reached")
+      : task.waitingReason === "agent_paused"
+        ? t("Paused")
+        : "";
     detailEl.append(
       h("h2", { text: task.prompt }),
-      h("span", { class: "hub-tag", text: `${statusLabel(task.status)}${agentLabel(task.agentId)} · ${modelLabel(task.modelProfileId)}` }),
+      h("span", {
+        class: "hub-tag",
+        text: `${statusLabel(task.status)}${waiting ? ` · ${waiting}` : ""}${agentLabel(task.agentId)} · ${modelLabel(task.modelProfileId)}`,
+      }),
     );
     if (task.result) detailEl.append(h("div", { class: "hub-ok", style: "white-space:pre-wrap", text: task.result.summary }));
     if (task.error) detailEl.append(h("div", { class: "hub-warn", text: task.error.message }));
-    if (ACTIVE.has(task.status)) {
-      detailEl.append(button(t("Cancel"), () => void OrchestratorBridge.cancel(task.id).then(reload, reload), "danger"));
+    if (task.question) {
+      const answerInput = h("input", {
+        class: "hub-input",
+        placeholder: t("Your answer"),
+        maxlength: "2000",
+      }) as HTMLInputElement;
+      const sendAnswer = (answer: string) => {
+        const value = answer.trim();
+        if (!value) return;
+        void OrchestratorBridge.answer(task.id, task.question!.id, value).then(() => reload(), (err) => {
+          note = String(err);
+          void reload();
+        });
+      };
+      const replies = h("div", { class: "tasks-actions" });
+      for (const option of task.question.options) {
+        replies.append(button(option, () => sendAnswer(option), "", true));
+      }
+      replies.append(answerInput, button(t("Answer"), () => sendAnswer(answerInput.value), "primary", true));
+      detailEl.append(card(
+        h("div", { class: "title", text: task.question.text }),
+        replies,
+      ));
     }
+    const taskActions = h("div", { class: "tasks-actions" });
+    if (PAUSABLE.has(task.status)) {
+      taskActions.append(button(t("Pause"), () => {
+        void OrchestratorBridge.pauseTask(task.id).then(() => reload(), () => reload());
+      }));
+    } else if (task.status === "paused") {
+      taskActions.append(button(t("Resume"), () => {
+        void OrchestratorBridge.resumeTask(task.id).then(() => reload(), () => reload());
+      }, "primary"));
+    }
+    if (ACTIVE.has(task.status)) {
+      taskActions.append(button(t("Cancel"), () => void OrchestratorBridge.cancel(task.id).then(() => reload(), () => reload()), "danger"));
+    }
+    if (taskActions.childElementCount) detailEl.append(taskActions);
 
     const entries = h("div", { class: "hub-entries" });
     for (const e of detail.events) {
@@ -325,21 +674,27 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
 
   // Live: every backend event the stream brings, and the connection's state.
   let queued = false;
-  const soon = () => {
+  let refreshExtras = false;
+  const soon = (extras = false) => {
+    refreshExtras ||= extras;
     if (queued) return;
     queued = true;
     window.setTimeout(() => {
       queued = false;
-      void reload();
+      const extras = refreshExtras;
+      refreshExtras = false;
+      void reload(extras);
     }, 250);
   };
   const stops = await Promise.all([
-    onEvent<OrchEvent>("orchestrator-event", soon),
-    onEvent<unknown>("orchestrator-status", soon),
+    onEvent<OrchEvent>("orchestrator-event", (event) => {
+      soon(event.type === "goal.updated" || event.type === "goal.checkin" || event.type === "memory.updated" || event.type === "agent.updated");
+    }),
+    onEvent<unknown>("orchestrator-status", () => soon(true)),
   ]);
   ctx.onLeave = () => {
     for (const stop of stops) stop();
   };
 
-  await reload();
+  await reload(true);
 }

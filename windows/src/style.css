@@ -799,6 +799,16 @@ body {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
+.agent-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.agent-actions .agent-chat-btn {
+  margin-top: 0;
+}
+
 /* What an agent is doing right now, under the typing dots in its chat. */
 .chat-row .agent-run {
   margin-left: 8px;
@@ -1069,6 +1079,30 @@ input[type="range"]::-webkit-slider-thumb {
   height: 7px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff6b5b, #f7b32b, #2dd4a7, #38bdf8, #a78bfa);
+}
+
+.quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.quick-replies:empty {
+  display: none;
+}
+
+.quick-reply {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 165, 36, 0.4);
+  background: rgba(245, 165, 36, 0.12);
+  color: var(--ink-2);
+  font: 600 10.5px var(--font);
+  cursor: default;
+}
+
+.quick-reply:hover {
+  background: rgba(245, 165, 36, 0.2);
 }
 
 .chat-log {

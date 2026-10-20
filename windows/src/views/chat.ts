@@ -15,7 +15,7 @@ import {
 } from "../core/providers";
 import { Sound } from "../core/sound";
 import { State, type AgentTask, type ChatMessage } from "../core/state";
-import { agentHistory, sendToAgent } from "../island/agent-chat";
+import { agentHistory, answerAgentQuestion, loadAgentHistory, sendToAgent } from "../island/agent-chat";
 import type { ViewHost } from "./views";
 import { N_, t, tl } from "../i18n/i18n";
 
@@ -108,6 +108,7 @@ function buildPicker(onChange: () => void): Picker {
       );
       chip.addEventListener("click", () => {
         State.chatAgent = id;
+        void loadAgentHistory(id, true);
         Sound.play("pop");
         close();
       });
@@ -248,6 +249,7 @@ function buildPicker(onChange: () => void): Picker {
 export function buildPrompt(onHeightChange: () => void): ViewHost {
   const chipRow = h("div", { class: "chip-row" });
   const log = h("div", { class: "chat-log" });
+  const quickReplies = h("div", { class: "quick-replies" });
   const input = h("input", {
     type: "text",
     class: "chat-input",
@@ -273,13 +275,15 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     body.classList.toggle("picking", picker.isOpen);
     drawModelButton();
   });
-  body.append(chipRow, log, picker.el, modelRow, bar);
+  body.append(chipRow, log, quickReplies, picker.el, modelRow, bar);
 
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
 
   let sending = false;
   let renderedCount = "";
+  let openedAgent: string | null = null;
+  let renderedQuestion = "";
   // A local model answers token by token: where its text so far is shown.
   let live: HTMLElement | null = null;
 
@@ -317,11 +321,18 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (agent) {
       // A message to an agent: a task for it; its answer comes back by itself.
       input.value = "";
+      sending = true;
+      drawModelButton();
       Sound.play("send");
       onHeightChange();
-      await sendToAgent(agent.orchestrator!.agentId, query);
-      onHeightChange();
-      input.focus();
+      try {
+        await sendToAgent(agent.orchestrator!.agentId, query);
+      } finally {
+        sending = false;
+        drawModelButton();
+        onHeightChange();
+        input.focus();
+      }
       return;
     }
     input.value = "";
@@ -386,6 +397,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       // The model's conversation, or the agent's the chat talks to.
       const agent = chatAgentTask();
       const agentId = agent?.orchestrator?.agentId ?? null;
+      if (agentId !== openedAgent) {
+        openedAgent = agentId;
+        if (agentId) void loadAgentHistory(agentId, true);
+      }
       const history = agentId ? agentHistory(agentId) : State.chatHistory;
       const run = agentId ? State.agentRuns.get(agentId) : undefined;
       const thinking = agentId ? run != null : State.stateOverride === "thinking";
@@ -399,13 +414,38 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
         // An agent answers later, by itself: the island grows with its conversation.
         if (agentId) onHeightChange();
       }
+      const question = agentId ? State.agentQuestions.get(agentId) : undefined;
+      const questionKey = question ? `${agentId}:${question.questionId}:${question.options.join("\n")}` : "";
+      if (questionKey !== renderedQuestion) {
+        renderedQuestion = questionKey;
+        clear(quickReplies);
+        for (const option of question?.options ?? []) {
+          quickReplies.append(h("button", {
+            class: "quick-reply",
+            text: option,
+            onclick: () => {
+              if (!agentId || sending) return;
+              sending = true;
+              drawModelButton();
+              void answerAgentQuestion(agentId, option).finally(() => {
+                sending = false;
+                drawModelButton();
+                State.notify();
+                input.focus();
+              });
+            },
+          }));
+        }
+      }
 
       // Leaving the chat folds the picker away.
       if (State.view !== "prompt" && picker.isOpen) picker.close();
       drawModelButton();
 
       input.placeholder = agent
-        ? t("Ask {name}…", { name: agent.name })
+        ? question
+          ? t("Answer {name}…", { name: agent.name })
+          : t("Ask {name}…", { name: agent.name })
         : t(history.length === 0 ? STRINGS.placeholderFirst : STRINGS.placeholderNext);
       input.disabled = sending;
     },
