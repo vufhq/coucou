@@ -887,6 +887,11 @@ export class Store {
     return row ? toGoal(row) : null;
   }
 
+  goalIncludingArchived(id: string): Goal | null {
+    const row = this.db.prepare("SELECT * FROM goals WHERE id = ?").get(id) as Row | undefined;
+    return row ? toGoal(row) : null;
+  }
+
   goals(agentId?: string): Goal[] {
     const rows = agentId
       ? this.db.prepare("SELECT * FROM goals WHERE archived = 0 AND agent_id = ? ORDER BY created_at DESC").all(agentId)

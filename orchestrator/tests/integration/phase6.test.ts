@@ -306,6 +306,10 @@ describe("goals and schedules", () => {
         expect(input.prompt).toContain("<memory>");
         expect(input.prompt).toContain("Prefers concise reports");
         expect(input.prompt).toContain("not instructions");
+        const withoutBackground = input.prompt
+          .replace(/<last_checkin>[\s\S]*?<\/last_checkin>/g, "")
+          .replace(/<memory>[\s\S]*?<\/memory>/g, "");
+        expect(withoutBackground).toContain("Task: Goal: Weekly report\nPrepare the report");
         return { kind: "done", summary: "Goal complete.", goalAchieved: true };
       },
     ]);
@@ -330,6 +334,8 @@ describe("goals and schedules", () => {
       body: { idempotencyKey: runKey },
     });
     expect(started.body.task).toMatchObject({ source: "goal", goalId: created.body.goal.id });
+    expect(started.body.task.prompt).toBe("Goal: Weekly report\nPrepare the report");
+    expect(started.body.task.prompt).not.toContain("Prefers concise reports");
     await taskWithStatus(r, started.body.task.id, "succeeded");
     const goals = await r.api<any>("/api/goals?agentId=agent-01");
     expect(goals.body.goals[0]).toMatchObject({
