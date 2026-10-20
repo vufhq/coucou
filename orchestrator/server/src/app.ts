@@ -10,6 +10,7 @@ import { buildGateway } from "./gateway.ts";
 import { Downloads, JobSignals } from "./jobs.ts";
 import type { ModelRouter } from "./model/router.ts";
 import { Runner } from "./runner.ts";
+import { GoalScheduler } from "./scheduler.ts";
 import { Store } from "./store.ts";
 import type { Tokens } from "./tokens.ts";
 import { wslRunning, type VmProbe } from "./vm.ts";
@@ -20,6 +21,7 @@ export interface Backend {
   store: Store;
   events: EventLog;
   runner: Runner;
+  scheduler: GoalScheduler;
   api: FastifyInstance;
   gateway: FastifyInstance;
   /** Starts listening and resumes in-flight tasks. Returns the bound ports. */
@@ -42,6 +44,7 @@ export function createBackend(
     pollMs?: number;
     modelRetries?: number;
     transientRetryDelaysMs?: number[];
+    schedulerPollMs?: number;
     /** Whether an agent's VM is running; the WSL check by default. */
     vmProbe?: VmProbe;
   } = {},
@@ -59,6 +62,7 @@ export function createBackend(
     modelRetries: opts.modelRetries,
     transientRetryDelaysMs: opts.transientRetryDelaysMs,
   });
+  const scheduler = new GoalScheduler(store, events, runner, opts.schedulerPollMs);
   const api = buildApi({ store, events, runner, signals, downloads, models, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
   const gateway = buildGateway({
     store,
@@ -78,12 +82,14 @@ export function createBackend(
     store,
     events,
     runner,
+    scheduler,
     api,
     gateway,
     async listen() {
       await api.listen({ host: config.apiHost, port: config.apiPort });
       await gateway.listen({ host: config.workerHost, port: config.workerPort });
       runner.start();
+      scheduler.start();
       prune(store, config.retentionDays);
       pruner = setInterval(() => prune(store, config.retentionDays), PRUNE_EVERY_MS);
       pruner.unref();
@@ -95,6 +101,7 @@ export function createBackend(
     },
     async close() {
       if (pruner) clearInterval(pruner);
+      scheduler.stop();
       await runner.stop();
       // Open event streams would otherwise keep the server alive.
       api.server.closeAllConnections?.();

@@ -17,6 +17,13 @@ export const EVENT_TYPES = [
   "task.completed",
   "task.failed",
   "task.cancelled",
+  "task.question",
+  "task.answered",
+  "task.paused",
+  "task.resumed",
+  "goal.updated",
+  "goal.checkin",
+  "memory.updated",
   "agent.heartbeat",
   "agent.status_changed",
   "agent.updated",
@@ -36,9 +43,27 @@ export type EventType = z.infer<typeof EventType>;
 export const EVENT_PAYLOADS = {
   "task.queued": z.object({ prompt: z.string() }).strict(),
   "task.started": z.object({ prompt: z.string(), modelProfileId: z.string() }).strict(),
-  "task.completed": z.object({ summary: z.string(), artifacts: z.array(z.string()), modelProfileId: z.string().optional() }).strict(),
+  "task.completed": z
+    .object({
+      summary: z.string(),
+      artifacts: z.array(z.string()),
+      modelProfileId: z.string().optional(),
+      goalId: z.string().optional(),
+    })
+    .strict(),
   "task.failed": z.object({ reason: FailureReason, message: z.string() }).strict(),
   "task.cancelled": z.object({}).strict(),
+  "task.question": z
+    .object({ questionId: z.string(), question: z.string(), options: z.array(z.string()) })
+    .strict(),
+  "task.answered": z.object({ questionId: z.string() }).strict(),
+  "task.paused": z.object({}).strict(),
+  "task.resumed": z.object({}).strict(),
+  "goal.updated": z.object({ goalId: z.string() }).strict(),
+  "goal.checkin": z
+    .object({ goalId: z.string(), title: z.string(), summary: z.string(), achieved: z.boolean() })
+    .strict(),
+  "memory.updated": z.object({}).strict(),
   "agent.heartbeat": z.object({}).strict(),
   "agent.status_changed": z.object({ status: z.enum(["offline", "starting", "ready", "busy", "error"]) }).strict(),
   /** The user renamed or recoloured the agent; read it again from /api/agents. */
@@ -85,5 +110,7 @@ export const STATUS_AFTER: Partial<Record<EventType, TaskStatus>> = {
   "task.completed": "succeeded",
   "task.failed": "failed",
   "task.cancelled": "cancelled",
+  "task.question": "waiting_for_answer",
+  "task.paused": "paused",
   "approval.requested": "waiting_for_approval",
 };

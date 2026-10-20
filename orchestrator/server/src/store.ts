@@ -9,12 +9,17 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import {
   DEFAULT_BUDGET,
   type Agent,
+  type AgentLimits,
   type Budget,
   type CreateTaskRequest,
   type FailureReason,
+  type Goal,
   type JobOutcome,
+  type Note,
   type OpName,
+  type Schedule,
   type Task,
+  type TaskQuestion,
   type TaskStatus,
   type WorkerHealth,
 } from "@coucou-orchestrator/protocol";
@@ -30,7 +35,10 @@ CREATE TABLE IF NOT EXISTS agents (
   approved_domains TEXT NOT NULL DEFAULT '[]',
   health TEXT,
   custom_name TEXT,
-  color TEXT
+  color TEXT,
+  paused INTEGER NOT NULL DEFAULT 0,
+  tasks_per_day INTEGER NOT NULL DEFAULT 30,
+  steps_per_day INTEGER NOT NULL DEFAULT 300
 );
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
@@ -48,7 +56,19 @@ CREATE TABLE IF NOT EXISTS tasks (
   context TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  started_at TEXT
+  started_at TEXT,
+  source TEXT NOT NULL DEFAULT 'user',
+  goal_id TEXT,
+  question TEXT,
+  question_count INTEGER NOT NULL DEFAULT 0,
+  answers TEXT NOT NULL DEFAULT '[]',
+  question_asked_at TEXT,
+  waiting_reason TEXT,
+  pause_requested INTEGER NOT NULL DEFAULT 0,
+  paused_by_agent INTEGER NOT NULL DEFAULT 0,
+  paused_from_status TEXT,
+  inactive_ms INTEGER NOT NULL DEFAULT 0,
+  inactive_since TEXT
 );
 CREATE INDEX IF NOT EXISTS tasks_by_status ON tasks(agent_id, status, created_at);
 CREATE TABLE IF NOT EXISTS steps (
@@ -105,6 +125,33 @@ CREATE TABLE IF NOT EXISTS events (
   UNIQUE (task_id, sequence)
 );
 CREATE INDEX IF NOT EXISTS tasks_by_age ON tasks(status, updated_at);
+CREATE INDEX IF NOT EXISTS tasks_by_goal ON tasks(goal_id, status);
+CREATE TABLE IF NOT EXISTS goals (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES agents(id),
+  title TEXT NOT NULL,
+  instructions TEXT NOT NULL,
+  schedule TEXT NOT NULL,
+  model_profile_id TEXT,
+  status TEXT NOT NULL,
+  next_run_at TEXT,
+  last_run_at TEXT,
+  last_task_id TEXT,
+  last_summary TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS goals_by_due ON goals(status, archived, next_run_at);
+CREATE TABLE IF NOT EXISTS notes (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES agents(id),
+  text TEXT NOT NULL,
+  source TEXT NOT NULL,
+  task_id TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS notes_by_agent ON notes(agent_id, created_at);
 `;
 
 /** Columns added after a database was first created: added in place, data kept. */
@@ -112,7 +159,22 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "agents", column: "health", ddl: "ALTER TABLE agents ADD COLUMN health TEXT" },
   { table: "agents", column: "custom_name", ddl: "ALTER TABLE agents ADD COLUMN custom_name TEXT" },
   { table: "agents", column: "color", ddl: "ALTER TABLE agents ADD COLUMN color TEXT" },
+  { table: "agents", column: "paused", ddl: "ALTER TABLE agents ADD COLUMN paused INTEGER NOT NULL DEFAULT 0" },
+  { table: "agents", column: "tasks_per_day", ddl: "ALTER TABLE agents ADD COLUMN tasks_per_day INTEGER NOT NULL DEFAULT 30" },
+  { table: "agents", column: "steps_per_day", ddl: "ALTER TABLE agents ADD COLUMN steps_per_day INTEGER NOT NULL DEFAULT 300" },
   { table: "tasks", column: "context", ddl: "ALTER TABLE tasks ADD COLUMN context TEXT" },
+  { table: "tasks", column: "source", ddl: "ALTER TABLE tasks ADD COLUMN source TEXT NOT NULL DEFAULT 'user'" },
+  { table: "tasks", column: "goal_id", ddl: "ALTER TABLE tasks ADD COLUMN goal_id TEXT" },
+  { table: "tasks", column: "question", ddl: "ALTER TABLE tasks ADD COLUMN question TEXT" },
+  { table: "tasks", column: "question_count", ddl: "ALTER TABLE tasks ADD COLUMN question_count INTEGER NOT NULL DEFAULT 0" },
+  { table: "tasks", column: "answers", ddl: "ALTER TABLE tasks ADD COLUMN answers TEXT NOT NULL DEFAULT '[]'" },
+  { table: "tasks", column: "question_asked_at", ddl: "ALTER TABLE tasks ADD COLUMN question_asked_at TEXT" },
+  { table: "tasks", column: "waiting_reason", ddl: "ALTER TABLE tasks ADD COLUMN waiting_reason TEXT" },
+  { table: "tasks", column: "pause_requested", ddl: "ALTER TABLE tasks ADD COLUMN pause_requested INTEGER NOT NULL DEFAULT 0" },
+  { table: "tasks", column: "paused_by_agent", ddl: "ALTER TABLE tasks ADD COLUMN paused_by_agent INTEGER NOT NULL DEFAULT 0" },
+  { table: "tasks", column: "paused_from_status", ddl: "ALTER TABLE tasks ADD COLUMN paused_from_status TEXT" },
+  { table: "tasks", column: "inactive_ms", ddl: "ALTER TABLE tasks ADD COLUMN inactive_ms INTEGER NOT NULL DEFAULT 0" },
+  { table: "tasks", column: "inactive_since", ddl: "ALTER TABLE tasks ADD COLUMN inactive_since TEXT" },
 ];
 
 export type JobStatus = "queued" | "claimed" | "succeeded" | "failed" | "cancelled";
@@ -167,10 +229,20 @@ export interface EventRow {
   payload: Record<string, unknown>;
 }
 
+export interface AnswerRow {
+  question: TaskQuestion;
+  answer: string;
+}
+
 type Row = Record<string, SQLInputValue>;
 
 const now = () => new Date().toISOString();
 const json = (v: unknown) => JSON.stringify(v);
+function localDayRange(at = new Date()): [string, string] {
+  const start = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const end = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1);
+  return [start.toISOString(), end.toISOString()];
+}
 function parse<T>(v: unknown): T {
   return JSON.parse(String(v)) as T;
 }
@@ -225,12 +297,14 @@ export class Store {
   }
 
   agents(): Agent[] {
-    return (this.db.prepare("SELECT * FROM agents ORDER BY id").all() as Row[]).map(toAgent);
+    return (this.db.prepare("SELECT * FROM agents ORDER BY id").all() as Row[]).map((row) =>
+      toAgent(row, this.agentUsage(String(row.id))),
+    );
   }
 
   agent(id: string): Agent | null {
     const row = this.db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as Row | undefined;
-    return row ? toAgent(row) : null;
+    return row ? toAgent(row, this.agentUsage(id)) : null;
   }
 
   setAgentStatus(id: string, status: Agent["status"]): boolean {
@@ -244,6 +318,31 @@ export class Store {
     if (identity.color !== undefined) {
       this.db.prepare("UPDATE agents SET color = ? WHERE id = ?").run(identity.color?.toUpperCase() ?? null, id);
     }
+  }
+
+  setAgentPaused(id: string, paused: boolean): void {
+    this.db.prepare("UPDATE agents SET paused = ? WHERE id = ?").run(paused ? 1 : 0, id);
+  }
+
+  setAgentLimits(id: string, limits: AgentLimits): void {
+    this.db
+      .prepare("UPDATE agents SET tasks_per_day = ?, steps_per_day = ? WHERE id = ?")
+      .run(limits.tasksPerDay, limits.stepsPerDay, id);
+  }
+
+  agentUsage(id: string, at = new Date()): Agent["usage"] {
+    const [start, end] = localDayRange(at);
+    const tasks = this.db
+      .prepare("SELECT COUNT(*) AS n FROM tasks WHERE agent_id = ? AND started_at >= ? AND started_at < ?")
+      .get(id, start, end) as Row;
+    const steps = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM steps
+         JOIN tasks ON tasks.id = steps.task_id
+         WHERE tasks.agent_id = ? AND steps.created_at >= ? AND steps.created_at < ?`,
+      )
+      .get(id, start, end) as Row;
+    return { tasksToday: Number(tasks.n), stepsToday: Number(steps.n) };
   }
 
   setAgentHealth(id: string, health: WorkerHealth): void {
@@ -271,7 +370,14 @@ export class Store {
    * Creates the task, or returns the one already created with this key.
    * `created` tells the caller which, so it only announces new tasks.
    */
-  createTask(req: Omit<CreateTaskRequest, "agentId"> & { agentId: string }, modelProfileId: string): { task: Task; created: boolean } {
+  createTask(
+    req: Omit<CreateTaskRequest, "agentId" | "source"> & {
+      agentId: string;
+      source?: "user" | "chat" | "goal";
+      goalId?: string | null;
+    },
+    modelProfileId: string,
+  ): { task: Task; created: boolean } {
     return this.tx(() => {
       const existing = this.db.prepare("SELECT * FROM tasks WHERE idempotency_key = ?").get(req.idempotencyKey) as
         | Row
@@ -282,11 +388,14 @@ export class Store {
       const t = now();
       this.db
         .prepare(
-          `INSERT INTO tasks (id, agent_id, prompt, status, model_profile_id, workspace, budget, idempotency_key, context, created_at, updated_at)
-           VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO tasks (
+             id, agent_id, prompt, status, source, goal_id, model_profile_id, workspace,
+             budget, idempotency_key, context, created_at, updated_at
+           ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          id, req.agentId, req.prompt, modelProfileId, `/workspace/tasks/${id}`, json(budget), req.idempotencyKey,
+          id, req.agentId, req.prompt, req.source ?? "user", req.goalId ?? null, modelProfileId,
+          `/workspace/tasks/${id}`, json(budget), req.idempotencyKey,
           req.context?.trim() || null, t, t,
         );
       return { task: this.task(id)!, created: true };
@@ -309,11 +418,26 @@ export class Store {
     return (row?.started_at as string | null) ?? null;
   }
 
-  tasks(filter: { active?: boolean; limit?: number } = {}): Task[] {
-    const where = filter.active ? "WHERE status NOT IN ('succeeded','failed','cancelled')" : "";
+  tasks(filter: { active?: boolean; limit?: number; agentId?: string; source?: Task["source"]; goalId?: string } = {}): Task[] {
+    const clauses: string[] = [];
+    const values: SQLInputValue[] = [];
+    if (filter.active) clauses.push("status NOT IN ('succeeded','failed','cancelled')");
+    if (filter.agentId) {
+      clauses.push("agent_id = ?");
+      values.push(filter.agentId);
+    }
+    if (filter.source) {
+      clauses.push("source = ?");
+      values.push(filter.source);
+    }
+    if (filter.goalId) {
+      clauses.push("goal_id = ?");
+      values.push(filter.goalId);
+    }
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const rows = this.db
       .prepare(`SELECT * FROM tasks ${where} ORDER BY created_at DESC LIMIT ?`)
-      .all(filter.limit ?? 50) as Row[];
+      .all(...values, filter.limit ?? 50) as Row[];
     return rows.map(toTask);
   }
 
@@ -321,7 +445,9 @@ export class Store {
   inFlightTasks(): Task[] {
     return (
       this.db
-        .prepare("SELECT * FROM tasks WHERE status IN ('starting','running','waiting_for_approval') ORDER BY created_at")
+        .prepare(
+          "SELECT * FROM tasks WHERE status IN ('starting','running','waiting_for_approval','waiting_for_answer') ORDER BY created_at",
+        )
         .all() as Row[]
     ).map(toTask);
   }
@@ -357,10 +483,191 @@ export class Store {
   }
 
   setTaskStatus(id: string, status: TaskStatus): void {
-    const startedAt = status === "starting" ? now() : null;
+    const row = this.db
+      .prepare("SELECT status, inactive_since, inactive_ms FROM tasks WHERE id = ?")
+      .get(id) as Row | undefined;
+    if (!row) return;
+    const t = now();
+    const wasInactive = row.status === "paused" || row.status === "waiting_for_answer";
+    const isInactive = status === "paused" || status === "waiting_for_answer";
+    let inactiveMs = Number(row.inactive_ms ?? 0);
+    if (wasInactive && !isInactive && row.inactive_since) {
+      inactiveMs += Math.max(0, Date.parse(t) - Date.parse(String(row.inactive_since)));
+    }
+    const inactiveSince = isInactive ? (wasInactive ? (row.inactive_since ?? t) : t) : null;
+    const startedAt = status === "starting" ? t : null;
     this.db
-      .prepare("UPDATE tasks SET status = ?, updated_at = ?, started_at = COALESCE(started_at, ?) WHERE id = ?")
-      .run(status, now(), startedAt, id);
+      .prepare(
+        `UPDATE tasks
+         SET status = ?, updated_at = ?, started_at = COALESCE(started_at, ?),
+             inactive_ms = ?, inactive_since = ?
+         WHERE id = ?`,
+      )
+      .run(status, t, startedAt, inactiveMs, inactiveSince, id);
+  }
+
+  setWaitingReason(id: string, reason: Task["waitingReason"]): void {
+    const row = this.db
+      .prepare("SELECT status, started_at, inactive_ms, inactive_since FROM tasks WHERE id = ?")
+      .get(id) as Row | undefined;
+    if (!row) return;
+    const t = now();
+    let inactiveMs = Number(row.inactive_ms ?? 0);
+    let inactiveSince = row.inactive_since ?? null;
+    const waitingAfterStart = row.status === "queued" && row.started_at != null;
+    if (reason && waitingAfterStart && !inactiveSince) inactiveSince = t;
+    if (!reason && waitingAfterStart && inactiveSince) {
+      inactiveMs += Math.max(0, Date.parse(t) - Date.parse(String(inactiveSince)));
+      inactiveSince = null;
+    }
+    this.db
+      .prepare(
+        `UPDATE tasks
+         SET waiting_reason = ?, inactive_ms = ?, inactive_since = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(reason, inactiveMs, inactiveSince, t, id);
+  }
+
+  requestPause(id: string, byAgent: boolean): void {
+    const row = this.db
+      .prepare("SELECT pause_requested, paused_by_agent FROM tasks WHERE id = ?")
+      .get(id) as Row | undefined;
+    const userAlreadyRequested =
+      Number(row?.pause_requested ?? 0) === 1 && Number(row?.paused_by_agent ?? 0) === 0;
+    this.db
+      .prepare("UPDATE tasks SET pause_requested = 1, paused_by_agent = ?, updated_at = ? WHERE id = ?")
+      .run(byAgent && !userAlreadyRequested ? 1 : 0, now(), id);
+  }
+
+  clearPauseRequest(id: string): void {
+    this.db
+      .prepare("UPDATE tasks SET pause_requested = 0, paused_by_agent = 0, updated_at = ? WHERE id = ?")
+      .run(now(), id);
+  }
+
+  pauseTask(id: string, from: TaskStatus, byAgent: boolean): void {
+    this.db
+      .prepare(
+        `UPDATE tasks
+         SET paused_from_status = ?, paused_by_agent = ?, pause_requested = 0,
+             waiting_reason = NULL, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(from, byAgent ? 1 : 0, now(), id);
+    this.setTaskStatus(id, "paused");
+    // Approval wait already excludes this interval. If it resolves while the
+    // task remains paused, inactivity starts at that boundary instead.
+    if (from === "waiting_for_approval") {
+      this.db.prepare("UPDATE tasks SET inactive_since = NULL WHERE id = ?").run(id);
+    }
+  }
+
+  resumeTask(id: string): TaskStatus {
+    const row = this.db.prepare("SELECT question FROM tasks WHERE id = ?").get(id) as Row;
+    const restore = row.question != null ? "waiting_for_answer" : "queued";
+    this.db
+      .prepare(
+        "UPDATE tasks SET pause_requested = 0, paused_by_agent = 0, paused_from_status = NULL, waiting_reason = NULL WHERE id = ?",
+      )
+      .run(id);
+    this.setTaskStatus(id, restore);
+    return restore;
+  }
+
+  pauseRequested(id: string): boolean {
+    const row = this.db.prepare("SELECT pause_requested FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return Number(row?.pause_requested ?? 0) === 1;
+  }
+
+  pausedByAgent(id: string): boolean {
+    const row = this.db.prepare("SELECT paused_by_agent FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return Number(row?.paused_by_agent ?? 0) === 1;
+  }
+
+  pausedFromStatus(id: string): TaskStatus | null {
+    const row = this.db.prepare("SELECT paused_from_status FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return (row?.paused_from_status as TaskStatus | null) ?? null;
+  }
+
+  startTaskInactivity(id: string): void {
+    this.db
+      .prepare("UPDATE tasks SET inactive_since = COALESCE(inactive_since, ?), updated_at = ? WHERE id = ?")
+      .run(now(), now(), id);
+  }
+
+  activeTasksForAgent(agentId: string): Task[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM tasks
+           WHERE agent_id = ? AND status NOT IN ('succeeded','failed','cancelled')
+           ORDER BY created_at`,
+        )
+        .all(agentId) as Row[]
+    ).map(toTask);
+  }
+
+  tasksWithPendingQuestions(): Task[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM tasks
+           WHERE question IS NOT NULL AND status NOT IN ('succeeded','failed','cancelled')
+           ORDER BY question_asked_at`,
+        )
+        .all() as Row[]
+    ).map(toTask);
+  }
+
+  setQuestion(id: string, question: TaskQuestion): void {
+    const t = now();
+    this.db
+      .prepare(
+        `UPDATE tasks
+         SET question = ?, question_count = question_count + 1, question_asked_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(json(question), t, t, id);
+    this.setTaskStatus(id, "waiting_for_answer");
+  }
+
+  questionCount(id: string): number {
+    const row = this.db.prepare("SELECT question_count FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return Number(row?.question_count ?? 0);
+  }
+
+  questionAskedAt(id: string): string | null {
+    const row = this.db.prepare("SELECT question_asked_at FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return (row?.question_asked_at as string | null) ?? null;
+  }
+
+  answerQuestion(id: string, answer: string): TaskQuestion | null {
+    return this.tx(() => {
+      const row = this.db.prepare("SELECT question, answers FROM tasks WHERE id = ?").get(id) as Row | undefined;
+      if (!row?.question) return null;
+      const question = parse<TaskQuestion>(row.question);
+      const answers = parse<AnswerRow[]>(row.answers ?? "[]");
+      answers.push({ question, answer });
+      this.db
+        .prepare("UPDATE tasks SET question = NULL, question_asked_at = NULL, answers = ?, updated_at = ? WHERE id = ?")
+        .run(json(answers), now(), id);
+      return question;
+    });
+  }
+
+  taskAnswers(id: string): AnswerRow[] {
+    const row = this.db.prepare("SELECT answers FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return row ? parse<AnswerRow[]>(row.answers ?? "[]") : [];
+  }
+
+  taskInactiveMs(id: string, at = Date.now()): number {
+    const row = this.db
+      .prepare("SELECT inactive_ms, inactive_since FROM tasks WHERE id = ?")
+      .get(id) as Row | undefined;
+    if (!row) return 0;
+    return Number(row.inactive_ms ?? 0) +
+      (row.inactive_since ? Math.max(0, at - Date.parse(String(row.inactive_since))) : 0);
   }
 
   finishTask(
@@ -369,7 +676,12 @@ export class Store {
     detail: { result?: { summary: string; artifacts: string[] }; error?: { reason: FailureReason; message: string } },
   ): void {
     this.db
-      .prepare("UPDATE tasks SET status = ?, result = ?, error = ?, updated_at = ? WHERE id = ?")
+      .prepare(
+        `UPDATE tasks
+         SET status = ?, result = ?, error = ?, question = NULL, question_asked_at = NULL,
+             waiting_reason = NULL, inactive_since = NULL, updated_at = ?
+         WHERE id = ?`,
+      )
       .run(status, detail.result ? json(detail.result) : null, detail.error ? json(detail.error) : null, now(), id);
   }
 
@@ -544,6 +856,165 @@ export class Store {
     return Number(r.changes) > 0;
   }
 
+  // ── Goals ─────────────────────────────────────────────────────────────────
+
+  createGoal(input: {
+    agentId: string;
+    title: string;
+    instructions: string;
+    schedule: Schedule;
+    modelProfileId?: string | null;
+    nextRunAt: string | null;
+  }): Goal {
+    const id = randomUUID();
+    const t = now();
+    this.db
+      .prepare(
+        `INSERT INTO goals (
+           id, agent_id, title, instructions, schedule, model_profile_id, status,
+           next_run_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+      )
+      .run(
+        id, input.agentId, input.title, input.instructions, json(input.schedule),
+        input.modelProfileId ?? null, input.nextRunAt, t, t,
+      );
+    return this.goal(id)!;
+  }
+
+  goal(id: string): Goal | null {
+    const row = this.db.prepare("SELECT * FROM goals WHERE id = ? AND archived = 0").get(id) as Row | undefined;
+    return row ? toGoal(row) : null;
+  }
+
+  goals(agentId?: string): Goal[] {
+    const rows = agentId
+      ? this.db.prepare("SELECT * FROM goals WHERE archived = 0 AND agent_id = ? ORDER BY created_at DESC").all(agentId)
+      : this.db.prepare("SELECT * FROM goals WHERE archived = 0 ORDER BY created_at DESC").all();
+    return (rows as Row[]).map(toGoal);
+  }
+
+  updateGoal(
+    id: string,
+    patch: Partial<Pick<Goal, "title" | "instructions" | "schedule" | "modelProfileId" | "status" | "nextRunAt">>,
+  ): Goal | null {
+    const fields: string[] = [];
+    const values: SQLInputValue[] = [];
+    const add = (name: string, value: SQLInputValue) => {
+      fields.push(`${name} = ?`);
+      values.push(value);
+    };
+    if (patch.title !== undefined) add("title", patch.title);
+    if (patch.instructions !== undefined) add("instructions", patch.instructions);
+    if (patch.schedule !== undefined) add("schedule", json(patch.schedule));
+    if (patch.modelProfileId !== undefined) add("model_profile_id", patch.modelProfileId);
+    if (patch.status !== undefined) add("status", patch.status);
+    if (patch.nextRunAt !== undefined) add("next_run_at", patch.nextRunAt);
+    if (fields.length === 0) return this.goal(id);
+    fields.push("updated_at = ?");
+    values.push(now(), id);
+    this.db.prepare(`UPDATE goals SET ${fields.join(", ")} WHERE id = ? AND archived = 0`).run(...values);
+    return this.goal(id);
+  }
+
+  archiveGoal(id: string): boolean {
+    const r = this.db
+      .prepare("UPDATE goals SET archived = 1, next_run_at = NULL, updated_at = ? WHERE id = ? AND archived = 0")
+      .run(now(), id);
+    return Number(r.changes) > 0;
+  }
+
+  dueGoals(at = new Date()): Goal[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT * FROM goals
+           WHERE archived = 0 AND status = 'active' AND next_run_at IS NOT NULL AND next_run_at <= ?
+           ORDER BY next_run_at`,
+        )
+        .all(at.toISOString()) as Row[]
+    ).map(toGoal);
+  }
+
+  activeGoalTask(goalId: string): Task | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM tasks
+         WHERE goal_id = ? AND status NOT IN ('succeeded','failed','cancelled')
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(goalId) as Row | undefined;
+    return row ? toTask(row) : null;
+  }
+
+  recordGoalRun(goalId: string, taskId: string, nextRunAt: string | null): void {
+    const t = now();
+    this.db
+      .prepare(
+        `UPDATE goals
+         SET last_run_at = ?, last_task_id = ?, next_run_at = ?, updated_at = ?
+         WHERE id = ? AND archived = 0`,
+      )
+      .run(t, taskId, nextRunAt, t, goalId);
+  }
+
+  completeGoalRun(goalId: string, summary: string, achieved: boolean): Goal | null {
+    const t = now();
+    this.db
+      .prepare(
+        `UPDATE goals
+         SET last_summary = ?, status = CASE WHEN ? THEN 'achieved' ELSE status END,
+             next_run_at = CASE WHEN ? THEN NULL ELSE next_run_at END, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(summary, achieved ? 1 : 0, achieved ? 1 : 0, t, goalId);
+    const row = this.db.prepare("SELECT * FROM goals WHERE id = ?").get(goalId) as Row | undefined;
+    return row ? toGoal(row) : null;
+  }
+
+  // ── Memory ────────────────────────────────────────────────────────────────
+
+  notes(agentId: string): Note[] {
+    return (
+      this.db.prepare("SELECT * FROM notes WHERE agent_id = ? ORDER BY created_at DESC, rowid DESC").all(agentId) as Row[]
+    ).map(toNote);
+  }
+
+  addNote(input: { agentId: string; text: string; source: Note["source"]; taskId?: string | null }): Note | null {
+    if (input.source === "agent") {
+      const duplicate = this.db
+        .prepare("SELECT * FROM notes WHERE agent_id = ? AND text = ? ORDER BY created_at DESC LIMIT 1")
+        .get(input.agentId, input.text) as Row | undefined;
+      if (duplicate) return toNote(duplicate);
+    }
+    const id = randomUUID();
+    this.db
+      .prepare("INSERT INTO notes (id, agent_id, text, source, task_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, input.agentId, input.text, input.source, input.taskId ?? null, now());
+    const count = Number(
+      (this.db.prepare("SELECT COUNT(*) AS n FROM notes WHERE agent_id = ?").get(input.agentId) as Row).n,
+    );
+    if (count > 50) {
+      const excess = count - 50;
+      this.db
+        .prepare(
+          `DELETE FROM notes WHERE id IN (
+             SELECT id FROM notes WHERE agent_id = ?
+             ORDER BY CASE WHEN source = 'agent' THEN 0 ELSE 1 END, created_at, rowid
+             LIMIT ?
+           )`,
+        )
+        .run(input.agentId, excess);
+    }
+    const kept = this.db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as Row | undefined;
+    return kept ? toNote(kept) : null;
+  }
+
+  deleteNote(agentId: string, noteId: string): boolean {
+    const r = this.db.prepare("DELETE FROM notes WHERE id = ? AND agent_id = ?").run(noteId, agentId);
+    return Number(r.changes) > 0;
+  }
+
   // ── Events ────────────────────────────────────────────────────────────────
 
   /** Appends an event; the per-task sequence is assigned in the same transaction. */
@@ -604,12 +1075,18 @@ export class Store {
   }
 }
 
-function toAgent(r: Row): Agent {
+function toAgent(r: Row, usage: Agent["usage"]): Agent {
   return {
     id: String(r.id),
     name: String(r.custom_name ?? r.name),
     vmId: String(r.vm_id),
     status: String(r.status) as Agent["status"],
+    paused: Number(r.paused ?? 0) === 1,
+    limits: {
+      tasksPerDay: Number(r.tasks_per_day ?? 30),
+      stepsPerDay: Number(r.steps_per_day ?? 300),
+    },
+    usage,
     color: (r.color as string | null) ?? null,
     modelProfileId: String(r.model_profile_id),
     lastSeenAt: (r.last_seen_at as string | null) ?? null,
@@ -623,6 +1100,10 @@ function toTask(r: Row): Task {
     agentId: String(r.agent_id),
     prompt: String(r.prompt),
     status: String(r.status) as TaskStatus,
+    source: String(r.source ?? "user") as Task["source"],
+    goalId: (r.goal_id as string | null) ?? null,
+    question: parseOrNull(r.question),
+    waitingReason: (r.waiting_reason as Task["waitingReason"]) ?? null,
     modelProfileId: String(r.model_profile_id),
     workspace: String(r.workspace),
     budget: parse<Budget>(r.budget),
@@ -632,6 +1113,35 @@ function toTask(r: Row): Task {
     cancelRequested: Number(r.cancel_requested) === 1,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
+  };
+}
+
+function toGoal(r: Row): Goal {
+  return {
+    id: String(r.id),
+    agentId: String(r.agent_id),
+    title: String(r.title),
+    instructions: String(r.instructions),
+    schedule: parse<Schedule>(r.schedule),
+    modelProfileId: (r.model_profile_id as string | null) ?? null,
+    status: String(r.status) as Goal["status"],
+    nextRunAt: (r.next_run_at as string | null) ?? null,
+    lastRunAt: (r.last_run_at as string | null) ?? null,
+    lastTaskId: (r.last_task_id as string | null) ?? null,
+    lastSummary: (r.last_summary as string | null) ?? null,
+    createdAt: String(r.created_at),
+    updatedAt: String(r.updated_at),
+  };
+}
+
+function toNote(r: Row): Note {
+  return {
+    id: String(r.id),
+    agentId: String(r.agent_id),
+    text: String(r.text),
+    source: String(r.source) as Note["source"],
+    taskId: (r.task_id as string | null) ?? null,
+    createdAt: String(r.created_at),
   };
 }
 

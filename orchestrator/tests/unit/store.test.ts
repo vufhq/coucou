@@ -57,6 +57,44 @@ describe("store", () => {
     expect(store.decideApproval(a.id, "rejected")).toBe(false);
     expect(store.approval(a.id)?.status).toBe("approved");
   });
+
+  it("does not count paused approval time twice", () => {
+    const task = store.createTask(req("key-approval-pause"), "scripted").task;
+    store.setTaskStatus(task.id, "starting");
+    store.setTaskStatus(task.id, "waiting_for_approval");
+    store.pauseTask(task.id, "waiting_for_approval", false);
+    expect(store.taskInactiveMs(task.id)).toBe(0);
+    expect(store.pausedFromStatus(task.id)).toBe("waiting_for_approval");
+    store.startTaskInactivity(task.id);
+    expect(store.taskInactiveMs(task.id)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("counts local-day usage and caps memory by dropping agent notes first", () => {
+    const task = store.createTask(req("key-usage-01"), "scripted").task;
+    store.setTaskStatus(task.id, "starting");
+    store.setTaskStatus(task.id, "running");
+    store.addStep({ taskId: task.id, note: "", op: "fs.list", args: {} });
+    expect(store.agent("agent-01")?.usage).toEqual({ tasksToday: 1, stepsToday: 1 });
+
+    const user = store.addNote({ agentId: "agent-01", text: "user note", source: "user" });
+    for (let index = 0; index < 50; index++) {
+      store.addNote({ agentId: "agent-01", text: `agent note ${index}`, source: "agent", taskId: task.id });
+    }
+    const notes = store.notes("agent-01");
+    expect(notes).toHaveLength(50);
+    expect(notes.some((note) => note.id === user!.id)).toBe(true);
+    expect(notes.some((note) => note.text === "agent note 0")).toBe(false);
+    expect(store.addNote({ agentId: "agent-01", text: "agent note 49", source: "agent" })!.id).toBe(
+      notes.find((note) => note.text === "agent note 49")!.id,
+    );
+
+    store.ensureAgent({ id: "agent-02", name: "Agent 02", vmId: "wsl:agent-02", modelProfileId: "scripted" });
+    for (let index = 0; index < 50; index++) {
+      store.addNote({ agentId: "agent-02", text: `user note ${index}`, source: "user" });
+    }
+    expect(store.addNote({ agentId: "agent-02", text: "agent note", source: "agent" })).toBeNull();
+    expect(store.notes("agent-02")).toHaveLength(50);
+  });
 });
 
 describe("retention", () => {
@@ -97,11 +135,36 @@ describe("retention", () => {
     db.exec(`CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT NOT NULL, vm_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'offline', model_profile_id TEXT NOT NULL, last_seen_at TEXT,
       approved_domains TEXT NOT NULL DEFAULT '[]')`);
+    db.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, agent_id TEXT NOT NULL, prompt TEXT NOT NULL, status TEXT NOT NULL,
+      model_profile_id TEXT NOT NULL, workspace TEXT NOT NULL, budget TEXT NOT NULL,
+      steps INTEGER NOT NULL DEFAULT 0, result TEXT, error TEXT,
+      cancel_requested INTEGER NOT NULL DEFAULT 0, idempotency_key TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT
+    )`);
     db.exec(`INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES ('agent-01', 'Agent 01', 'wsl:agent-01', 'scripted')`);
+    db.exec(`INSERT INTO tasks (
+      id, agent_id, prompt, status, model_profile_id, workspace, budget,
+      idempotency_key, created_at, updated_at
+    ) VALUES (
+      'old-task', 'agent-01', 'keep me', 'queued', 'scripted', '/workspace/tasks/old-task',
+      '{"maxSteps":20,"timeoutMs":600000,"opTimeoutMs":60000}',
+      'old-task-key', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+    )`);
     db.close();
     const migrated = new Store(path);
     try {
       expect(migrated.agent("agent-01")?.health).toBeNull();
+      expect(migrated.agent("agent-01")).toMatchObject({
+        paused: false,
+        limits: { tasksPerDay: 30, stepsPerDay: 300 },
+      });
+      expect(migrated.task("old-task")).toMatchObject({
+        prompt: "keep me",
+        source: "user",
+        goalId: null,
+        question: null,
+      });
       migrated.setAgentHealth("agent-01", { diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
       expect(migrated.agent("agent-01")?.health).toMatchObject({ diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
     } finally {
