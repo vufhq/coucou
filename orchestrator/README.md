@@ -7,7 +7,7 @@ WSL2 VM, one task at a time**, with a reconnectable activity stream into Coucou.
 ```
 Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (this folder, Node on Windows)
                                                                  tasks · steps · jobs · approvals · events (SQLite)
-                                                                 policy · model router (Claude Code CLI)
+                                                                 policy · model router (Claude Code / Cursor CLIs)
                                                                      ▲ worker pulls jobs (WSL interface :47621)
                                                        agent-01 (WSL2, Ubuntu 24.04) — coucou-worker
                                                        browser (Playwright/Chromium) · files · terminal
@@ -28,7 +28,8 @@ The model never gets host access, credentials or control over the VM.
 
 ## Setup
 
-You need Node 24+ on Windows, WSL2, and Claude Code signed in with your subscription (`claude` on PATH).
+You need Node 24+ on Windows, WSL2, and at least one subscription CLI signed in:
+Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
 
 1. **Install and start the backend once.** This creates its two access tokens
    in the Windows Credential Manager (`orchestrator-token`,
@@ -60,7 +61,8 @@ You need Node 24+ on Windows, WSL2, and Claude Code signed in with your subscrip
    `D:\coucou-vms\agent-01`. Pass `-Location` to put it somewhere else. It then
    installs Node, Chromium and the worker, and restarts the distro. To update
    the worker later, run the same command with `-Update`. The disk and
-   `/workspace` are kept.
+   `/workspace` are kept. (After a backend update that changes the worker, as
+   0.2 did for downloads and health reports, run `-Update` once.)
 
 3. **In Coucou**, open **Tasks** in the sidebar and switch on
    **Orchestrator backend**. Then give agent-01 a task, for example:
@@ -70,15 +72,46 @@ You need Node 24+ on Windows, WSL2, and Claude Code signed in with your subscrip
 Keep `npm start` running. Closing Coucou does not stop a task. Stopping the
 backend pauses tasks, and they carry on when it starts again.
 
+## Models
+
+Each task runs on one model profile, picked on the Tasks page (or `modelProfileId` in `POST /api/tasks`).
+`GET /api/models` lists what this machine has.
+
+| Profile | Runs | Locked down by |
+|---|---|---|
+| `claude-cli` | Claude Code CLI, your Claude subscription | `--tools ""` (every tool off), `--restricted`, no MCP, no saved session, an empty folder, answer forced into the decision schema |
+| `cursor-cli` | Cursor CLI (`%LOCALAPPDATA%\cursor-agent`), your Cursor subscription | a private home (none of your Cursor or Claude hooks, MCP servers or settings), a `cli-config.json` there denying `Shell`, `Read`, `Write`, `WebFetch` and `Mcp`, read-only ask mode, no `--force`, an empty folder |
+| `local` | An OpenAI-compatible `/v1` server on this machine (`ORCH_LOCAL_URL`, loopback only) | no tools; only the JSON decision is sent to the server |
+
+Cursor's CLI has no switch that turns its tools off, and its sandbox is macOS/Linux only, so its locks were
+checked on Windows against a canary file: reading it (outside and inside the folder), running `whoami`,
+fetching a page and calling a Gmail MCP tool were all refused, and the canary never appeared.
+
+When a model is rate-limited or unavailable, the task carries on with the other one (`ORCH_MODEL_FALLBACK=0`
+turns that off). A bad answer, a timeout or a cancellation never switches models.
+
+Cursor syncs the plugins installed on your Cursor account into its private home: about 4 GB on this machine,
+downloaded once. Point `ORCH_CURSOR_STATE_DIR` at a drive with room.
+
 ## Configuration
+
+Settings go in the environment or in a `.env` file next to `package.json` (git-ignored; `npm start` reads it).
 
 | Variable | Default | |
 |---|---|---|
 | `ORCH_API_PORT` | `47620` | Coucou's API, always on 127.0.0.1 |
 | `ORCH_WORKER_PORT` | `47621` | The worker's listener |
 | `ORCH_WORKER_HOST` | WSL adapter address | Where the worker listener binds |
+| `ORCH_MODEL_PROFILE` | `claude-cli` | The model tasks use unless they name one |
+| `ORCH_MODEL_FALLBACK` | on | `0`: never switch models after a rate limit |
 | `ORCH_CLAUDE_MODEL` | Claude Code's default | e.g. `sonnet`, `opus` |
+| `ORCH_CURSOR_MODEL` | Cursor's default | e.g. `gpt-5.3-codex`, `sonnet-4.5` |
+| `ORCH_CURSOR_DIR` | `%LOCALAPPDATA%\cursor-agent` | Where the Cursor CLI is installed |
+| `ORCH_CURSOR_STATE_DIR` | `<data dir>\cursor` | Cursor's private home and empty folder (several GB) |
+| `ORCH_LOCAL_URL` | unset | Base URL of an OpenAI-compatible server on this machine (loopback only), e.g. `http://127.0.0.1:11434/v1` |
+| `ORCH_LOCAL_MODEL` | `local` | Model sent to the local server |
 | `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
+| `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
 | `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distro running |
 
 ## Safety model
@@ -97,8 +130,8 @@ backend pauses tasks, and they carry on when it starts again.
   and `ProtectSystem=strict`. It may write to `/workspace` only.
 - **Secrets:** tokens live in the Credential Manager and in a root-only file
   in the VM. Every event and job result is redacted before it is stored,
-  streamed, or shown to the model. The Claude CLI runs with every tool off,
-  restricted, and in an empty folder, so it can only answer.
+  streamed, or shown to the model. Both model CLIs run so that they can only
+  answer (see Models): no shell, no files, no web, no MCP on this computer.
 - **Isolation limit:** all WSL2 distros on this PC, including Docker's and
   Podman's, share one utility VM and kernel. agent-01 is isolated from Windows,
   but it shares a kernel with those distros.
@@ -119,19 +152,43 @@ backend pauses tasks, and they carry on when it starts again.
   it, `timeout` for both the task budget (10 min of work, not counting time
   waiting for you) and each operation (60 s), `max_steps` after 20 steps,
   `rate_limited` when you reach your plan's limit, and `model_error`.
+- A model that times out or can't be reached is asked again after 5 s, then
+  after 20 s, before the task fails. A rate limit isn't retried: plan limits
+  last hours, and the other models have already been tried.
+- A task that runs out of time while the agent's computer is offline fails as
+  `worker_lost`, not `timeout`.
+- **Health:** the worker reports its free disk space and whether Chromium is
+  installed, once a minute. Coucou's Tasks page shows the agent's state and
+  what is wrong: its computer is stopped (checked with
+  `wsl --list --running`), its worker does not answer, its disk has under
+  1 GB free, or Chromium is missing.
+- **Retention:** every 6 hours the backend removes finished tasks older than
+  `ORCH_RETENTION_DAYS`, and the worker removes task folders in the VM nothing
+  has touched for a day longer than that. Tasks still running are never touched.
+- **Downloads:** files come down byte for byte, up to 8 MB, screenshots
+  included. The bytes go straight from the worker to Coucou: they are never
+  stored in the database or the event log. Text files (`.md`, `.txt`, `.json`,
+  `.csv`, `.html`…) are redacted like everything else that leaves the VM as text.
+  Downloading is the backend's own operation (`fs.fetch`): a model can't ask for it.
 
 ## Tests
 
 ```powershell
-npm test          # 72 tests: unit + integration (real backend and worker, fake browser, scripted model)
+npm test          # unit + integration (real backend and worker, fake browser, scripted models)
 npm run typecheck
 ```
 
-## Known limits (Phase 1)
+## Known limits
 
 - One agent, one task at a time. Further tasks queue.
-- File download through the API is text only. Screenshots are listed but not downloadable yet.
+- Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
+  with `provision.ps1 -Update`.
 - After you approve a site, redirects to another site are followed without asking.
   The host and the LAN stay blocked.
-- Only Claude (through the Claude Code CLI) is wired up as a model. The
-  OpenAI-compatible adapter and Codex/Cursor CLIs come in Phase 3.
+- Models: Claude Code, Cursor, and an optional OpenAI-compatible server on this
+  machine. ChatGPT through the Codex CLI (`server/src/model/codex-cli.ts`) is not
+  enabled: Codex's read-only sandbox still lets the model run commands that read
+  files, credentials included, so it waits until it is locked down and passes the
+  canary probe Cursor passed.
+- Cursor's account plugins load in its private home: their tools are denied,
+  but their skill text reaches the model's context.

@@ -35,9 +35,17 @@ export interface RunnerOptions {
   pollMs?: number;
   /** A failed model answer is shown to it and asked again this many times. */
   modelRetries?: number;
+  /**
+   * A model that timed out or could not be reached is asked again after each
+   * of these pauses; a rate limit is not (it lasts hours, and the router has
+   * already tried the fallbacks).
+   */
+  transientRetryDelaysMs?: number[];
 }
 
-const SYSTEM = `You are agent-01, an agent working inside an isolated Linux computer.
+type ModelAnswer = { decision: Decision; profileId: string };
+
+export const SYSTEM_PROMPT = `You are agent-01, an agent working inside an isolated Linux computer.
 You complete the user's task one operation at a time. Each reply is ONE JSON object:
 
   {"kind":"action","note":"<one short sentence>","op":"<operation>","args":{...}}
@@ -75,7 +83,13 @@ export class Runner {
     this.store = store;
     this.events = events;
     this.models = models;
-    this.options = { modelTimeoutMs: 180_000, pollMs: 1_000, modelRetries: 2, ...options };
+    this.options = {
+      modelTimeoutMs: 180_000,
+      pollMs: 1_000,
+      modelRetries: 2,
+      transientRetryDelaysMs: [5_000, 20_000],
+      ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
+    } as Required<RunnerOptions>;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -172,6 +186,8 @@ export class Runner {
   }
 
   private async loop(taskId: string): Promise<void> {
+    let decisionFeedback = "";
+    let answeringProfile: string | null = null;
     while (!this.stopped) {
       const task = this.store.task(taskId);
       if (!task || FINAL_STATUSES.has(task.status)) return;
@@ -180,7 +196,12 @@ export class Runner {
         await this.waitForPoke(taskId, this.options.pollMs * 30);
         continue;
       }
-      if (this.activeMs(task) > task.budget.timeoutMs) return this.fail(task, "timeout", "the task ran out of time");
+      if (this.activeMs(task) > task.budget.timeoutMs) {
+        if (this.store.agent(task.agentId)?.status === "offline") {
+          return this.fail(task, "worker_lost", "the task ran out of time while the agent's computer was offline");
+        }
+        return this.fail(task, "timeout", "the task ran out of time");
+      }
 
       const last = this.store.lastStep(taskId);
       if (last && !last.outcome) {
@@ -191,12 +212,29 @@ export class Runner {
         return this.fail(task, "max_steps", `stopped after ${task.budget.maxSteps} steps without finishing`);
       }
 
-      const decision = await this.askModel(task);
+      const decision = await this.askModel(task, decisionFeedback);
+      decisionFeedback = "";
       if (decision === "retry") continue;
       if (decision === null) return;
-      if (decision.kind === "done") return this.succeed(task, decision.summary);
+      answeringProfile = decision.profileId;
+      if (decision.decision.kind === "done") return this.succeed(task, decision.decision.summary, answeringProfile);
 
-      const step = this.store.addStep({ taskId, note: decision.note, op: decision.op.op, args: decision.op.args });
+      if (
+        last?.outcome?.status === "succeeded" &&
+        last.op === decision.decision.op.op &&
+        JSON.stringify(last.args) === JSON.stringify(decision.decision.op.args)
+      ) {
+        decisionFeedback =
+          "\n\nYour previous operation already succeeded with the result shown above. Do not repeat it; reply with kind \"done\" now if the task is complete.";
+        continue;
+      }
+
+      const step = this.store.addStep({
+        taskId,
+        note: decision.decision.note,
+        op: decision.decision.op.op,
+        args: decision.decision.op.args,
+      });
       this.judge(task, step);
     }
   }
@@ -297,27 +335,37 @@ export class Runner {
 
   // ── The model ─────────────────────────────────────────────────────────────
 
-  private async askModel(task: Task): Promise<Decision | "retry" | null> {
+  private async askModel(task: Task, extra = ""): Promise<ModelAnswer | "retry" | null> {
     let feedback = "";
+    let transient = 0;
     for (let attempt = 0; attempt <= this.options.modelRetries; attempt++) {
       const controller = new AbortController();
       this.modelCalls.set(task.id, controller);
       try {
         const out = await this.models.generate(task.modelProfileId, {
-          system: SYSTEM,
-          prompt: this.prompt(task) + feedback,
+          system: SYSTEM_PROMPT,
+          prompt: this.prompt(task, extra) + feedback,
           jsonSchema: DECISION_JSON_SCHEMA,
           timeoutMs: this.options.modelTimeoutMs,
           signal: controller.signal,
         });
         const parsed = parseDecision(out.json);
-        if (parsed.ok) return parsed.decision;
+        if (parsed.ok) return { decision: parsed.decision, profileId: out.profileId };
         feedback = `\n\nYour previous answer was refused: ${parsed.error}. Answer again with one valid JSON object.`;
       } catch (err) {
         if (!(err instanceof ModelError)) throw err;
         if (err.code === "cancelled") return "retry";
         if (err.code === "malformed_output") {
           feedback = `\n\nYour previous answer was refused: ${err.message}. Answer again with one valid JSON object.`;
+          continue;
+        }
+        const pause = this.options.transientRetryDelaysMs[transient];
+        if ((err.code === "timeout" || err.code === "unavailable") && pause !== undefined && !this.stopped) {
+          transient++;
+          attempt--; // A lost answer is not a bad answer: it does not use up the format retries.
+          await this.waitForPoke(task.id, pause);
+          const now = this.store.task(task.id);
+          if (this.stopped || !now || now.cancelRequested || FINAL_STATUSES.has(now.status)) return "retry";
           continue;
         }
         this.fail(task, err.code === "rate_limited" ? "rate_limited" : "model_error", err.message);
@@ -331,7 +379,7 @@ export class Runner {
   }
 
   /** The task and everything that happened so far. Recent outcomes in full, older ones short. */
-  private prompt(task: Task): string {
+  private prompt(task: Task, extra = ""): string {
     const steps = this.store.steps(task.id);
     const lines = [`Task: ${task.prompt}`, "", `Task folder: ${task.workspace}`, ""];
     if (steps.length === 0) lines.push("No steps yet.");
@@ -347,15 +395,15 @@ export class Runner {
       lines.push(`<tool_output>\n${body}\n</tool_output>`);
     });
     lines.push("", `Steps left: ${task.budget.maxSteps - task.steps}. Reply with the next decision as one JSON object.`);
-    return lines.join("\n");
+    return lines.join("\n") + extra;
   }
 
   // ── Endings ───────────────────────────────────────────────────────────────
 
-  private succeed(task: Task, summary: string): void {
+  private succeed(task: Task, summary: string, modelProfileId: string | null): void {
     const artifacts = this.store.artifacts(task.id);
     this.store.finishTask(task.id, "succeeded", { result: { summary, artifacts } });
-    this.events.emit("task.completed", task.agentId, task.id, { summary, artifacts });
+    this.events.emit("task.completed", task.agentId, task.id, { summary, artifacts, ...(modelProfileId ? { modelProfileId } : {}) });
   }
 
   private fail(task: Task, reason: FailureReason, message: string): void {

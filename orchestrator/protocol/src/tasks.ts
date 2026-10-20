@@ -82,8 +82,28 @@ export const Agent = z.object({
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
   modelProfileId: z.string(),
   lastSeenAt: z.string().nullable(),
+  /** The worker's last health report, and when it came. */
+  health: z
+    .object({
+      diskFreeBytes: z.number(),
+      diskTotalBytes: z.number(),
+      browserReady: z.boolean(),
+      checkedAt: z.string(),
+    })
+    .nullable(),
 });
 export type Agent = z.infer<typeof Agent>;
+
+/**
+ * What is wrong with an agent's computer, if anything, as a code Coucou
+ * words in the user's language:
+ * - vm_stopped: the WSL distro is not running
+ * - worker_down: the distro runs but its worker does not answer
+ * - low_disk: under 1 GiB free in the workspace
+ * - no_browser: Chromium is missing, browser steps will fail
+ */
+export const AgentProblem = z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser"]);
+export type AgentProblem = z.infer<typeof AgentProblem>;
 
 export const ApprovalDecision = z.object({
   approvalId: z.string().min(1).max(64),

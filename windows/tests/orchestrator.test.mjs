@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
-import { eventLine, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
+import { agentLine, eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
 
 const AGENT = "agent_agent-01";
 
@@ -104,9 +104,28 @@ test("the Tasks page timeline reads each event, and leaves out the noise", () =>
   assert.equal(statusLabel("succeeded"), "Done");
 });
 
+test("the Tasks page names a model by the subscription it runs on", () => {
+  assert.equal(modelLabel("claude-cli"), "Claude");
+  assert.equal(modelLabel("cursor-cli"), "Cursor");
+  assert.equal(modelLabel("local-llm"), "local-llm");
+});
+
 test("every new task gets its own idempotency key, in the backend's alphabet", () => {
   const a = newTaskKey();
   const b = newTaskKey();
   assert.notEqual(a, b);
   for (const k of [a, b]) assert.match(k, /^[A-Za-z0-9_-]{8,64}$/);
+});
+
+test("an agent's line says its state, then what is wrong with its computer", () => {
+  assert.equal(agentLine({ id: "agent-01", name: "Agent 01", status: "ready", problems: [] }), "Ready");
+  assert.equal(agentLine({ id: "agent-01", name: "Agent 01", status: "busy" }), "Busy");
+  assert.equal(
+    agentLine({ id: "agent-01", name: "Agent 01", status: "offline", problems: ["vm_stopped"] }),
+    "Offline · Its Linux computer is not running.",
+  );
+  assert.equal(
+    agentLine({ id: "agent-01", name: "Agent 01", status: "ready", problems: ["low_disk", "no_browser"] }),
+    "Ready · Its disk is almost full. · Chromium is missing: web steps will fail.",
+  );
 });

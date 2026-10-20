@@ -822,6 +822,7 @@ pub fn run() {
             orchestrator::orchestrator_tasks,
             orchestrator::orchestrator_task,
             orchestrator::orchestrator_submit,
+            orchestrator::orchestrator_models,
             orchestrator::orchestrator_cancel,
             orchestrator::orchestrator_decide,
             orchestrator::orchestrator_files,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CreateTaskRequest, isPrivateHost, parseDecision, parseOperation } from "@coucou-orchestrator/protocol";
+import { CreateTaskRequest, DECISION_JSON_SCHEMA, isPrivateHost, parseDecision, parseOperation } from "@coucou-orchestrator/protocol";
 
 describe("operations", () => {
   it("accepts a well-formed operation and drops nothing it needs", () => {
@@ -45,6 +45,15 @@ describe("decisions", () => {
     if (!bad.ok) expect(bad.error).toMatch(/fs\.read/);
     expect(parseDecision({ kind: "done" }).ok).toBe(false);
     expect(parseDecision("yes").ok).toBe(false);
+  });
+
+  it("keeps backend-only operations out of the model's reach", () => {
+    expect(parseDecision({ kind: "action", op: "fs.fetch", args: { path: "a.png" } })).toEqual({
+      ok: false,
+      error: "unknown operation fs.fetch",
+    });
+    expect(DECISION_JSON_SCHEMA.properties.op.enum).not.toContain("fs.fetch");
+    expect(parseOperation("fs.fetch", { path: "a.png" }).ok).toBe(true);
   });
 });
 

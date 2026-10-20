@@ -1,3 +1,5 @@
 node_modules/
 # Local runs keep their database and tokens out of the tree.
 .data/
+# This machine's settings (ORCH_*), read by `npm start`.
+.env

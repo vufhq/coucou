@@ -18,6 +18,7 @@ export interface OrchTask {
   id: string;
   agentId: string;
   prompt: string;
+  modelProfileId: string;
   status: TaskStatus;
   steps: number;
   result: { summary: string; artifacts: string[] } | null;
@@ -35,10 +36,15 @@ export interface OrchApproval {
   reason: string;
 }
 
+/** What the backend found wrong with an agent's computer (AgentProblem in the protocol). */
+export type AgentProblem = "vm_stopped" | "worker_down" | "low_disk" | "no_browser";
+
 export interface OrchAgent {
   id: string;
   name: string;
   status: "offline" | "starting" | "ready" | "busy" | "error";
+  /** Absent from a backend older than the health checks. */
+  problems?: AgentProblem[];
 }
 
 export interface OrchEvent {
@@ -62,8 +68,9 @@ export const OrchestratorBridge = {
   tasks: () => callOrThrow<{ tasks: OrchTask[] | null; agents: OrchAgent[] | null; approvals: OrchApproval[] | null }>("orchestrator_tasks"),
   task: (taskId: string) =>
     callOrThrow<{ task: OrchTask; approvals: OrchApproval[]; events: OrchEvent[] }>("orchestrator_task", { taskId }),
-  submit: (prompt: string, idempotencyKey: string) =>
-    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", { prompt, idempotencyKey }),
+  submit: (prompt: string, idempotencyKey: string, modelProfileId: string | null) =>
+    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", { prompt, idempotencyKey, modelProfileId }),
+  models: () => callOrThrow<{ profiles: { id: string }[]; default: string | null }>("orchestrator_models"),
   cancel: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_cancel", { taskId }),
   decide: (agentId: string, approvalId: string, approve: boolean) =>
     callOrThrow<unknown>("orchestrator_decide", { agentId, approvalId, approve }),
@@ -73,10 +80,40 @@ export const OrchestratorBridge = {
     callOrThrow<string>("orchestrator_save_file", { agentId, taskId, path }),
 };
 
+/** What a model profile is called on the page: the subscription it runs on. */
+export function modelLabel(profileId: string): string {
+  switch (profileId) {
+    case "claude-cli":
+      return "Claude";
+    case "cursor-cli":
+      return "Cursor";
+    default:
+      return profileId;
+  }
+}
+
 /** A fresh idempotency key: a retried click sends the same one and gets the same task. */
 export function newTaskKey(): string {
   const rand = Math.random().toString(36).slice(2, 10);
   return `coucou-${Date.now().toString(36)}-${rand}`;
+}
+
+/** How an agent's computer is doing, in one line: its state, then whatever is wrong. */
+export function agentLine(agent: OrchAgent): string {
+  const state = agent.status === "offline" ? t("Offline") : agent.status === "busy" ? t("Busy") : t("Ready");
+  const problems = (agent.problems ?? []).map((p) => {
+    switch (p) {
+      case "vm_stopped":
+        return t("Its Linux computer is not running.");
+      case "worker_down":
+        return t("Its Linux computer is running, but the worker in it does not answer.");
+      case "low_disk":
+        return t("Its disk is almost full.");
+      case "no_browser":
+        return t("Chromium is missing: web steps will fail.");
+    }
+  });
+  return [state, ...problems].join(" · ");
 }
 
 export const ACTIVE: ReadonlySet<TaskStatus> = new Set(["queued", "starting", "running", "waiting_for_approval"]);

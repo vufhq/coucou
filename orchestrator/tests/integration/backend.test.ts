@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentEvent, Task } from "@coucou-orchestrator/protocol";
+import { ModelError } from "../../server/src/model/adapter.ts";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import type { Worker } from "../../worker/src/worker.ts";
 import {
   FakeBrowser,
+  PNG_BYTES,
   WORKER_TOKEN,
   cleanup,
   ended,
@@ -36,12 +38,16 @@ afterEach(async () => {
   dirs = [];
 });
 
-async function setup(script: ConstructorParameters<typeof ScriptedModel>[0], ports?: { api: number; worker: number }) {
+async function setup(
+  script: ConstructorParameters<typeof ScriptedModel>[0],
+  ports?: { api: number; worker: number },
+  options: Parameters<typeof startBackend>[4] = {},
+) {
   const dataDir = await tempDir("orch-data-");
   const workspace = await tempDir("orch-ws-");
   dirs.push(dataDir, workspace);
   const model = new ScriptedModel(script);
-  const r = await startBackend(dataDir, model, ports);
+  const r = await startBackend(dataDir, model, ports, {}, options);
   running.push(r);
   const browser = new FakeBrowser();
   browser.site.set(DOCS, { title: "Install guide", text: "Install with: pip install example\nRequires Python 3.10+." });
@@ -110,6 +116,22 @@ describe("the vertical slice", () => {
     expect(model.calls).toHaveLength(4);
     // The approved site is remembered: the next task goes straight through.
     expect(r.backend.store.approvedDomains("agent-01")).toEqual(["example.org"]);
+  });
+
+  it("does not approve or run the same successful operation twice", async () => {
+    const { r, model } = await setup([
+      act("fs.write_artifact", { path: "report.md", content: "saved" }),
+      act("fs.write_artifact", { path: "report.md", content: "saved" }),
+      done("Saved the report."),
+    ]);
+    const task = await submit(r);
+    const events = await taskEnd(r, task.id);
+
+    expect(events.at(-1)).toMatchObject({ type: "task.completed" });
+    expect(events.filter((e) => e.type === "tool.started")).toHaveLength(1);
+    expect(events.filter((e) => e.type === "approval.requested")).toHaveLength(0);
+    expect((await r.api(`/api/tasks/${task.id}`)).body.task.steps).toBe(1);
+    expect(model.calls).toHaveLength(3);
   });
 
   it("returns the same task when a submit is retried", async () => {
@@ -258,6 +280,33 @@ describe("reliability", () => {
   });
 });
 
+describe("model retries", () => {
+  it("asks again when the model timed out or could not be reached", async () => {
+    const { r, model } = await setup([
+      new ModelError("timeout", "no answer within 180 s"),
+      new ModelError("unavailable", "claude exited with code 1"),
+      done("third time lucky"),
+    ]);
+    const task = await submit(r);
+    const events = await taskEnd(r, task.id);
+    expect(events.at(-1)).toMatchObject({ type: "task.completed", payload: { summary: "third time lucky" } });
+    expect(model.calls).toHaveLength(3);
+  });
+
+  it("gives up once the pauses are used, and never retries a rate limit", async () => {
+    const lost = () => new ModelError("unavailable", "down");
+    const a = await setup([lost(), lost(), lost(), done("never")]);
+    const t1 = await submit(a.r);
+    expect((await taskEnd(a.r, t1.id)).at(-1)).toMatchObject({ type: "task.failed", payload: { reason: "model_error" } });
+    expect(a.model.calls).toHaveLength(3);
+
+    const b = await setup([new ModelError("rate_limited", "usage limit reached"), done("never")]);
+    const t2 = await submit(b.r);
+    expect((await taskEnd(b.r, t2.id)).at(-1)).toMatchObject({ type: "task.failed", payload: { reason: "rate_limited" } });
+    expect(b.model.calls).toHaveLength(1);
+  });
+});
+
 describe("safety", () => {
   it("reports a rejected approval to the model instead of running the operation", async () => {
     const { r, browser } = await setup([
@@ -342,6 +391,48 @@ describe("files", () => {
     expect(file).toEqual({ status: 200, body: "# Report" });
     expect((await r.api(`/api/agents/agent-01/files/${task.id}/..%2Fsecret`)).status).toBe(400);
   });
+
+  it("downloads a screenshot byte for byte", async () => {
+    const { r } = await setup([
+      act("browser.navigate", { url: DOCS }),
+      act("browser.screenshot", { name: "page.png" }),
+      done("captured"),
+    ]);
+    const task = await submit(r);
+    const approval = await readEvents(r.apiPort, { taskId: task.id, until: (e) => e.type === "approval.requested" });
+    await r.api("/api/agents/agent-01/approval", {
+      body: { approvalId: approval.at(-1)!.payload.approvalId, decision: "approve" },
+    });
+    await taskEnd(r, task.id);
+    const file = await r.raw(`/api/agents/agent-01/files/${task.id}/page.png`);
+    expect(file.status).toBe(200);
+    expect(file.type).toBe("image/png");
+    expect(file.bytes.equals(PNG_BYTES)).toBe(true);
+    // The bytes never reach the event log or the database.
+    const stored = JSON.stringify(r.backend.store.db.prepare("SELECT outcome FROM jobs").all());
+    expect(stored).not.toContain(PNG_BYTES.subarray(8, 40).toString("base64"));
+  });
+
+  it("downloads a long text file whole, with secrets redacted", async () => {
+    const long = `${"line of the report\n".repeat(2_000)}token=sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAA\n`;
+    const { r } = await setup([act("fs.write_artifact", { path: "big.md", content: long }), done("saved")]);
+    const task = await submit(r);
+    await taskEnd(r, task.id);
+    const file = await r.raw(`/api/agents/agent-01/files/${task.id}/big.md`);
+    expect(file.status).toBe(200);
+    const text = file.bytes.toString("utf8");
+    expect(text.length).toBeGreaterThan(30_000);
+    expect(text).not.toContain("sk-ant-api03");
+    expect(text.endsWith("token=[redacted]\n")).toBe(true);
+  });
+
+  it("never lets the model ask for a download", async () => {
+    const { r, model } = await setup([act("fs.fetch", { path: "x.md" }), done("ok")]);
+    const task = await submit(r);
+    await taskEnd(r, task.id);
+    expect(model.calls[1]?.prompt).toMatch(/refused: unknown operation fs\.fetch/);
+    expect(r.backend.store.steps(task.id)).toHaveLength(0);
+  });
 });
 
 describe("agents", () => {
@@ -354,5 +445,70 @@ describe("agents", () => {
     expect(agents[0]).toMatchObject({ id: "agent-01", status: "ready" });
     const statusEvents: AgentEvent[] = r.backend.events.after(0).filter((e) => e.type === "agent.status_changed");
     expect(statusEvents[0]?.payload).toEqual({ status: "ready" });
+  });
+
+  it("reports the worker's disk and browser, and what is wrong with them", async () => {
+    const { r, browser } = await setup([]);
+    const ready = await waitFor(async () => {
+      const res = await r.api("/api/agents");
+      return res.body.agents[0]?.health ? res.body.agents[0] : null;
+    }, 5_000, "a health report");
+    expect(ready.health).toMatchObject({ browserReady: true });
+    expect(ready.health.diskTotalBytes).toBeGreaterThan(0);
+    expect(ready.problems).toEqual(ready.health.diskFreeBytes < 1024 ** 3 ? ["low_disk"] : []);
+
+    browser.installed = false;
+    r.backend.store.setAgentHealth("agent-01", { diskFreeBytes: 10, diskTotalBytes: 100, browserReady: false });
+    expect((await r.api("/api/agents")).body.agents[0].problems).toEqual(["low_disk", "no_browser"]);
+  });
+
+  it("tells a stopped VM from a worker that does not answer", async () => {
+    let vmRunning: boolean | null = false;
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, new ScriptedModel([]), undefined, {}, { vmProbe: async () => vmRunning });
+    running.push(r);
+    expect((await r.api("/api/agents")).body.agents[0]).toMatchObject({ status: "offline", problems: ["vm_stopped"] });
+    vmRunning = true;
+    await new Promise((resolve) => setTimeout(resolve, 10_050)); // past the 10 s cache
+    expect((await r.api("/api/agents")).body.agents[0].problems).toEqual(["worker_down"]);
+  }, 20_000);
+
+  it("hands the worker the retention period", async () => {
+    const { r } = await setup([], undefined, { retentionDays: 7 });
+    const res = await fetch(`http://127.0.0.1:${r.workerPort}/worker/v1/hello`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${WORKER_TOKEN}` },
+      body: JSON.stringify({ agentId: "agent-01", version: "test", capabilities: [], journal: [] }),
+    });
+    expect(await res.json()).toMatchObject({ ok: true, retentionDays: 7 });
+  });
+});
+
+describe("models", () => {
+  it("runs a task on the model it names, through the same worker and events", async () => {
+    const dataDir = await tempDir("orch-data-");
+    const workspace = await tempDir("orch-ws-");
+    dirs.push(dataDir, workspace);
+    const main = new ScriptedModel([]);
+    const other = new ScriptedModel([act("fs.write_artifact", { path: "a.md", content: "from the other model" }), done("written")]);
+    const r = await startBackend(dataDir, main, undefined, { other });
+    running.push(r);
+    const { worker } = startWorker(workspace, r.workerPort, new FakeBrowser());
+    workers.push(worker);
+
+    const models = await r.api("/api/models");
+    expect(models.body.profiles.map((p: { id: string }) => p.id)).toEqual(["scripted", "other"]);
+    expect((await r.api("/api/tasks", { body: { prompt: "x", idempotencyKey: key(), modelProfileId: "nope" } })).status).toBe(400);
+
+    const task = await submit(r, "write a.md", { modelProfileId: "other" });
+    expect(task.modelProfileId).toBe("other");
+    const events = await taskEnd(r, task.id);
+    expect(events.at(-1)?.type).toBe("task.completed");
+    expect(events.at(-1)?.payload.modelProfileId).toBe("other");
+    expect(events.find((e) => e.type === "task.started")?.payload.modelProfileId).toBe("other");
+    expect(main.calls).toHaveLength(0);
+    expect(other.calls).toHaveLength(2);
+    expect(await readFile(join(workspace, "tasks", task.id, "a.md"), "utf8")).toBe("from the other model");
   });
 });

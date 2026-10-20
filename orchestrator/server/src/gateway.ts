@@ -6,16 +6,18 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import type { z } from "zod";
 import {
+  ClaimRequest,
   EVENT_PAYLOADS,
   Heartbeat,
   Hello,
   JobOutcome,
+  MAX_FETCH_BYTES,
   READ_ONLY_OPS,
   WorkerEvents,
   type ClaimResponse,
 } from "@coucou-orchestrator/protocol";
 import type { EventLog } from "./events.ts";
-import type { JobSignals } from "./jobs.ts";
+import type { Downloads, JobSignals } from "./jobs.ts";
 import { redact } from "./redact.ts";
 import type { Runner } from "./runner.ts";
 import type { JobRow, Store } from "./store.ts";
@@ -26,9 +28,11 @@ export interface GatewayDeps {
   events: EventLog;
   runner: Runner;
   signals: JobSignals;
+  downloads: Downloads;
   token: string;
   leaseMs: number;
   claimWaitMs: number;
+  retentionDays: number;
 }
 
 function bad(reply: FastifyReply, error: z.ZodError) {
@@ -38,6 +42,10 @@ function bad(reply: FastifyReply, error: z.ZodError) {
 export function buildGateway(deps: GatewayDeps): FastifyInstance {
   const { store, events, runner, signals } = deps;
   const app = Fastify({ logger: false, bodyLimit: 256 * 1024 });
+  // Download bytes, on their one route; everything else is JSON.
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: MAX_FETCH_BYTES }, (_req, body, done) =>
+    done(null, body),
+  );
 
   app.addHook("onRequest", async (req, reply) => {
     if (!bearerMatches(req.headers.authorization, deps.token)) {
@@ -65,9 +73,10 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   app.post("/worker/v1/hello", async (req, reply) => {
     const hello = Hello.safeParse(req.body);
     if (!hello.success) return bad(reply, hello.error);
-    const { agentId, journal } = hello.data;
+    const { agentId, journal, health } = hello.data;
     if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
     store.touchAgent(agentId);
+    if (health) store.setAgentHealth(agentId, health);
 
     // Reconcile what the worker remembers with what we remember.
     const known = new Map(journal.map((j) => [j.jobId, j]));
@@ -94,14 +103,15 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     }
     setStatus(agentId, "ready");
     runner.pump(agentId);
-    return { ok: true, leaseMs: deps.leaseMs };
+    return { ok: true, leaseMs: deps.leaseMs, retentionDays: deps.retentionDays };
   });
 
   app.post("/worker/v1/jobs/claim", async (req, reply): Promise<ClaimResponse | FastifyReply> => {
-    const body = Heartbeat.pick({ agentId: true }).safeParse(req.body);
+    const body = ClaimRequest.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
-    const { agentId } = body.data;
+    const { agentId, health } = body.data;
     if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
+    if (health) store.setAgentHealth(agentId, health);
     const until = Date.now() + deps.claimWaitMs;
     // The response's close (not the request's, which fires once the body is
     // read) tells us the worker hung up while we were waiting.
@@ -146,6 +156,17 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
       if (!payload.success) return bad(reply, payload.error);
       events.emit(e.type, job.agentId, job.taskId, payload.data as never);
     }
+    return { ok: true };
+  });
+
+  // A download's bytes, for a job the backend itself asked for. Held for the
+  // API answer only; never stored, never in an event.
+  app.post<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/file", async (req, reply) => {
+    const job = heldJob(String(req.query.agentId), req.params.id);
+    if (!job || job.op !== "fs.fetch") return reply.code(409).send({ error: "not_held" });
+    if (!Buffer.isBuffer(req.body)) return reply.code(415).send({ error: "invalid", message: "expected application/octet-stream" });
+    store.renewLeases(job.agentId, [job.id], deps.leaseMs);
+    deps.downloads.put(job.id, req.body);
     return { ok: true };
   });
 

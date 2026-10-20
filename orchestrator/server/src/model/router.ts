@@ -24,8 +24,8 @@ export class ModelRouter {
     return this.profiles.has(id);
   }
 
-  list(): ModelProfile[] {
-    return [...this.profiles.values()].map((p) => p.profile);
+  list(): (ModelProfile & { fallbacks: string[] })[] {
+    return [...this.profiles.values()].map((p) => ({ ...p.profile, fallbacks: this.fallbacks.get(p.profile.id) ?? [] }));
   }
 
   async generate(profileId: string, input: ModelInput): Promise<ModelOutput & { profileId: string }> {
@@ -50,4 +50,12 @@ export const CLAUDE_CLI_PROFILE: ModelProfile = {
   provider: "claude-code-cli",
   model: "default",
   capabilities: { streaming: false, toolCalling: false, structuredOutput: true },
+};
+
+/** No schema flag: the schema travels in the prompt and the answer is parsed from text. */
+export const CURSOR_CLI_PROFILE: ModelProfile = {
+  id: "cursor-cli",
+  provider: "cursor-agent-cli",
+  model: "default",
+  capabilities: { streaming: false, toolCalling: false, structuredOutput: false },
 };

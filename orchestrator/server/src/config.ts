@@ -17,6 +17,8 @@ export interface Config {
   leaseMs: number;
   /** How long a claim waits for a job before answering "nothing". */
   claimWaitMs: number;
+  /** Finished tasks, their events and their folders in the VM go after this many days. 0 keeps everything. */
+  retentionDays: number;
   /** The model profile used when a task names none. */
   defaultModelProfile: string;
   /** Agents the backend knows about. Phase 1 has exactly one. */
@@ -52,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     workerPort: int(env.ORCH_WORKER_PORT, 47621),
     leaseMs: int(env.ORCH_LEASE_MS, 15_000),
     claimWaitMs: int(env.ORCH_CLAIM_WAIT_MS, 25_000),
+    retentionDays: Math.max(0, int(env.ORCH_RETENTION_DAYS, 30)),
     defaultModelProfile: env.ORCH_MODEL_PROFILE ?? "claude-cli",
     agents: [{ id: "agent-01", name: "Agent 01", vmId: "wsl:agent-01" }],
   };

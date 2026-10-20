@@ -435,9 +435,23 @@ pub async fn orchestrator_task(app: AppHandle, task_id: String) -> Result<Value,
 }
 
 #[tauri::command]
-pub async fn orchestrator_submit(app: AppHandle, prompt: String, idempotency_key: String) -> Result<Value, String> {
-    let body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)?, "agentId": "agent-01" });
+pub async fn orchestrator_submit(
+    app: AppHandle,
+    prompt: String,
+    idempotency_key: String,
+    model_profile_id: Option<String>,
+) -> Result<Value, String> {
+    let mut body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)?, "agentId": "agent-01" });
+    if let Some(profile) = model_profile_id {
+        body["modelProfileId"] = json!(segment(&profile)?);
+    }
     api(&app, Method::POST, "/api/tasks", Some(body)).await
+}
+
+/// The models the backend can run tasks on (Claude, Cursor…), and its default.
+#[tauri::command]
+pub async fn orchestrator_models(app: AppHandle) -> Result<Value, String> {
+    api(&app, Method::GET, "/api/models", None).await
 }
 
 #[tauri::command]
