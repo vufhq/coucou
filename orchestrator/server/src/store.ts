@@ -16,6 +16,7 @@ import {
   type OpName,
   type Task,
   type TaskStatus,
+  type WorkerHealth,
 } from "@coucou-orchestrator/protocol";
 
 const SCHEMA = `
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS agents (
   status TEXT NOT NULL DEFAULT 'offline',
   model_profile_id TEXT NOT NULL,
   last_seen_at TEXT,
-  approved_domains TEXT NOT NULL DEFAULT '[]'
+  approved_domains TEXT NOT NULL DEFAULT '[]',
+  health TEXT
 );
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS jobs_by_status ON jobs(agent_id, status, created_at);
+CREATE INDEX IF NOT EXISTS jobs_by_task ON jobs(task_id);
 CREATE TABLE IF NOT EXISTS approvals (
   id TEXT PRIMARY KEY,
   task_id TEXT NOT NULL REFERENCES tasks(id),
@@ -98,7 +101,13 @@ CREATE TABLE IF NOT EXISTS events (
   payload TEXT NOT NULL,
   UNIQUE (task_id, sequence)
 );
+CREATE INDEX IF NOT EXISTS tasks_by_age ON tasks(status, updated_at);
 `;
+
+/** Columns added after a database was first created: added in place, data kept. */
+const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
+  { table: "agents", column: "health", ddl: "ALTER TABLE agents ADD COLUMN health TEXT" },
+];
 
 export type JobStatus = "queued" | "claimed" | "succeeded" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
@@ -170,7 +179,15 @@ export class Store {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+    this.migrate();
     this.db.exec(SCHEMA);
+  }
+
+  private migrate(): void {
+    for (const { table, column, ddl } of ADDED_COLUMNS) {
+      const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as Row[];
+      if (cols.length > 0 && !cols.some((c) => c.name === column)) this.db.exec(ddl);
+    }
   }
 
   close(): void {
@@ -213,6 +230,10 @@ export class Store {
   setAgentStatus(id: string, status: Agent["status"]): boolean {
     const r = this.db.prepare("UPDATE agents SET status = ? WHERE id = ? AND status != ?").run(status, id, status);
     return Number(r.changes) > 0;
+  }
+
+  setAgentHealth(id: string, health: WorkerHealth): void {
+    this.db.prepare("UPDATE agents SET health = ? WHERE id = ?").run(json({ ...health, checkedAt: now() }), id);
   }
 
   touchAgent(id: string): void {
@@ -519,6 +540,25 @@ export class Store {
     return (rows as Row[]).map(toEvent);
   }
 
+  // ── Retention ─────────────────────────────────────────────────────────────
+
+  /**
+   * Removes finished tasks last changed before `before`, with everything they
+   * own, and agent-level events as old. Never touches a task still in flight.
+   * Returns how many tasks went.
+   */
+  pruneBefore(before: Date): number {
+    const cutoff = before.toISOString();
+    return this.tx(() => {
+      const old = `SELECT id FROM tasks WHERE status IN ('succeeded','failed','cancelled') AND updated_at < ?`;
+      for (const table of ["events", "approvals", "jobs", "steps"]) {
+        this.db.prepare(`DELETE FROM ${table} WHERE task_id IN (${old})`).run(cutoff);
+      }
+      this.db.prepare("DELETE FROM events WHERE task_id IS NULL AND timestamp < ?").run(cutoff);
+      return Number(this.db.prepare(`DELETE FROM tasks WHERE id IN (${old})`).run(cutoff).changes);
+    });
+  }
+
   artifacts(taskId: string): string[] {
     const rows = this.db
       .prepare("SELECT payload FROM events WHERE task_id = ? AND type = 'artifact.created' ORDER BY seq")
@@ -535,6 +575,7 @@ function toAgent(r: Row): Agent {
     status: String(r.status) as Agent["status"],
     modelProfileId: String(r.model_profile_id),
     lastSeenAt: (r.last_seen_at as string | null) ?? null,
+    health: parseOrNull(r.health),
   };
 }
 

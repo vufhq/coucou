@@ -4,9 +4,11 @@
 import {
   ClaimResponse,
   HeartbeatResponse,
+  HelloResponse,
   type Hello,
   type JobOutcome,
   type WorkerEvent,
+  type WorkerHealth,
 } from "@coucou-orchestrator/protocol";
 
 export class BackendError extends Error {
@@ -30,10 +32,14 @@ export class BackendClient {
   }
 
   private async post(path: string, body: unknown, timeoutMs: number): Promise<unknown> {
+    const binary = body instanceof Uint8Array;
     const res = await fetch(`${this.base}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
-      body: JSON.stringify(body),
+      headers: {
+        "Content-Type": binary ? "application/octet-stream" : "application/json",
+        Authorization: `Bearer ${this.token}`,
+      },
+      body: binary ? body : JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
     const text = await res.text();
@@ -41,12 +47,18 @@ export class BackendClient {
     return text ? JSON.parse(text) : {};
   }
 
-  hello(hello: Hello): Promise<unknown> {
-    return this.post("/worker/v1/hello", hello, 10_000);
+  async hello(hello: Hello): Promise<{ leaseMs: number; retentionDays: number }> {
+    return HelloResponse.parse(await this.post("/worker/v1/hello", hello, 10_000));
   }
 
-  async claim(waitMs: number): Promise<ClaimResponse> {
-    return ClaimResponse.parse(await this.post("/worker/v1/jobs/claim", { agentId: this.agentId }, waitMs + 10_000));
+  async claim(waitMs: number, health?: WorkerHealth): Promise<ClaimResponse> {
+    const body = health ? { agentId: this.agentId, health } : { agentId: this.agentId };
+    return ClaimResponse.parse(await this.post("/worker/v1/jobs/claim", body, waitMs + 10_000));
+  }
+
+  /** The bytes of a file download job, sent before the job is completed. */
+  async upload(jobId: string, bytes: Uint8Array): Promise<void> {
+    await this.post(`/worker/v1/jobs/${encodeURIComponent(jobId)}/file?agentId=${this.agentId}`, bytes, 60_000);
   }
 
   async heartbeat(running: string[]): Promise<string[]> {

@@ -5,6 +5,7 @@
 // The backend is allowed to vanish at any moment: the job carries on, its
 // outcome waits in the journal, and the next hello hands it over.
 
+import { statfs } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   OP_NAMES,
@@ -13,15 +14,20 @@ import {
   type JobOutcome,
   type OpArgs,
   type WorkerEvent,
+  type WorkerHealth,
 } from "@coucou-orchestrator/protocol";
 import { BackendError, type BackendClient } from "./client.ts";
 import type { Journal } from "./journal.ts";
 import { PathError, ensureTaskDir } from "./paths.ts";
 import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } from "./ops/browser.ts";
-import { listFiles, readText, writeArtifact } from "./ops/fs.ts";
+import { fetchFile, listFiles, readText, writeArtifact } from "./ops/fs.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
+import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.1.0";
+export const WORKER_VERSION = "0.2.0";
+
+const HEALTH_EVERY_MS = 60_000;
+const PRUNE_EVERY_MS = 6 * 60 * 60_000;
 
 export interface OpContext {
   taskId: string;
@@ -31,6 +37,8 @@ export interface OpContext {
   deadlineMs: number;
   signal: AbortSignal;
   report(type: WorkerEvent["type"], payload: Record<string, unknown>): void;
+  /** Sends a download's bytes to the backend (fs.fetch only). */
+  upload(bytes: Uint8Array): Promise<void>;
 }
 
 export interface OpResult {
@@ -54,6 +62,9 @@ export class Worker {
   private readonly o: Required<WorkerOptions>;
   private stopped = false;
   private current: AbortController | null = null;
+  private retentionDays = 0;
+  private healthAt = 0;
+  private prunedAt = 0;
 
   constructor(options: WorkerOptions) {
     this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, ...options };
@@ -64,22 +75,54 @@ export class Worker {
     this.current?.abort();
   }
 
+  /** Disk space and browser, as reported to the backend. */
+  async health(): Promise<WorkerHealth> {
+    let diskFreeBytes = 0;
+    let diskTotalBytes = 0;
+    try {
+      const fs = await statfs(this.o.workspace);
+      diskFreeBytes = fs.bavail * fs.bsize;
+      diskTotalBytes = fs.blocks * fs.bsize;
+    } catch {
+      // Unknown: reported as 0 of 0, which the backend does not treat as full.
+    }
+    const browserReady = (await this.o.browser.ready?.().catch(() => false)) ?? true;
+    return { diskFreeBytes, diskTotalBytes, browserReady };
+  }
+
+  /** Between jobs: old task folders go, at most every few hours. */
+  private async prune(): Promise<void> {
+    if (Date.now() - this.prunedAt < PRUNE_EVERY_MS) return;
+    this.prunedAt = Date.now();
+    const removed = await pruneTaskDirs(this.o.workspace, this.retentionDays).catch(() => []);
+    if (removed.length) this.o.log(`removed ${removed.length} old task folder(s)`);
+  }
+
   async run(): Promise<void> {
     let backoff = 500;
     let greeted = false;
     while (!this.stopped) {
       try {
         if (!greeted) {
-          await this.o.client.hello({
+          const hello = await this.o.client.hello({
             agentId: this.o.client.agentId,
             version: WORKER_VERSION,
             capabilities: OP_NAMES,
             journal: await this.o.journal.entries(),
+            health: await this.health(),
           });
+          this.retentionDays = hello.retentionDays;
+          this.healthAt = Date.now();
           greeted = true;
           this.o.log("connected to the backend");
         }
-        const claim = await this.o.client.claim(this.o.claimWaitMs);
+        await this.prune();
+        let health: WorkerHealth | undefined;
+        if (Date.now() - this.healthAt >= HEALTH_EVERY_MS) {
+          health = await this.health();
+          this.healthAt = Date.now();
+        }
+        const claim = await this.o.client.claim(this.o.claimWaitMs, health);
         backoff = 500;
         if (claim.job) await this.handle(claim.job);
       } catch (err) {
@@ -152,7 +195,8 @@ export class Worker {
 
     try {
       const dir = await ensureTaskDir(this.o.workspace, job.taskId);
-      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, deadlineMs: job.deadlineMs, signal: controller.signal, report };
+      const upload = (bytes: Uint8Array) => this.o.client.upload(job.id, bytes);
+      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, deadlineMs: job.deadlineMs, signal: controller.signal, report, upload };
       const run = this.dispatch(ctx, parsed.op.op, parsed.op.args);
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
@@ -193,6 +237,8 @@ export class Worker {
         return listFiles(ctx);
       case "fs.read":
         return readText(ctx, args as OpArgs<"fs.read">);
+      case "fs.fetch":
+        return fetchFile(ctx, args as OpArgs<"fs.fetch">);
       case "terminal.run":
         return runCommand(ctx, args as OpArgs<"terminal.run">);
       default:

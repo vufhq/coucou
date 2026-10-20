@@ -5,7 +5,7 @@
 // The arguments are then checked against the operation's own schema.
 
 import { z } from "zod";
-import { OP_NAMES, parseOperation, type Operation } from "./ops.ts";
+import { BACKEND_ONLY_OPS, MODEL_OP_NAMES, parseOperation, type Operation } from "./ops.ts";
 
 export const RawDecision = z.object({
   kind: z.enum(["action", "done"]),
@@ -32,6 +32,7 @@ export function parseDecision(value: unknown): ParsedDecision {
   }
   const op = parseOperation(d.op, d.args);
   if (!op.ok) return { ok: false, error: op.error };
+  if (BACKEND_ONLY_OPS.has(op.op.op)) return { ok: false, error: `unknown operation ${op.op.op}` };
   return { ok: true, decision: { kind: "action", note: d.note?.trim() ?? "", op: op.op } };
 }
 
@@ -43,7 +44,7 @@ export const DECISION_JSON_SCHEMA = {
   properties: {
     kind: { type: "string", enum: ["action", "done"] },
     note: { type: "string", description: "One short sentence: what this step does and why." },
-    op: { type: "string", enum: OP_NAMES },
+    op: { type: "string", enum: MODEL_OP_NAMES },
     args: { type: "object", description: "Arguments of the operation, as described in the instructions." },
     summary: { type: "string", description: "With kind=done: the final answer for the user, in Markdown." },
   },

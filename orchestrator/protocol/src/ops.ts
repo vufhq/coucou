@@ -26,6 +26,7 @@ export const OPS = {
     .strict(),
   "fs.list": z.object({}).strict(),
   "fs.read": z.object({ path: RelPath }).strict(),
+  "fs.fetch": z.object({ path: RelPath }).strict(),
   "terminal.run": z.object({ argv: z.array(z.string().min(1).max(1_000)).min(1).max(32) }).strict(),
 } as const;
 
@@ -46,7 +47,17 @@ export const READ_ONLY_OPS: ReadonlySet<OpName> = new Set([
   "browser.extract_text",
   "fs.list",
   "fs.read",
+  "fs.fetch",
 ]);
+
+/**
+ * Operations only the backend asks for, on the user's behalf (a file
+ * download for Coucou). A model answer naming one is refused.
+ */
+export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch"]);
+
+/** What a model may propose. */
+export const MODEL_OP_NAMES = OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op));
 
 export type ParsedOp = { ok: true; op: Operation } | { ok: false; error: string };
 

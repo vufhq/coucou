@@ -35,6 +35,12 @@ export interface RunnerOptions {
   pollMs?: number;
   /** A failed model answer is shown to it and asked again this many times. */
   modelRetries?: number;
+  /**
+   * A model that timed out or could not be reached is asked again after each
+   * of these pauses; a rate limit is not (it lasts hours, and the router has
+   * already tried the fallbacks).
+   */
+  transientRetryDelaysMs?: number[];
 }
 
 type ModelAnswer = { decision: Decision; profileId: string };
@@ -77,7 +83,13 @@ export class Runner {
     this.store = store;
     this.events = events;
     this.models = models;
-    this.options = { modelTimeoutMs: 180_000, pollMs: 1_000, modelRetries: 2, ...options };
+    this.options = {
+      modelTimeoutMs: 180_000,
+      pollMs: 1_000,
+      modelRetries: 2,
+      transientRetryDelaysMs: [5_000, 20_000],
+      ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
+    } as Required<RunnerOptions>;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -184,7 +196,12 @@ export class Runner {
         await this.waitForPoke(taskId, this.options.pollMs * 30);
         continue;
       }
-      if (this.activeMs(task) > task.budget.timeoutMs) return this.fail(task, "timeout", "the task ran out of time");
+      if (this.activeMs(task) > task.budget.timeoutMs) {
+        if (this.store.agent(task.agentId)?.status === "offline") {
+          return this.fail(task, "worker_lost", "the task ran out of time while the agent's computer was offline");
+        }
+        return this.fail(task, "timeout", "the task ran out of time");
+      }
 
       const last = this.store.lastStep(taskId);
       if (last && !last.outcome) {
@@ -320,6 +337,7 @@ export class Runner {
 
   private async askModel(task: Task, extra = ""): Promise<ModelAnswer | "retry" | null> {
     let feedback = "";
+    let transient = 0;
     for (let attempt = 0; attempt <= this.options.modelRetries; attempt++) {
       const controller = new AbortController();
       this.modelCalls.set(task.id, controller);
@@ -339,6 +357,15 @@ export class Runner {
         if (err.code === "cancelled") return "retry";
         if (err.code === "malformed_output") {
           feedback = `\n\nYour previous answer was refused: ${err.message}. Answer again with one valid JSON object.`;
+          continue;
+        }
+        const pause = this.options.transientRetryDelaysMs[transient];
+        if ((err.code === "timeout" || err.code === "unavailable") && pause !== undefined && !this.stopped) {
+          transient++;
+          attempt--; // A lost answer is not a bad answer: it does not use up the format retries.
+          await this.waitForPoke(task.id, pause);
+          const now = this.store.task(task.id);
+          if (this.stopped || !now || now.cancelRequested || FINAL_STATUSES.has(now.status)) return "retry";
           continue;
         }
         this.fail(task, err.code === "rate_limited" ? "rate_limited" : "model_error", err.message);

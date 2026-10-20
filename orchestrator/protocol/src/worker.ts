@@ -28,13 +28,38 @@ export const JournalEntry = z.object({
 });
 export type JournalEntry = z.infer<typeof JournalEntry>;
 
+/** How the agent's computer is doing, as the worker sees it. */
+export const WorkerHealth = z.object({
+  /** Free and total bytes on the disk that holds the workspace. */
+  diskFreeBytes: z.number().int().nonnegative(),
+  diskTotalBytes: z.number().int().nonnegative(),
+  /** Chromium is installed and can be found. */
+  browserReady: z.boolean(),
+});
+export type WorkerHealth = z.infer<typeof WorkerHealth>;
+
 export const Hello = z.object({
   agentId: AgentId,
   version: z.string().max(32),
   capabilities: z.array(OpName),
   journal: z.array(JournalEntry).max(500),
+  health: WorkerHealth.optional(),
 });
 export type Hello = z.infer<typeof Hello>;
+
+export const HelloResponse = z.object({
+  ok: z.literal(true),
+  leaseMs: z.number().int().positive(),
+  /** Task folders untouched for longer than this are removed. 0 keeps them. */
+  retentionDays: z.number().int().nonnegative().default(0),
+});
+
+/** A claim, with the worker's health now and then (at most once a minute). */
+export const ClaimRequest = z.object({ agentId: AgentId, health: WorkerHealth.optional() });
+export type ClaimRequest = z.infer<typeof ClaimRequest>;
+
+/** The largest file a download carries (Coucou reads at most 8 MiB). */
+export const MAX_FETCH_BYTES = 8 * 1024 * 1024 - 64 * 1024;
 
 export const Job = z.object({
   id: z.string(),

@@ -61,7 +61,8 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    `D:\coucou-vms\agent-01`. Pass `-Location` to put it somewhere else. It then
    installs Node, Chromium and the worker, and restarts the distro. To update
    the worker later, run the same command with `-Update`. The disk and
-   `/workspace` are kept.
+   `/workspace` are kept. (After a backend update that changes the worker, as
+   0.2 did for downloads and health reports, run `-Update` once.)
 
 3. **In Coucou**, open **Tasks** in the sidebar and switch on
    **Orchestrator backend**. Then give agent-01 a task, for example:
@@ -110,6 +111,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_LOCAL_URL` | unset | Base URL of an OpenAI-compatible server on this machine (loopback only), e.g. `http://127.0.0.1:11434/v1` |
 | `ORCH_LOCAL_MODEL` | `local` | Model sent to the local server |
 | `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
+| `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
 | `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distro running |
 
 ## Safety model
@@ -150,6 +152,24 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   it, `timeout` for both the task budget (10 min of work, not counting time
   waiting for you) and each operation (60 s), `max_steps` after 20 steps,
   `rate_limited` when you reach your plan's limit, and `model_error`.
+- A model that times out or can't be reached is asked again after 5 s, then
+  after 20 s, before the task fails. A rate limit isn't retried: plan limits
+  last hours, and the other models have already been tried.
+- A task that runs out of time while the agent's computer is offline fails as
+  `worker_lost`, not `timeout`.
+- **Health:** the worker reports its free disk space and whether Chromium is
+  installed, once a minute. Coucou's Tasks page shows the agent's state and
+  what is wrong: its computer is stopped (checked with
+  `wsl --list --running`), its worker does not answer, its disk has under
+  1 GB free, or Chromium is missing.
+- **Retention:** every 6 hours the backend removes finished tasks older than
+  `ORCH_RETENTION_DAYS`, and the worker removes task folders in the VM nothing
+  has touched for a day longer than that. Tasks still running are never touched.
+- **Downloads:** files come down byte for byte, up to 8 MB, screenshots
+  included. The bytes go straight from the worker to Coucou: they are never
+  stored in the database or the event log. Text files (`.md`, `.txt`, `.json`,
+  `.csv`, `.html`…) are redacted like everything else that leaves the VM as text.
+  Downloading is the backend's own operation (`fs.fetch`): a model can't ask for it.
 
 ## Tests
 
@@ -158,10 +178,11 @@ npm test          # unit + integration (real backend and worker, fake browser, s
 npm run typecheck
 ```
 
-## Known limits (Phase 1)
+## Known limits
 
 - One agent, one task at a time. Further tasks queue.
-- File download through the API is text only. Screenshots are listed but not downloadable yet.
+- Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
+  with `provision.ps1 -Update`.
 - After you approve a site, redirects to another site are followed without asking.
   The host and the LAN stay blocked.
 - Models: Claude Code, Cursor, and an optional OpenAI-compatible server on this

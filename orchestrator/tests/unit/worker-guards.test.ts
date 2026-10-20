@@ -1,9 +1,10 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureTaskDir, inside, taskDir } from "../../worker/src/paths.ts";
 import { checkArgv } from "../../worker/src/ops/terminal.ts";
+import { pruneTaskDirs } from "../../worker/src/retention.ts";
 
 const TASK = "11111111-2222-3333-4444-555555555555";
 let workspace: string;
@@ -47,5 +48,36 @@ describe("terminal arguments", () => {
 
   it("allows arguments that stay in the folder", () => {
     expect(() => checkArgv(["grep", "-n", "install", "report.md"])).not.toThrow();
+  });
+});
+
+describe("task folder retention", () => {
+  it("removes folders left alone past the period, and keeps the rest", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "orch-retain-"));
+    try {
+      const day = 24 * 60 * 60_000;
+      const old = "aaaaaaaa-0000-0000-0000-000000000001";
+      const recent = "aaaaaaaa-0000-0000-0000-000000000002";
+      const touched = "aaaaaaaa-0000-0000-0000-000000000003";
+      const stamp = async (path: string, ms: number) => utimes(path, new Date(ms), new Date(ms));
+      for (const id of [old, recent, touched]) {
+        await mkdir(join(ws, "tasks", id, "sub"), { recursive: true });
+        await writeFile(join(ws, "tasks", id, "sub", "f.md"), "x");
+      }
+      await mkdir(join(ws, "tasks", "not-a-task"), { recursive: true });
+      const now = Date.now();
+      for (const id of [old, touched]) {
+        for (const p of ["sub/f.md", "sub", ""]) await stamp(join(ws, "tasks", id, p), now - 40 * day);
+      }
+      // One file changed lately keeps its whole folder.
+      await stamp(join(ws, "tasks", touched, "sub", "f.md"), now - day);
+      await stamp(join(ws, "tasks", "not-a-task"), now - 400 * day);
+
+      expect(await pruneTaskDirs(ws, 0, now)).toEqual([]);
+      expect(await pruneTaskDirs(ws, 30, now)).toEqual([old]);
+      expect((await readdir(join(ws, "tasks"))).sort()).toEqual([recent, touched, "not-a-task"].sort());
+    } finally {
+      await rm(ws, { recursive: true, force: true });
+    }
   });
 });

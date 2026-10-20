@@ -10,6 +10,7 @@ import type { AgentEvent } from "@coucou-orchestrator/protocol";
 import { createBackend, type Backend } from "../../server/src/app.ts";
 import type { Config } from "../../server/src/config.ts";
 import type { ModelAdapter } from "../../server/src/model/adapter.ts";
+import type { VmProbe } from "../../server/src/vm.ts";
 import { ModelRouter } from "../../server/src/model/router.ts";
 import { BackendClient } from "../../worker/src/client.ts";
 import { Journal } from "../../worker/src/journal.ts";
@@ -40,6 +41,9 @@ export async function cleanup(...dirs: string[]): Promise<void> {
   for (const dir of dirs) await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});
 }
 
+/** Every byte value once: a screenshot that survives the trip only if nothing treats it as text. */
+export const PNG_BYTES = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(Array.from({ length: 256 }, (_, i) => i))]);
+
 /** Pages are whatever the test says they are; `hold()` makes the next loads hang until released. */
 export class FakeBrowser implements BrowserDriver {
   readonly site = new Map<string, { title: string; text: string }>();
@@ -60,6 +64,10 @@ export class FakeBrowser implements BrowserDriver {
 
   blocked = async (_host: string) => false;
 
+  /** Whether Chromium is "installed", for the worker's health report. */
+  installed = true;
+  ready = async () => this.installed;
+
   async page(taskId: string): Promise<BrowserPage> {
     return {
       goto: async (url) => {
@@ -70,7 +78,7 @@ export class FakeBrowser implements BrowserDriver {
       url: () => this.current.get(taskId) ?? "about:blank",
       title: async () => this.site.get(this.current.get(taskId) ?? "")?.title ?? "Untitled",
       text: async () => this.site.get(this.current.get(taskId) ?? "")?.text ?? "",
-      screenshot: async (path) => writeFile(path, "png"),
+      screenshot: async (path) => writeFile(path, PNG_BYTES),
     };
   }
 
@@ -82,6 +90,8 @@ export interface Running {
   apiPort: number;
   workerPort: number;
   api<T = any>(path: string, init?: { method?: string; body?: unknown; token?: string }): Promise<{ status: number; body: T }>;
+  /** The raw bytes and type of an answer, for downloads. */
+  raw(path: string): Promise<{ status: number; type: string | null; bytes: Buffer }>;
 }
 
 export async function startBackend(
@@ -90,6 +100,7 @@ export async function startBackend(
   ports?: { api: number; worker: number },
   /** More model profiles, by id, beside the default "scripted" one. */
   extraModels: Record<string, ModelAdapter> = {},
+  options: { vmProbe?: VmProbe; retentionDays?: number } = {},
 ): Promise<Running> {
   const config: Config = {
     dataDir,
@@ -99,6 +110,7 @@ export async function startBackend(
     workerPort: ports?.worker ?? 0,
     leaseMs: 1_500,
     claimWaitMs: 300,
+    retentionDays: options.retentionDays ?? 30,
     defaultModelProfile: "scripted",
     agents: [{ id: "agent-01", name: "Agent 01", vmId: "test" }],
   };
@@ -110,7 +122,11 @@ export async function startBackend(
   for (const [id, adapter] of Object.entries(extraModels)) {
     models.register({ id, provider: "test", model: id, capabilities: { streaming: false, toolCalling: false, structuredOutput: false } }, adapter);
   }
-  const backend = createBackend(config, { api: API_TOKEN, worker: WORKER_TOKEN }, models, { pollMs: 50 });
+  const backend = createBackend(config, { api: API_TOKEN, worker: WORKER_TOKEN }, models, {
+    pollMs: 50,
+    transientRetryDelaysMs: [20, 20],
+    vmProbe: options.vmProbe ?? (async () => null),
+  });
   const { apiPort, workerPort } = await backend.listen();
   return {
     backend,
@@ -133,6 +149,10 @@ export async function startBackend(
         // Plain text (a file download).
       }
       return { status: res.status, body };
+    },
+    async raw(path) {
+      const res = await fetch(`http://127.0.0.1:${apiPort}${path}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+      return { status: res.status, type: res.headers.get("content-type"), bytes: Buffer.from(await res.arrayBuffer()) };
     },
   };
 }

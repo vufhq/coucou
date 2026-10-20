@@ -41,6 +41,7 @@ export function describeTarget(op: Operation): string {
       return (a.argv as string[]).join(" ");
     case "fs.write_artifact":
     case "fs.read":
+    case "fs.fetch":
       return String(a.path);
     case "browser.screenshot":
       return String(a.name);
@@ -75,5 +76,8 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
     case "fs.list":
     case "fs.read":
       return { verdict: "allow" };
+    case "fs.fetch":
+      // A download for the user, asked by the backend; never a model's step.
+      return { verdict: "deny", reason: "not an operation the model can use" };
   }
 }

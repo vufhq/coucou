@@ -12,6 +12,9 @@ describe("redaction", () => {
     ["https://bob:s3cret@example.com/x", "s3cret"],
     ["https://api.example.com/v1?access_token=XYZ123&page=2", "XYZ123"],
     ["AKIAABCDEFGHIJKLMNOP", "AKIAABCDEFGHIJKLMNOP"],
+    ["Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"],
+    ["curl -H 'Authorization: Bearer 0a1b2c3d4e5f'", "0a1b2c3d4e5f"],
+    ["use Token abcdef_ghijkl", "abcdef_ghijkl"],
   ])("removes the secret from %s", (text, secret) => {
     const out = redactText(text);
     expect(out).not.toContain(secret);
@@ -20,6 +23,10 @@ describe("redaction", () => {
 
   it("keeps ordinary text and nested structure", () => {
     expect(redactText("pip install requests")).toBe("pip install requests");
+    // A heading from a real report, once wrongly cut to "Basic [redacted]".
+    for (const prose of ["## Basic installation", "Bearer bonds.", "Token budget remaining", "basic authentication"]) {
+      expect(redactText(prose)).toBe(prose);
+    }
     expect(redact({ a: ["x", { b: "sk-proj-ZZZZZZZZZZZZZZZZZZZZ" }], n: 3 })).toEqual({ a: ["x", { b: "[redacted]" }], n: 3 });
   });
 });
@@ -46,6 +53,10 @@ describe("policy", () => {
     expect(run("rm", "-rf", "x")).toBe("approve");
     expect(run("pip", "install", "x")).toBe("approve");
     expect(run("/bin/ls")).toBe("approve");
+  });
+
+  it("never runs a download as a model's step", () => {
+    expect(decide({ op: "fs.fetch", args: { path: "a.png" } }, ctx).verdict).toBe("deny");
   });
 
   it("asks before overwriting a file", () => {

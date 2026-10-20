@@ -4537,6 +4537,72 @@
    "pt-BR": "Recusada",
    "ru": "Отклонено",
    "id": "Ditolak"
+  },
+  "Offline": {
+   "zh-Hans": "离线",
+   "hi": "ऑफ़लाइन",
+   "es": "Sin conexión",
+   "ar": "غير متصل",
+   "fr": "Hors ligne",
+   "bn": "অফলাইন",
+   "pt-BR": "Offline",
+   "ru": "Не в сети",
+   "id": "Offline"
+  },
+  "Busy": {
+   "zh-Hans": "忙碌",
+   "hi": "व्यस्त",
+   "es": "Ocupado",
+   "ar": "مشغول",
+   "fr": "Occupé",
+   "bn": "ব্যস্ত",
+   "pt-BR": "Ocupado",
+   "ru": "Занят",
+   "id": "Sibuk"
+  },
+  "Its Linux computer is not running.": {
+   "zh-Hans": "它的 Linux 电脑没有运行。",
+   "hi": "इसका Linux कंप्यूटर चल नहीं रहा है।",
+   "es": "Su ordenador Linux no está en marcha.",
+   "ar": "حاسوبه بنظام Linux لا يعمل.",
+   "fr": "Son ordinateur Linux n’est pas démarré.",
+   "bn": "এর Linux কম্পিউটার চালু নেই।",
+   "pt-BR": "O computador Linux dele não está ligado.",
+   "ru": "Его Linux-компьютер не запущен.",
+   "id": "Komputer Linux-nya tidak berjalan."
+  },
+  "Its Linux computer is running, but the worker in it does not answer.": {
+   "zh-Hans": "它的 Linux 电脑在运行，但其中的 worker 没有响应。",
+   "hi": "इसका Linux कंप्यूटर चल रहा है, पर उसमें worker जवाब नहीं दे रहा।",
+   "es": "Su ordenador Linux está en marcha, pero el worker que contiene no responde.",
+   "ar": "حاسوبه بنظام Linux يعمل، لكن الـ worker بداخله لا يستجيب.",
+   "fr": "Son ordinateur Linux tourne, mais le worker qu’il contient ne répond pas.",
+   "bn": "এর Linux কম্পিউটার চালু আছে, কিন্তু ভেতরের worker সাড়া দিচ্ছে না।",
+   "pt-BR": "O computador Linux dele está ligado, mas o worker dentro dele não responde.",
+   "ru": "Его Linux-компьютер запущен, но worker в нём не отвечает.",
+   "id": "Komputer Linux-nya berjalan, tetapi worker di dalamnya tidak menjawab."
+  },
+  "Its disk is almost full.": {
+   "zh-Hans": "它的磁盘快满了。",
+   "hi": "इसकी डिस्क लगभग भर गई है।",
+   "es": "Su disco está casi lleno.",
+   "ar": "قرصه ممتلئ تقريبًا.",
+   "fr": "Son disque est presque plein.",
+   "bn": "এর ডিস্ক প্রায় ভরে গেছে।",
+   "pt-BR": "O disco dele está quase cheio.",
+   "ru": "Его диск почти заполнен.",
+   "id": "Disknya hampir penuh."
+  },
+  "Chromium is missing: web steps will fail.": {
+   "zh-Hans": "缺少 Chromium：网页步骤会失败。",
+   "hi": "Chromium नहीं है: वेब वाले चरण विफल होंगे।",
+   "es": "Falta Chromium: los pasos web fallarán.",
+   "ar": "Chromium غير موجود: ستفشل خطوات الويب.",
+   "fr": "Chromium est absent : les étapes web échoueront.",
+   "bn": "Chromium নেই: ওয়েবের ধাপগুলো ব্যর্থ হবে।",
+   "pt-BR": "O Chromium não está instalado: as etapas na web vão falhar.",
+   "ru": "Chromium не установлен: шаги в браузере не выполнятся.",
+   "id": "Chromium tidak ada: langkah web akan gagal."
   }
  }
 }

@@ -1,8 +1,9 @@
 // File operations, all inside the task's folder.
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import type { OpArgs } from "@coucou-orchestrator/protocol";
+import { MAX_FETCH_BYTES, type OpArgs } from "@coucou-orchestrator/protocol";
 import { PathError, inside } from "../paths.ts";
 import type { OpContext, OpResult } from "../worker.ts";
 
@@ -41,4 +42,15 @@ export async function readText(ctx: OpContext, args: OpArgs<"fs.read">): Promise
   const path = await inside(ctx.dir, args.path);
   const text = await readFile(path, "utf8");
   return { result: text.length > MAX_READ_CHARS ? `${text.slice(0, MAX_READ_CHARS)}\n…(cut)` : text };
+}
+
+/** A whole file, bytes as they are, for a download the user asked for. */
+export async function fetchFile(ctx: OpContext, args: OpArgs<"fs.fetch">): Promise<OpResult> {
+  const path = await inside(ctx.dir, args.path);
+  const info = await stat(path);
+  if (!info.isFile()) throw new PathError(`${args.path} is not a file`);
+  if (info.size > MAX_FETCH_BYTES) throw new PathError(`${args.path} is larger than ${Math.floor(MAX_FETCH_BYTES / 1024 / 1024)} MB`);
+  const bytes = await readFile(path);
+  await ctx.upload(bytes);
+  return { result: JSON.stringify({ bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }) };
 }

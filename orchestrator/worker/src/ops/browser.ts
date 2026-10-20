@@ -4,6 +4,7 @@
 // LAN and non-web schemes are blocked even after a redirect or from a script.
 
 import { lookup } from "node:dns/promises";
+import { access } from "node:fs/promises";
 import { isIP } from "node:net";
 import { isPrivateHost, type OpArgs } from "@coucou-orchestrator/protocol";
 import { inside } from "../paths.ts";
@@ -23,6 +24,8 @@ export interface BrowserDriver {
   close(): Promise<void>;
   /** Replaces the DNS-based check, for tests that run without a network. */
   blocked?(host: string): Promise<boolean>;
+  /** Whether a browser can be started at all (Chromium installed). */
+  ready?(): Promise<boolean>;
 }
 
 export class BrowserError extends Error {}
@@ -118,6 +121,15 @@ export function playwrightDriver(): BrowserDriver {
           await page.screenshot({ path, fullPage: false });
         },
       };
+    },
+    async ready() {
+      try {
+        const pw: Pw = await import("playwright");
+        await access(pw.chromium.executablePath());
+        return true;
+      } catch {
+        return false;
+      }
     },
     async close() {
       clearInterval(sweep);

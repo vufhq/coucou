@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Store } from "../../server/src/store.ts";
 
@@ -52,5 +56,57 @@ describe("store", () => {
     expect(store.decideApproval(a.id, "approved")).toBe(true);
     expect(store.decideApproval(a.id, "rejected")).toBe(false);
     expect(store.approval(a.id)?.status).toBe("approved");
+  });
+});
+
+describe("retention", () => {
+  const finish = (key: string, status: "succeeded" | "running") => {
+    const task = store.createTask(req(key), "scripted").task;
+    store.appendEvent({ taskId: task.id, agentId: "agent-01", type: "task.queued", payload: {} });
+    const step = store.addStep({ taskId: task.id, note: "", op: "fs.list", args: {} });
+    const job = store.createJob({ taskId: task.id, agentId: "agent-01", op: "fs.list", args: {}, deadlineMs: 1_000 });
+    store.setStepJob(task.id, step.n, job.id);
+    store.createApproval({ taskId: task.id, agentId: "agent-01", step: step.n, op: "fs.list", target: "", reason: "" });
+    if (status === "succeeded") store.finishTask(task.id, "succeeded", { result: { summary: "", artifacts: [] } });
+    else store.setTaskStatus(task.id, "running");
+    return task.id;
+  };
+
+  it("removes old finished tasks and all they own, and nothing still running", () => {
+    const old = finish("key-0000old1", "succeeded");
+    const busy = finish("key-0000busy", "running");
+    store.appendEvent({ taskId: null, agentId: "agent-01", type: "agent.status_changed", payload: {} });
+    // Nothing is older than an hour ago yet.
+    expect(store.pruneBefore(new Date(Date.now() - 3_600_000))).toBe(0);
+    expect(store.pruneBefore(new Date(Date.now() + 1_000))).toBe(1);
+    expect(store.task(old)).toBeNull();
+    expect(store.steps(old)).toEqual([]);
+    expect(store.eventsAfter(0, { taskId: old })).toEqual([]);
+    const count = (table: string) =>
+      Number((store.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE task_id = ?`).get(old) as { n: number }).n);
+    expect(count("jobs") + count("approvals")).toBe(0);
+    expect(store.task(busy)?.status).toBe("running");
+    expect(store.steps(busy)).toHaveLength(1);
+    expect(store.eventsAfter(0).filter((e) => e.taskId === null)).toEqual([]);
+  });
+
+  it("adds the health column to a database made before it existed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "orch-migrate-"));
+    const path = join(dir, "old.db");
+    const db = new DatabaseSync(path);
+    db.exec(`CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT NOT NULL, vm_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'offline', model_profile_id TEXT NOT NULL, last_seen_at TEXT,
+      approved_domains TEXT NOT NULL DEFAULT '[]')`);
+    db.exec(`INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES ('agent-01', 'Agent 01', 'wsl:agent-01', 'scripted')`);
+    db.close();
+    const migrated = new Store(path);
+    try {
+      expect(migrated.agent("agent-01")?.health).toBeNull();
+      migrated.setAgentHealth("agent-01", { diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
+      expect(migrated.agent("agent-01")?.health).toMatchObject({ diskFreeBytes: 1, diskTotalBytes: 2, browserReady: true });
+    } finally {
+      migrated.close();
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+    }
   });
 });

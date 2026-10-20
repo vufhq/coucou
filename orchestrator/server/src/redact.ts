@@ -27,8 +27,14 @@ const URL_CREDENTIALS = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
 const URL_SECRET_PARAM =
   /([?&](?:access_token|token|key|api_key|apikey|sig|signature|secret|password|code|auth)=)[^&#\s]+/gi;
 
-/** `Bearer <token>` / `Basic <token>`: the scheme stays, the credential goes. */
-const AUTH_SCHEME = /\b(Bearer|Basic|Token|Digest)\s+[A-Za-z0-9._~+/=-]{6,}/gi;
+/**
+ * `Bearer <token>` / `Basic <token>`: the scheme stays, the credential goes.
+ * Only something shaped like a credential counts: a digit, a `_~+/=`, an
+ * inner `.`, or a capital past the first letter. A plain word after the
+ * scheme ("Basic installation", "Token budget.") is prose and stays.
+ */
+const AUTH_SCHEME =
+  /\b([Bb]earer|[Bb]asic|[Tt]oken|[Dd]igest)\s+(?=[A-Za-z0-9._~+/=-]*?(?:[0-9_~+/=]|\.[A-Za-z0-9]|[A-Za-z0-9][A-Z]))[A-Za-z0-9._~+/=-]{6,}/g;
 
 export function redactText(text: string): string {
   let out = text;

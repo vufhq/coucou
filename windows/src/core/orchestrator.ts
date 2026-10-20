@@ -36,10 +36,15 @@ export interface OrchApproval {
   reason: string;
 }
 
+/** What the backend found wrong with an agent's computer (AgentProblem in the protocol). */
+export type AgentProblem = "vm_stopped" | "worker_down" | "low_disk" | "no_browser";
+
 export interface OrchAgent {
   id: string;
   name: string;
   status: "offline" | "starting" | "ready" | "busy" | "error";
+  /** Absent from a backend older than the health checks. */
+  problems?: AgentProblem[];
 }
 
 export interface OrchEvent {
@@ -91,6 +96,24 @@ export function modelLabel(profileId: string): string {
 export function newTaskKey(): string {
   const rand = Math.random().toString(36).slice(2, 10);
   return `coucou-${Date.now().toString(36)}-${rand}`;
+}
+
+/** How an agent's computer is doing, in one line: its state, then whatever is wrong. */
+export function agentLine(agent: OrchAgent): string {
+  const state = agent.status === "offline" ? t("Offline") : agent.status === "busy" ? t("Busy") : t("Ready");
+  const problems = (agent.problems ?? []).map((p) => {
+    switch (p) {
+      case "vm_stopped":
+        return t("Its Linux computer is not running.");
+      case "worker_down":
+        return t("Its Linux computer is running, but the worker in it does not answer.");
+      case "low_disk":
+        return t("Its disk is almost full.");
+      case "no_browser":
+        return t("Chromium is missing: web steps will fail.");
+    }
+  });
+  return [state, ...problems].join(" · ");
 }
 
 export const ACTIVE: ReadonlySet<TaskStatus> = new Set(["queued", "starting", "running", "waiting_for_approval"]);

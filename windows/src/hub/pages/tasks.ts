@@ -9,10 +9,12 @@ import { onEvent } from "../../core/bridge";
 import {
   ACTIVE,
   OrchestratorBridge,
+  agentLine,
   eventLine,
   modelLabel,
   newTaskKey,
   statusLabel,
+  type OrchAgent,
   type OrchApproval,
   type OrchEvent,
   type OrchStatus,
@@ -27,6 +29,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let status: OrchStatus | null = await OrchestratorBridge.status().catch(() => null);
   let tasks: OrchTask[] = [];
   let approvals: OrchApproval[] = [];
+  let agents: OrchAgent[] = [];
   let selected: string | null = null;
   let detail: { task: OrchTask; events: OrchEvent[] } | null = null;
   let files: { path: string; bytes: number }[] | null = null;
@@ -54,6 +57,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       const data = await OrchestratorBridge.tasks().catch(() => null);
       tasks = data?.tasks ?? [];
       approvals = data?.approvals ?? [];
+      agents = data?.agents ?? [];
       selected ??= tasks[0]?.id ?? null;
       if (models.length === 0) {
         const m = await OrchestratorBridge.models().catch(() => null);
@@ -94,6 +98,9 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       });
     });
     connection.append(card(row(t("Orchestrator backend"), line, sw)));
+    if (!connected()) return;
+    // The agent's computer: its state, and in words what is wrong with it if anything.
+    for (const agent of agents) connection.append(card(row(agent.name, agentLine(agent))));
   }
 
   function drawComposer() {
