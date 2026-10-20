@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { CreateTaskRequest, DECISION_JSON_SCHEMA, isPrivateHost, parseDecision, parseOperation } from "@coucou-orchestrator/protocol";
+import {
+  CreateTaskRequest,
+  DECISION_JSON_SCHEMA,
+  EVENT_PAYLOADS,
+  Job,
+  OP_NAMES,
+  isPrivateHost,
+  parseDecision,
+  parseOperation,
+} from "@coucou-orchestrator/protocol";
 
 describe("operations", () => {
   it("accepts a well-formed operation and drops nothing it needs", () => {
@@ -73,6 +82,20 @@ describe("decisions", () => {
     });
     expect(DECISION_JSON_SCHEMA.properties.op.enum).not.toContain("fs.fetch");
     expect(parseOperation("fs.fetch", { path: "a.png" }).ok).toBe(true);
+  });
+
+  it("accepts chief operations in decisions and events without changing worker jobs", () => {
+    expect(
+      parseDecision({
+        kind: "action",
+        op: "agent.delegate",
+        args: { assignments: [{ agentId: "builder", message: "Build it" }] },
+      }),
+    ).toMatchObject({ ok: true, decision: { op: { op: "agent.delegate" } } });
+    expect(DECISION_JSON_SCHEMA.properties.op.enum).toContain("team.propose");
+    expect(EVENT_PAYLOADS["tool.started"].safeParse({ jobId: "step-1", op: "team.propose", target: "team" }).success).toBe(true);
+    expect(OP_NAMES).not.toContain("team.propose");
+    expect(Job.safeParse({ id: "j", taskId: "t", op: "team.propose", args: {}, deadlineMs: 1_000 }).success).toBe(false);
   });
 });
 

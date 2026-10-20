@@ -18,12 +18,13 @@ export type TaskStatus =
   | "running"
   | "waiting_for_approval"
   | "waiting_for_answer"
+  | "waiting_for_agents"
   | "paused"
   | "succeeded"
   | "failed"
   | "cancelled";
 
-export type TaskSource = "user" | "chat" | "goal";
+export type TaskSource = "user" | "chat" | "goal" | "delegated";
 
 export interface OrchTask {
   id: string;
@@ -35,6 +36,7 @@ export interface OrchTask {
   result: { summary: string; artifacts: string[] } | null;
   error: { reason: string; message: string } | null;
   source: TaskSource;
+  parentTaskId: string | null;
   goalId: string | null;
   question: { id: string; text: string; options: string[] } | null;
   waitingReason: "agent_paused" | "daily_limit" | null;
@@ -65,6 +67,45 @@ export interface OrchAgent {
   paused: boolean;
   limits: { tasksPerDay: number; stepsPerDay: number };
   usage: { tasksToday: number; stepsToday: number };
+  kind: "chief" | "coworker";
+  role: string | null;
+  outfit: OrchOutfit | null;
+  teamId: string | null;
+  order: number;
+  computerId: string;
+  createdBy: "system" | "user" | "chief";
+  persona: string | null;
+}
+
+export type OrchOutfit =
+  | "none"
+  | "partyHat"
+  | "beanie"
+  | "crown"
+  | "sunglasses"
+  | "roundGlasses"
+  | "bow"
+  | "scarf"
+  | "witchHat"
+  | "pumpkin"
+  | "santaHat"
+  | "bunnyEars";
+
+export interface OrchTeam {
+  id: string;
+  name: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface OrchComputer {
+  id: string;
+  vmId: string;
+  status: OrchAgent["status"];
+  lastSeenAt: string | null;
+  health: Record<string, unknown> | null;
+  problems: AgentProblem[];
+  agentIds: string[];
 }
 
 export type GoalSchedule =
@@ -116,7 +157,13 @@ export interface OrchStatus {
 export const OrchestratorBridge = {
   status: () => callOrThrow<OrchStatus>("orchestrator_status"),
   setPrefs: (enabled: boolean, url: string) => callOrThrow<void>("orchestrator_set_prefs", { enabled, url }),
-  tasks: () => callOrThrow<{ tasks: OrchTask[] | null; agents: OrchAgent[] | null; approvals: OrchApproval[] | null }>("orchestrator_tasks"),
+  tasks: () => callOrThrow<{
+    tasks: OrchTask[] | null;
+    agents: OrchAgent[] | null;
+    teams: OrchTeam[] | null;
+    computers: OrchComputer[] | null;
+    approvals: OrchApproval[] | null;
+  }>("orchestrator_tasks"),
   task: (taskId: string) =>
     callOrThrow<{ task: OrchTask; approvals: OrchApproval[]; events: OrchEvent[] }>("orchestrator_task", { taskId }),
   /** `agentId` null: the backend picks a free agent. */
@@ -137,14 +184,33 @@ export const OrchestratorBridge = {
     callOrThrow<{ task: OrchTask }>("orchestrator_answer", { taskId, questionId, answer }),
   pauseTask: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_pause_task", { taskId }),
   resumeTask: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_resume_task", { taskId }),
-  agents: () => callOrThrow<{ agents: OrchAgent[] | null }>("orchestrator_agents"),
+  agents: () => callOrThrow<{
+    agents: OrchAgent[] | null;
+    teams: OrchTeam[] | null;
+    computers: OrchComputer[] | null;
+  }>("orchestrator_agents"),
   pauseAgent: (agentId: string) => callOrThrow<{ agent: OrchAgent }>("orchestrator_pause_agent", { agentId }),
   resumeAgent: (agentId: string) => callOrThrow<{ agent: OrchAgent }>("orchestrator_resume_agent", { agentId }),
   setLimits: (agentId: string, tasksPerDay: number, stepsPerDay: number) =>
     callOrThrow<{ agent: OrchAgent }>("orchestrator_set_limits", { agentId, tasksPerDay, stepsPerDay }),
-  /** Renames or recolours an agent; null puts the default back, a missing field is left alone. */
-  updateAgent: (agentId: string, identity: { name?: string | null; color?: string | null }) =>
+  /** Changes an agent; null puts the default back, a missing field is left alone. */
+  updateAgent: (agentId: string, identity: Partial<Pick<
+    OrchAgent,
+    "name" | "color" | "role" | "outfit" | "teamId" | "order" | "computerId" | "persona"
+  >>) =>
     callOrThrow<{ agent: OrchAgent }>("orchestrator_update_agent", { agentId, identity }),
+  createAgent: (identity: Pick<OrchAgent, "name"> & Partial<Pick<
+    OrchAgent,
+    "role" | "color" | "outfit" | "teamId" | "computerId" | "persona"
+  >>) => callOrThrow<{ agent: OrchAgent }>("orchestrator_create_agent", { identity }),
+  retireAgent: (agentId: string) =>
+    callOrThrow<{ ok: boolean }>("orchestrator_retire_agent", { agentId }),
+  createTeam: (name: string) =>
+    callOrThrow<{ team: OrchTeam }>("orchestrator_create_team", { name }),
+  updateTeam: (teamId: string, changes: Partial<Pick<OrchTeam, "name" | "order">>) =>
+    callOrThrow<{ team: OrchTeam }>("orchestrator_update_team", { teamId, changes }),
+  deleteTeam: (teamId: string) =>
+    callOrThrow<{ ok: boolean }>("orchestrator_delete_team", { teamId }),
   decide: (agentId: string, approvalId: string, approve: boolean) =>
     callOrThrow<unknown>("orchestrator_decide", { agentId, approvalId, approve }),
   files: (agentId: string, taskId: string) =>
@@ -198,14 +264,18 @@ export function newTaskKey(): string {
 }
 
 /** How an agent's computer is doing, in one line: its state, then whatever is wrong. */
-export function agentLine(agent: OrchAgent): string {
+export function agentLine(agent: Pick<OrchAgent, "status"> & Partial<Pick<OrchAgent, "paused" | "problems">>): string {
   const state = agent.paused
     ? t("Paused")
     : agent.status === "offline"
       ? t("Offline")
       : agent.status === "busy"
         ? t("Busy")
-        : t("Ready");
+        : agent.status === "starting"
+          ? t("Starting…")
+          : agent.status === "error"
+            ? t("Error")
+            : t("Ready");
   const problems = (agent.problems ?? []).map((p) => {
     switch (p) {
       case "vm_stopped":
@@ -224,10 +294,10 @@ export function agentLine(agent: OrchAgent): string {
 }
 
 export const ACTIVE: ReadonlySet<TaskStatus> = new Set([
-  "queued", "starting", "running", "waiting_for_approval", "waiting_for_answer", "paused",
+  "queued", "starting", "running", "waiting_for_approval", "waiting_for_answer", "waiting_for_agents", "paused",
 ]);
 export const PAUSABLE: ReadonlySet<TaskStatus> = new Set([
-  "queued", "starting", "running", "waiting_for_approval", "waiting_for_answer",
+  "queued", "starting", "running", "waiting_for_approval", "waiting_for_answer", "waiting_for_agents",
 ]);
 
 export function statusLabel(status: TaskStatus): string {
@@ -241,6 +311,8 @@ export function statusLabel(status: TaskStatus): string {
       return t("Waiting for approval");
     case "waiting_for_answer":
       return t("Waiting for answer");
+    case "waiting_for_agents":
+      return t("Waiting for agents");
     case "paused":
       return t("Paused");
     case "succeeded":
@@ -282,6 +354,12 @@ export function eventLine(e: OrchEvent): string | null {
       return t("Paused");
     case "task.resumed":
       return t("Resumed");
+    case "agent.delegated":
+      return t("Asked {name}: {message}", { name: str(p.toAgentId), message: str(p.message) });
+    case "agent.reported":
+      return `${str(p.fromAgentId)}: ${str(p.summary)}`;
+    case "task.waiting_for_agents":
+      return t("Waiting for agents");
     case "goal.checkin":
       return `${t("Goal: {title}", { title: str(p.title) })} · ${str(p.summary)}`;
     case "task.completed":
@@ -293,4 +371,10 @@ export function eventLine(e: OrchEvent): string | null {
     default:
       return null;
   }
+}
+
+export function approvalLabel(op: string): string {
+  if (op === "team.propose") return t("Create team");
+  if (op === "team.retire") return t("Retire agent");
+  return op;
 }

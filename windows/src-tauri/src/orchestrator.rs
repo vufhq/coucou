@@ -170,10 +170,13 @@ pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
     let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
     let agent = event.get("agentId").and_then(Value::as_str).unwrap_or("");
     let p = event.get("payload").cloned().unwrap_or_else(|| json!({}));
-    if kind == "goal.updated" || kind == "memory.updated" {
+    if kind == "goal.updated" || kind == "memory.updated" || kind == "team.updated" {
         return vec![(
             "orchestrator-refresh",
-            json!({ "agentId": agent, "kind": if kind == "goal.updated" { "goals" } else { "memory" } }),
+            json!({
+                "agentId": agent,
+                "kind": if kind == "goal.updated" { "goals" } else if kind == "memory.updated" { "memory" } else { "teams" },
+            }),
         )];
     }
     let Some(task) = event.get("taskId").and_then(Value::as_str) else {
@@ -204,7 +207,7 @@ pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
             "PermissionRequest",
             json!({
                 "request_id": format!("{REQUEST_PREFIX}{agent}:{}", text("approvalId")),
-                "tool_name": text("op"),
+                "tool_name": approval_tool(&text("op")),
                 "tool_input": { "command": text("target") },
             }),
         )],
@@ -225,6 +228,36 @@ pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
         "task.paused" => vec![(
             "orchestrator-task-state",
             json!({ "agentId": agent, "taskId": task, "state": "idle" }),
+        )],
+        "task.waiting_for_agents" => vec![(
+            "orchestrator-task-state",
+            json!({
+                "agentId": agent,
+                "taskId": task,
+                "state": "waiting_for_agents",
+                "childTaskIds": p.get("childTaskIds"),
+            }),
+        )],
+        "agent.delegated" => vec![(
+            "orchestrator-delegated",
+            json!({
+                "agentId": agent,
+                "taskId": task,
+                "toAgentId": p.get("toAgentId"),
+                "childTaskId": p.get("childTaskId"),
+                "message": p.get("message"),
+            }),
+        )],
+        "agent.reported" => vec![(
+            "orchestrator-reported",
+            json!({
+                "agentId": agent,
+                "taskId": task,
+                "fromAgentId": p.get("fromAgentId"),
+                "childTaskId": p.get("childTaskId"),
+                "status": p.get("status"),
+                "summary": p.get("summary"),
+            }),
         )],
         "goal.checkin" => vec![(
             "orchestrator-goal-checkin",
@@ -254,6 +287,14 @@ fn island_tool(op: &str) -> &'static str {
         "fs.list" => "LS",
         "terminal.run" => "Bash",
         _ => "Tool",
+    }
+}
+
+fn approval_tool(op: &str) -> String {
+    match op {
+        "team.propose" => t("Create team"),
+        "team.retire" => t("Retire agent"),
+        _ => op.to_string(),
     }
 }
 
@@ -305,6 +346,19 @@ async fn restore(app: &AppHandle, tasks: &[Value]) {
                 });
                 deliver(app, &event);
             }
+        } else if task.get("status").and_then(Value::as_str) == Some("waiting_for_agents") {
+            let children: Vec<&Value> = detail
+                .get("children")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|child| child.get("id"))
+                .collect();
+            let event = json!({
+                "type": "task.waiting_for_agents", "taskId": id, "agentId": agent,
+                "payload": { "childTaskIds": children },
+            });
+            deliver(app, &event);
         } else if task.get("status").and_then(Value::as_str) == Some("paused") {
             let event = json!({
                 "type": "task.paused", "taskId": id, "agentId": agent, "payload": {},
@@ -319,7 +373,14 @@ async fn restore(app: &AppHandle, tasks: &[Value]) {
 async fn push_agents(app: &AppHandle) {
     match api(app, Method::GET, "/api/agents", None).await {
         Ok(body) => {
-            let _ = app.emit("orchestrator-agents", json!({ "agents": body.get("agents") }));
+            let _ = app.emit(
+                "orchestrator-agents",
+                json!({
+                    "agents": body.get("agents"),
+                    "teams": body.get("teams"),
+                    "computers": body.get("computers"),
+                }),
+            );
         }
         Err(e) => log::line(format!("orchestrator: agents not read: {e}")),
     }
@@ -329,7 +390,7 @@ async fn push_agents(app: &AppHandle) {
 pub fn is_agent_event(event: &Value) -> bool {
     event.get("type").and_then(Value::as_str).is_some_and(|k| {
         (k.starts_with("agent.") && k != "agent.heartbeat")
-            || matches!(k, "goal.updated" | "goal.checkin" | "memory.updated")
+            || matches!(k, "team.updated" | "goal.updated" | "goal.checkin" | "memory.updated")
     })
 }
 
@@ -498,7 +559,13 @@ pub fn orchestrator_set_prefs(app: AppHandle, enabled: bool, url: String) -> Res
 pub async fn orchestrator_tasks(app: AppHandle) -> Result<Value, String> {
     let tasks = api(&app, Method::GET, "/api/tasks?limit=50", None).await?;
     let agents = api(&app, Method::GET, "/api/agents", None).await?;
-    Ok(json!({ "tasks": tasks.get("tasks"), "agents": agents.get("agents"), "approvals": agents.get("approvals") }))
+    Ok(json!({
+        "tasks": tasks.get("tasks"),
+        "agents": agents.get("agents"),
+        "teams": agents.get("teams"),
+        "computers": agents.get("computers"),
+        "approvals": agents.get("approvals"),
+    }))
 }
 
 #[tauri::command]
@@ -549,17 +616,55 @@ pub async fn orchestrator_agents(app: AppHandle) -> Result<Value, String> {
     api(&app, Method::GET, "/api/agents", None).await
 }
 
-/// Renames or recolours an agent. Only `name` and `color` go through; the
-/// backend checks both, and null puts its default back.
-#[tauri::command]
-pub async fn orchestrator_update_agent(app: AppHandle, agent_id: String, identity: Value) -> Result<Value, String> {
+fn selected_fields(raw: &Value, fields: &[&str]) -> Value {
     let mut body = serde_json::Map::new();
-    for key in ["name", "color"] {
-        if let Some(v) = identity.get(key) {
-            body.insert(key.to_string(), v.clone());
+    for key in fields {
+        if let Some(value) = raw.get(key) {
+            body.insert((*key).to_string(), value.clone());
         }
     }
-    api(&app, Method::PATCH, &format!("/api/agents/{}", segment(&agent_id)?), Some(Value::Object(body))).await
+    Value::Object(body)
+}
+
+/// Changes an agent's contract fields. The backend validates values, and null
+/// puts the corresponding default back.
+#[tauri::command]
+pub async fn orchestrator_update_agent(app: AppHandle, agent_id: String, identity: Value) -> Result<Value, String> {
+    let body = selected_fields(
+        &identity,
+        &["name", "color", "role", "outfit", "teamId", "order", "computerId", "persona"],
+    );
+    api(&app, Method::PATCH, &format!("/api/agents/{}", segment(&agent_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_create_agent(app: AppHandle, identity: Value) -> Result<Value, String> {
+    let body = selected_fields(
+        &identity,
+        &["name", "role", "color", "outfit", "teamId", "computerId", "persona"],
+    );
+    api(&app, Method::POST, "/api/agents", Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_retire_agent(app: AppHandle, agent_id: String) -> Result<Value, String> {
+    api(&app, Method::DELETE, &format!("/api/agents/{}", segment(&agent_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_create_team(app: AppHandle, name: String) -> Result<Value, String> {
+    api(&app, Method::POST, "/api/teams", Some(json!({ "name": name }))).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_update_team(app: AppHandle, team_id: String, changes: Value) -> Result<Value, String> {
+    let body = selected_fields(&changes, &["name", "order"]);
+    api(&app, Method::PATCH, &format!("/api/teams/{}", segment(&team_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_delete_team(app: AppHandle, team_id: String) -> Result<Value, String> {
+    api(&app, Method::DELETE, &format!("/api/teams/{}", segment(&team_id)?), None).await
 }
 
 #[tauri::command]
@@ -606,7 +711,7 @@ pub async fn orchestrator_set_limits(
 
 #[tauri::command]
 pub async fn orchestrator_chat_history(app: AppHandle, agent_id: String) -> Result<Value, String> {
-    let path = format!("/api/tasks?agentId={}&source=chat&limit=50", segment(&agent_id)?);
+    let path = format!("/api/tasks?agentId={}&source=chat,delegated&limit=50", segment(&agent_id)?);
     api(&app, Method::GET, &path, None).await
 }
 
@@ -808,6 +913,9 @@ mod tests {
         let of = |kind: &str| json!({ "type": kind, "taskId": null, "agentId": "agent-01", "payload": {} });
         assert!(is_agent_event(&of("agent.status_changed")));
         assert!(is_agent_event(&of("agent.updated")));
+        assert!(is_agent_event(&of("agent.delegated")));
+        assert!(is_agent_event(&of("agent.reported")));
+        assert!(is_agent_event(&of("team.updated")));
         assert!(is_agent_event(&of("goal.updated")));
         assert!(is_agent_event(&of("goal.checkin")));
         assert!(is_agent_event(&of("memory.updated")));
@@ -844,6 +952,11 @@ mod tests {
         });
         assert_eq!(translate(&goal)[0].1["kind"], "goals");
         assert_eq!(translate(&memory)[0].1["kind"], "memory");
+        let team = json!({
+            "type": "team.updated", "taskId": null, "agentId": null,
+            "payload": {},
+        });
+        assert_eq!(translate(&team)[0].1["kind"], "teams");
         let checkin = translate(&event(
             "goal.checkin",
             json!({ "goalId": "g-1", "title": "Track docs", "summary": "No changes", "achieved": false }),
@@ -863,6 +976,53 @@ mod tests {
             json!({ "kind": "weekdays", "time": "09:30" }),
         );
         assert!(schedule(&json!({ "kind": "monthly" })).is_err());
+    }
+
+    #[test]
+    fn delegation_events_and_waiting_reach_the_island() {
+        let delegated = translate(&event(
+            "agent.delegated",
+            json!({ "toAgentId": "ada", "childTaskId": "t-child", "message": "Review this" }),
+        ));
+        assert_eq!(delegated[0].0, "orchestrator-delegated");
+        assert_eq!(delegated[0].1["toAgentId"], "ada");
+        assert_eq!(delegated[0].1["childTaskId"], "t-child");
+
+        let reported = translate(&event(
+            "agent.reported",
+            json!({ "fromAgentId": "ada", "childTaskId": "t-child", "status": "succeeded", "summary": "Done" }),
+        ));
+        assert_eq!(reported[0].0, "orchestrator-reported");
+        assert_eq!(reported[0].1["summary"], "Done");
+
+        let waiting = translate(&event("task.waiting_for_agents", json!({ "childTaskIds": ["t-child"] })));
+        assert_eq!(waiting[0].0, "orchestrator-task-state");
+        assert_eq!(waiting[0].1["state"], "waiting_for_agents");
+        assert_eq!(waiting[0].1["childTaskIds"], json!(["t-child"]));
+    }
+
+    #[test]
+    fn team_approvals_have_readable_tool_names() {
+        assert_eq!(approval_tool("team.propose"), t("Create team"));
+        assert_eq!(approval_tool("team.retire"), t("Retire agent"));
+        assert_eq!(approval_tool("terminal.run"), "terminal.run");
+    }
+
+    #[test]
+    fn agent_changes_forward_only_contract_fields() {
+        let body = selected_fields(
+            &json!({
+                "name": "Ada", "role": "Backend lead", "outfit": "beanie",
+                "teamId": "builders", "order": 2, "computerId": "agent-02",
+                "persona": "Careful reviewer", "color": "#38BDF8", "kind": "chief",
+                "status": "busy", "unknown": true,
+            }),
+            &["name", "color", "role", "outfit", "teamId", "order", "computerId", "persona"],
+        );
+        assert_eq!(body.as_object().unwrap().len(), 8);
+        assert!(body.get("kind").is_none());
+        assert!(body.get("status").is_none());
+        assert!(body.get("unknown").is_none());
     }
 
     #[test]

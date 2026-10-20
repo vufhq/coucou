@@ -8,6 +8,7 @@ import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { agentLine, eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
+import { miniOutfit } from "../src/mochi/minibots.ts";
 
 const AGENT = "agent_agent-01";
 
@@ -39,6 +40,7 @@ beforeEach(() => {
   State.agentChats.clear();
   State.agentQuestions.clear();
   State.agentRuns.clear();
+  State.chatAgent = null;
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
 });
@@ -145,6 +147,14 @@ const agentInfo = (id, extra = {}) => ({
   agentId: id,
   name: id,
   color: "#4ADE80",
+  kind: "coworker",
+  role: null,
+  outfit: null,
+  teamId: null,
+  teamName: null,
+  teamOrder: null,
+  order: 0,
+  computerId: "agent-01",
   status: "ready",
   problems: [],
   paused: false,
@@ -168,6 +178,14 @@ test("the backend's agents get pills that stay, after the catalog's", () => {
   assert.equal(one.color, "#38BDF8");
   assert.deepEqual(one.orchestrator, {
     agentId: "agent-01",
+    kind: "chief",
+    role: null,
+    outfit: null,
+    teamId: null,
+    teamName: null,
+    teamOrder: null,
+    order: 0,
+    computerId: "agent-01",
     status: "ready",
     problems: [],
     paused: false,
@@ -215,6 +233,30 @@ test("renaming an agent renames its pill in place", () => {
   assert.equal(State.tasks.filter((t) => t.id === AGENT).length, 1);
   assert.equal(task().name, "Scout");
   assert.equal(task().color, "#F4505E");
+});
+
+test("the chief leads, then coworkers follow team order and their order", () => {
+  State.syncOrchestratorAgents([
+    agentInfo("linus", { name: "Linus", teamId: "dev", teamName: "Developers", teamOrder: 2, order: 1 }),
+    agentInfo("ada", { name: "Ada", teamId: "research", teamName: "Research", teamOrder: 1, order: 3 }),
+    agentInfo("grace", { name: "Grace", teamId: "research", teamName: "Research", teamOrder: 1, order: 1 }),
+    agentInfo("agent-01", { name: "Mochi", kind: "chief", order: 99 }),
+  ]);
+  assert.deepEqual(
+    State.tasks.filter((item) => item.orchestrator).map((item) => item.orchestrator.agentId),
+    ["agent-01", "grace", "ada", "linus"],
+  );
+  assert.equal(State.chatAgent, "agent-01", "Mochi is the default chat agent");
+});
+
+test("a coworker mini selects its outfit while an undressed mini stays unchanged", () => {
+  State.syncOrchestratorAgents([
+    agentInfo("agent-01", { kind: "chief" }),
+    agentInfo("ada", { outfit: "beanie" }),
+    agentInfo("linus", { outfit: null }),
+  ]);
+  assert.equal(miniOutfit(State.tasks.find((item) => item.id === "agent_ada")), "beanie");
+  assert.equal(miniOutfit(State.tasks.find((item) => item.id === "agent_linus")), "none");
 });
 
 // ── Chatting with an agent in the island's chat ──────────────────────────────
@@ -386,4 +428,60 @@ test("a goal check-in is labelled and appended to its agent chat", () => {
     payload: { goalId: "g-1", title: "Watch releases", summary: "Version 2 shipped.", achieved: false },
   });
   assert.equal(agentHistory("agent-02").at(-1).content, "Goal: Watch releases\n\nVersion 2 shipped.");
+});
+
+test("delegation and reports are visible in Mochi's and the coworker's chats", () => {
+  State.syncOrchestratorAgents([
+    agentInfo("agent-01", { name: "Mochi", kind: "chief" }),
+    agentInfo("ada", { name: "Ada" }),
+  ]);
+  emit("orchestrator-event", {
+    seq: 10,
+    taskId: "t-chief",
+    agentId: "agent-01",
+    type: "agent.delegated",
+    timestamp: "",
+    payload: { toAgentId: "ada", childTaskId: "t-child", message: "Review the API" },
+  });
+  assert.equal(agentHistory("agent-01").at(-1).content, "Asked Ada: Review the API");
+  assert.equal(agentHistory("ada").at(-1).content, "From Mochi\n\nReview the API");
+
+  emit("orchestrator-event", {
+    seq: 11,
+    taskId: "t-chief",
+    agentId: "agent-01",
+    type: "agent.reported",
+    timestamp: "",
+    payload: { fromAgentId: "ada", childTaskId: "t-child", status: "succeeded", summary: "The API is sound." },
+  });
+  assert.equal(agentHistory("agent-01").at(-1).content, "Ada: The API is sound.");
+  assert.equal(agentHistory("ada").at(-1).content, "The API is sound.");
+});
+
+test("a delegated coworker question stays in chat without lighting its pill for the user", () => {
+  State.syncOrchestratorAgents([
+    agentInfo("agent-01", { name: "Mochi", kind: "chief" }),
+    agentInfo("ada", { name: "Ada" }),
+  ]);
+  emit("orchestrator-event", {
+    seq: 12,
+    taskId: "t-chief-2",
+    agentId: "agent-01",
+    type: "agent.delegated",
+    timestamp: "",
+    payload: { toAgentId: "ada", childTaskId: "t-child-question", message: "Review the schema" },
+  });
+  emit("orchestrator-event", {
+    seq: 13,
+    taskId: "t-child-question",
+    agentId: "ada",
+    type: "task.question",
+    timestamp: "",
+    payload: { questionId: "q-delegated", question: "Should nullable fields be omitted?", options: ["Yes", "No"] },
+  });
+  const ada = State.tasks.find((item) => item.id === "agent_ada");
+  assert.equal(agentHistory("ada").at(-1).content, "Should nullable fields be omitted?");
+  assert.equal(State.agentQuestions.has("ada"), false);
+  assert.equal(ada.state, "idle");
+  assert.equal(ada.pillBadge ?? null, null);
 });

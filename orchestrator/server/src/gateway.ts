@@ -61,8 +61,11 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   const impostor = (req: { raw: object }, reply: FastifyReply, agentId: string) =>
     agentId !== caller(req) ? reply.code(403).send({ error: "wrong_agent" }) : null;
 
-  const setStatus = (agentId: string, status: "ready" | "busy") => {
-    if (store.setAgentStatus(agentId, status)) events.emit("agent.status_changed", agentId, null, { status });
+  const setStatus = (computerId: string, status: "ready" | "busy") => {
+    if (!store.setComputerStatus(computerId, status)) return;
+    for (const agent of store.agentsOnComputer(computerId)) {
+      events.emit("agent.status_changed", agent.id, null, { status: agent.status });
+    }
   };
 
   /** A job this agent holds right now, or null. */
@@ -83,9 +86,9 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     if (!hello.success) return bad(reply, hello.error);
     const { agentId, journal, health } = hello.data;
     if (impostor(req, reply, agentId)) return reply;
-    if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
-    store.touchAgent(agentId);
-    if (health) store.setAgentHealth(agentId, health);
+    if (!store.computer(agentId)) return reply.code(404).send({ error: "unknown_agent" });
+    store.touchComputer(agentId);
+    if (health) store.setComputerHealth(agentId, health);
 
     // Reconcile what the worker remembers with what we remember.
     const known = new Map(journal.map((j) => [j.jobId, j]));
@@ -120,8 +123,8 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     if (!body.success) return bad(reply, body.error);
     const { agentId, health } = body.data;
     if (impostor(req, reply, agentId)) return reply;
-    if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
-    if (health) store.setAgentHealth(agentId, health);
+    if (!store.computer(agentId)) return reply.code(404).send({ error: "unknown_agent" });
+    if (health) store.setComputerHealth(agentId, health);
     const until = Date.now() + deps.claimWaitMs;
     // The response's close (not the request's, which fires once the body is
     // read) tells us the worker hung up while we were waiting.
@@ -130,7 +133,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
       closed = true;
     });
     for (;;) {
-      store.touchAgent(agentId);
+      store.touchComputer(agentId);
       const cancel = store.cancelRequestedJobs(agentId);
       if (closed) return { job: null, cancel };
       const job = store.claimJob(agentId, deps.leaseMs);
@@ -148,7 +151,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     const body = Heartbeat.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
     if (impostor(req, reply, body.data.agentId)) return reply;
-    store.touchAgent(body.data.agentId);
+    store.touchComputer(body.data.agentId);
     const cancel = new Set([
       ...store.renewLeases(body.data.agentId, body.data.running, deps.leaseMs),
       ...store.cancelRequestedJobs(body.data.agentId),
@@ -165,7 +168,8 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     for (const e of body.data.events) {
       const payload = EVENT_PAYLOADS[e.type].safeParse({ ...e.payload, jobId: job.id });
       if (!payload.success) return bad(reply, payload.error);
-      events.emit(e.type, job.agentId, job.taskId, payload.data as never);
+      const task = store.task(job.taskId);
+      if (task) events.emit(e.type, task.agentId, job.taskId, payload.data as never);
     }
     return { ok: true };
   });

@@ -10,6 +10,7 @@ import {
   ACTIVE,
   PAUSABLE,
   OrchestratorBridge,
+  approvalLabel,
   agentLine,
   eventLine,
   modelLabel,
@@ -17,17 +18,21 @@ import {
   statusLabel,
   type OrchAgent,
   type OrchApproval,
+  type OrchComputer,
   type OrchEvent,
   type OrchGoal,
+  type OrchOutfit,
   type OrchStatus,
   type OrchTask,
+  type OrchTeam,
   type GoalSchedule,
   type MemoryNote,
 } from "../../core/orchestrator";
 import type { HubContext } from "../shell";
-import { button, card, divider, label, row, segmented, toggle } from "../ui";
+import { button, card, divider, label, row, segmented, select, toggle } from "../ui";
 import { colorDot } from "../../settings/colors";
 import { agentColor } from "../../island/agents";
+import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../../mochi/wardrobe";
 
 /** The agent the island's Activity link asked for, picked up by the next draw. */
 let agentFilter: string | null = null;
@@ -54,11 +59,22 @@ interface GoalDraft {
   modelProfileId: string | null;
 }
 
+interface AgentDraft {
+  name: string;
+  role: string;
+  color: string;
+  outfit: OrchOutfit | null;
+  teamId: string | null;
+  computerId: string | null;
+}
+
 export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let status: OrchStatus | null = await OrchestratorBridge.status().catch(() => null);
   let tasks: OrchTask[] = [];
   let approvals: OrchApproval[] = [];
   let agents: OrchAgent[] = [];
+  let teams: OrchTeam[] = [];
+  let computers: OrchComputer[] = [];
   let selected: string | null = null;
   let detail: { task: OrchTask; events: OrchEvent[] } | null = null;
   let files: { path: string; bytes: number }[] | null = null;
@@ -72,6 +88,8 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   const memories = new Map<string, MemoryNote[]>();
   const memoryDrafts = new Map<string, string>();
   let goalDraft: GoalDraft | null = null;
+  let teamDraft = "";
+  let agentDraft: AgentDraft | null = null;
   /** The agent picked for the next task; null lets the backend choose a free one. */
   let agentChoice: string | null = null;
   /** An agent's name, for the task list once there is more than one. */
@@ -96,6 +114,8 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       tasks = data?.tasks ?? [];
       approvals = data?.approvals ?? [];
       agents = data?.agents ?? [];
+      teams = data?.teams ?? [];
+      computers = data?.computers ?? [];
       await Promise.all(agents.flatMap((agent) => [
         refreshExtras || !goals.has(agent.id)
           ? OrchestratorBridge.goals(agent.id).then((r) => goals.set(agent.id, r.goals ?? []), () => goals.set(agent.id, []))
@@ -145,55 +165,6 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       });
     });
     connection.append(card(row(t("Orchestrator backend"), line, sw)));
-    if (!connected()) return;
-    // The agent's computer: its state, and in words what is wrong with it if anything.
-    for (const agent of agents) connection.append(card(agentRow(agent)));
-  }
-
-  /**
-   * An agent: its state, and its name and colour, which are the user's to
-   * change. They are the backend's, so the island and every window agree.
-   */
-  function agentRow(agent: OrchAgent): HTMLElement {
-    const name = h("input", { class: "hub-input", placeholder: t("Name"), style: "width:130px", spellcheck: "false" }) as HTMLInputElement;
-    name.value = agent.name;
-    name.maxLength = 24;
-    const save = () => {
-      const next = name.value.trim();
-      if (next === agent.name) return;
-      // Empty: back to the agent's own id.
-      OrchestratorBridge.updateAgent(agent.id, { name: next || null }).then(() => reload(), (err) => {
-        note = String(err);
-        void reload();
-      });
-    };
-    name.addEventListener("change", save);
-    name.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") name.blur();
-    });
-    const pillId = `agent_${agent.id}`;
-    const color = colorDot(
-      { id: pillId, name: agent.name, color: agentColor(agent.id) },
-      "width:14px;height:14px",
-      () => (agent.color ? { [pillId]: agent.color } : {}),
-      (next) => {
-        OrchestratorBridge.updateAgent(agent.id, { color: next[pillId] ?? null }).then(() => reload(), (err) => {
-          note = String(err);
-          void reload();
-        });
-      },
-    );
-    const pause = button(agent.paused ? t("Resume") : t("Pause"), () => {
-      const action = agent.paused
-        ? OrchestratorBridge.resumeAgent(agent.id)
-        : OrchestratorBridge.pauseAgent(agent.id);
-      pause.disabled = true;
-      void action.then(() => reload(), (err) => {
-        note = String(err);
-        void reload();
-      });
-    }, "", true);
-    return row(agent.name, agentLine(agent), name, color, pause);
   }
 
   function drawComposer() {
@@ -393,9 +364,251 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     );
   }
 
+  const changeAgent = (agent: OrchAgent, changes: Parameters<typeof OrchestratorBridge.updateAgent>[1]) => {
+    void OrchestratorBridge.updateAgent(agent.id, changes).then(() => reload(), (err) => {
+      note = String(err);
+      void reload();
+    });
+  };
+
+  function identityInput(
+    value: string,
+    placeholder: string,
+    maxLength: number,
+    save: (next: string) => void,
+  ): HTMLInputElement {
+    const input = h("input", {
+      class: "hub-input",
+      placeholder,
+      maxlength: String(maxLength),
+      spellcheck: "false",
+    }) as HTMLInputElement;
+    input.value = value;
+    input.addEventListener("change", () => save(input.value.trim()));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") input.blur();
+    });
+    return input;
+  }
+
+  function teamPicker(value: string | null, onChange: (teamId: string | null) => void): HTMLSelectElement {
+    return select(
+      [["none", t("No team")] as [string, string], ...[...teams]
+        .sort((a, b) => a.order - b.order)
+        .map((team) => [team.id, team.name] as [string, string])],
+      value ?? "none",
+      (id) => onChange(id === "none" ? null : id),
+    );
+  }
+
+  function computerPicker(value: string | null, onChange: (computerId: string) => void): HTMLSelectElement {
+    const choices = computers.map((computer) => [computer.id, computer.id] as [string, string]);
+    const current = value && computers.some((computer) => computer.id === value)
+      ? value
+      : choices[0]?.[0] ?? "";
+    return select(choices, current, onChange);
+  }
+
+  function outfitPicker(value: OrchOutfit | null, onChange: (outfit: OrchOutfit | null) => void): HTMLSelectElement {
+    const choices: [string, string][] = [
+      ["default", t("Default look")],
+      ...OUTFIT_SELECTIONS
+        .filter((outfit) => outfit !== "auto")
+        .map((outfit) => [outfit, OUTFIT_LABELS[outfit]] as [string, string]),
+    ];
+    return select(choices, value ?? "default", (outfit) => {
+      onChange(outfit === "default" ? null : outfit as OrchOutfit);
+    });
+  }
+
+  function agentIdentityCard(agent: OrchAgent): HTMLElement {
+    const name = identityInput(agent.name, t("Name"), 60, (next) => {
+      if (next && next !== agent.name) changeAgent(agent, { name: next });
+    });
+    const role = identityInput(agent.role ?? "", t("Role"), 60, (next) => {
+      if (next !== (agent.role ?? "")) changeAgent(agent, { role: next || null });
+    });
+    const pillId = `agent_${agent.id}`;
+    const color = colorDot(
+      { id: pillId, name: agent.name, color: agentColor(agent.id) },
+      "width:14px;height:14px",
+      () => (agent.color ? { [pillId]: agent.color } : {}),
+      (next) => changeAgent(agent, { color: next[pillId] ?? null }),
+    );
+    const outfit = outfitPicker(agent.outfit, (next) => changeAgent(agent, { outfit: next }));
+    const team = teamPicker(agent.teamId, (next) => changeAgent(agent, { teamId: next }));
+    const computer = computerPicker(agent.computerId, (next) => changeAgent(agent, { computerId: next }));
+    const pause = button(agent.paused ? t("Resume") : t("Pause"), () => {
+      const action = agent.paused
+        ? OrchestratorBridge.resumeAgent(agent.id)
+        : OrchestratorBridge.pauseAgent(agent.id);
+      pause.disabled = true;
+      void action.then(() => reload(), (err) => {
+        note = String(err);
+        void reload();
+      });
+    }, "", true);
+    const retire = agent.kind === "chief"
+      ? null
+      : button(t("Retire"), () => {
+          if (!window.confirm(t("Retire {name}?", { name: agent.name }))) return;
+          retire!.disabled = true;
+          void OrchestratorBridge.retireAgent(agent.id).then(() => reload(true), (err) => {
+            note = String(err);
+            void reload();
+          });
+        }, "danger", true);
+    return card(
+      row(agent.name, `${agent.role || t("Agent")} · ${agentLine(agent)}`, name, color),
+      row(t("Role"), null, role),
+      row(t("Outfit"), null, outfit),
+      row(t("Team"), null, team),
+      row(t("Computer"), null, computer),
+      h("div", { class: "tasks-actions" }, pause, retire),
+    );
+  }
+
+  function newAgentForm(draft: AgentDraft): HTMLElement {
+    const name = identityInput(draft.name, t("Name"), 60, (next) => (draft.name = next));
+    name.addEventListener("input", () => (draft.name = name.value));
+    const role = identityInput(draft.role, t("Role"), 60, (next) => (draft.role = next));
+    role.addEventListener("input", () => (draft.role = role.value));
+    const color = h("input", {
+      class: "hub-input",
+      type: "color",
+      value: draft.color,
+      title: t("Colour"),
+    }) as HTMLInputElement;
+    color.addEventListener("input", () => (draft.color = color.value));
+    const outfit = outfitPicker(draft.outfit, (next) => (draft.outfit = next));
+    const team = teamPicker(draft.teamId, (next) => (draft.teamId = next));
+    const computer = computerPicker(draft.computerId, (next) => (draft.computerId = next));
+    const create = button(t("Create"), () => {
+      const agentName = draft.name.trim();
+      if (!agentName) return;
+      create.disabled = true;
+      void OrchestratorBridge.createAgent({
+        name: agentName,
+        role: draft.role.trim() || null,
+        color: draft.color,
+        outfit: draft.outfit,
+        teamId: draft.teamId,
+        computerId: draft.computerId ?? undefined,
+      }).then(() => {
+        agentDraft = null;
+        void reload(true);
+      }, (err) => {
+        note = String(err);
+        create.disabled = false;
+        drawManagement();
+      });
+    }, "primary");
+    return card(
+      row(t("Name"), null, name, color),
+      row(t("Role"), null, role),
+      row(t("Outfit"), null, outfit),
+      row(t("Team"), null, team),
+      row(t("Computer"), null, computer),
+      h("div", { class: "tasks-actions" },
+        create,
+        button(t("Cancel"), () => {
+          agentDraft = null;
+          drawManagement();
+        }),
+      ),
+    );
+  }
+
+  function drawTeamManagement() {
+    management.append(label(t("Team")));
+    const teamsCard = card();
+    for (const [index, team] of [...teams].sort((a, b) => a.order - b.order).entries()) {
+      if (index) teamsCard.append(divider());
+      const name = identityInput(team.name, t("Team name"), 40, (next) => {
+        if (!next || next === team.name) return;
+        void OrchestratorBridge.updateTeam(team.id, { name: next }).then(() => reload(), (err) => {
+          note = String(err);
+          void reload();
+        });
+      });
+      const remove = button(t("Delete"), () => {
+        if (!window.confirm(t("Delete team {name}?", { name: team.name }))) return;
+        remove.disabled = true;
+        void OrchestratorBridge.deleteTeam(team.id).then(() => reload(true), (err) => {
+          note = String(err);
+          void reload();
+        });
+      }, "danger", true);
+      teamsCard.append(row(team.name, null, name, remove));
+    }
+    const teamName = identityInput(teamDraft, t("Team name"), 40, (next) => (teamDraft = next));
+    teamName.addEventListener("input", () => (teamDraft = teamName.value));
+    const createTeam = button(t("Create team"), () => {
+      const name = teamName.value.trim();
+      if (!name) return;
+      createTeam.disabled = true;
+      void OrchestratorBridge.createTeam(name).then(() => {
+        teamDraft = "";
+        void reload(true);
+      }, (err) => {
+        note = String(err);
+        createTeam.disabled = false;
+      });
+    }, "primary", true);
+    teamsCard.append(h("div", { class: "hub-row" }, teamName, createTeam));
+    management.append(teamsCard);
+
+    const orderedTeams: ({ id: string | null; name: string; order: number }[]) = [
+      ...[...teams].sort((a, b) => a.order - b.order),
+      { id: null, name: t("No team"), order: Number.MAX_SAFE_INTEGER },
+    ];
+    for (const group of orderedTeams) {
+      const members = agents
+        .filter((agent) => (agent.teamId ?? null) === group.id)
+        .sort((a, b) => Number(b.kind === "chief") - Number(a.kind === "chief") || a.order - b.order);
+      if (members.length === 0) continue;
+      management.append(h("h2", { class: "tasks-agent-title", text: group.name }));
+      for (const agent of members) management.append(agentIdentityCard(agent));
+    }
+    if (agentDraft) {
+      management.append(h("h2", { class: "tasks-agent-title", text: t("New agent") }), newAgentForm(agentDraft));
+    } else {
+      management.append(button(t("New agent"), () => {
+        agentDraft = {
+          name: "",
+          role: "",
+          color: "#38BDF8",
+          outfit: null,
+          teamId: teams[0]?.id ?? null,
+          computerId: computers[0]?.id ?? null,
+        };
+        drawManagement();
+      }, "primary"));
+    }
+  }
+
+  function drawComputers() {
+    management.append(label(t("Computers")));
+    const computersCard = card();
+    for (const [index, computer] of computers.entries()) {
+      if (index) computersCard.append(divider());
+      const names = computer.agentIds
+        .map((id) => agents.find((agent) => agent.id === id)?.name ?? id)
+        .join(", ");
+      computersCard.append(row(
+        computer.id,
+        `${agentLine({ status: computer.status, problems: computer.problems })} · ${t("Agents: {names}", { names: names || "—" })}`,
+      ));
+    }
+    if (computers.length === 0) computersCard.append(h("div", { class: "hub-note", text: t("No computer available.") }));
+    management.append(computersCard);
+  }
+
   function drawManagement() {
     clear(management);
     if (!connected()) return;
+    drawTeamManagement();
+    drawComputers();
     for (const agent of agents) {
       const heading = agents.length > 1 ? h("h2", { class: "tasks-agent-title", text: agent.name }) : null;
       if (heading) management.append(heading);
@@ -529,7 +742,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     for (const a of approvals) {
       const allow = button(t("Allow"), () => decide(a, true), "primary", true);
       const deny = button(t("Deny"), () => decide(a, false), "", true);
-      approvalsEl.append(card(row(`${a.op} · ${a.target}`, `${t("Waiting for approval")} · ${a.reason}`, deny, allow)));
+      approvalsEl.append(card(row(`${approvalLabel(a.op)} · ${a.target}`, `${t("Waiting for approval")} · ${a.reason}`, deny, allow)));
     }
   }
 
@@ -595,6 +808,12 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     if (task.result) detailEl.append(h("div", { class: "hub-ok", style: "white-space:pre-wrap", text: task.result.summary }));
     if (task.error) detailEl.append(h("div", { class: "hub-warn", text: task.error.message }));
     if (task.question) {
+      if (task.source === "delegated") {
+        detailEl.append(card(
+          h("div", { class: "title", text: task.question.text }),
+          h("div", { class: "hub-note", text: t("Waiting for Mochi to answer.") }),
+        ));
+      } else {
       const answerInput = h("input", {
         class: "hub-input",
         placeholder: t("Your answer"),
@@ -617,6 +836,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
         h("div", { class: "title", text: task.question.text }),
         replies,
       ));
+      }
     }
     const taskActions = h("div", { class: "tasks-actions" });
     if (PAUSABLE.has(task.status)) {
@@ -688,7 +908,13 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   };
   const stops = await Promise.all([
     onEvent<OrchEvent>("orchestrator-event", (event) => {
-      soon(event.type === "goal.updated" || event.type === "goal.checkin" || event.type === "memory.updated" || event.type === "agent.updated");
+      soon(
+        event.type === "goal.updated" ||
+        event.type === "goal.checkin" ||
+        event.type === "memory.updated" ||
+        event.type === "agent.updated" ||
+        event.type === "team.updated",
+      );
     }),
     onEvent<unknown>("orchestrator-status", () => soon(true)),
   ]);

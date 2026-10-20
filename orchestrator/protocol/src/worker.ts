@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { AgentId } from "./tasks.ts";
-import { OpName } from "./ops.ts";
+import { WorkerOpName } from "./ops.ts";
 
 export const WORKER_PROTOCOL = "worker/v1";
 
@@ -41,7 +41,7 @@ export type WorkerHealth = z.infer<typeof WorkerHealth>;
 export const Hello = z.object({
   agentId: AgentId,
   version: z.string().max(32),
-  capabilities: z.array(OpName),
+  capabilities: z.array(WorkerOpName),
   journal: z.array(JournalEntry).max(500),
   health: WorkerHealth.optional(),
 });
@@ -64,7 +64,7 @@ export const MAX_FETCH_BYTES = 8 * 1024 * 1024 - 64 * 1024;
 export const Job = z.object({
   id: z.string(),
   taskId: z.string(),
-  op: OpName,
+  op: WorkerOpName,
   args: z.record(z.string(), z.unknown()),
   deadlineMs: z.number().int().positive(),
 });

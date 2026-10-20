@@ -45,6 +45,18 @@ export function describeTarget(op: Operation): string {
       return String(a.path);
     case "browser.screenshot":
       return String(a.name);
+    case "team.propose": {
+      const team = a.team as { name?: string; id?: string };
+      const members = a.members as { name: string; role: string }[];
+      return `Create team ${team.name ?? team.id}: ${members.map((member) => `${member.name} (${member.role})`).join(", ")}`;
+    }
+    case "team.retire":
+      return `Retire agent ${String(a.agentId)}`;
+    case "team.organize":
+    case "agent.delegate":
+    case "agent.answer":
+    case "agent.wait":
+      return "";
     default:
       return "";
   }
@@ -79,5 +91,14 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
     case "fs.fetch":
       // A download for the user, asked by the backend; never a model's step.
       return { verdict: "deny", reason: "not an operation the model can use" };
+    case "team.propose":
+      return { verdict: "approve", reason: "creating agents always needs the user's approval" };
+    case "team.retire":
+      return { verdict: "approve", reason: "retiring an agent always needs the user's approval" };
+    case "team.organize":
+    case "agent.delegate":
+    case "agent.answer":
+    case "agent.wait":
+      return { verdict: "allow" };
   }
 }

@@ -18,6 +18,7 @@ const TURN_CHARS = 1_200;
 let nextId = 1;
 const revisions = new Map<string, number>();
 const loading = new Map<string, Promise<void>>();
+const delegated = new Map<string, { chiefId: string; coworkerId: string; message: string }>();
 
 function changed(agentId: string) {
   revisions.set(agentId, (revisions.get(agentId) ?? 0) + 1);
@@ -52,24 +53,45 @@ function reply(agentId: string, content: string) {
   changed(agentId);
 }
 
-function rebuilt(tasks: OrchTask[]): { messages: ChatMessage[]; question: AgentQuestion | null } {
+function append(agentId: string, role: ChatMessage["role"], content: string) {
+  const history = agentHistory(agentId);
+  if (history.at(-1)?.role === role && history.at(-1)?.content === content) return;
+  history.push({ id: nextId++, role, content });
+  changed(agentId);
+}
+
+function agentName(agentId: string): string {
+  return State.tasks.find((task) => task.orchestrator?.agentId === agentId)?.name ?? agentId;
+}
+
+function rebuilt(agentId: string, tasks: OrchTask[]): { messages: ChatMessage[]; question: AgentQuestion | null } {
   const messages: ChatMessage[] = [];
   let question: AgentQuestion | null = null;
   // GET /api/tasks is newest first; chat reads oldest to newest.
   for (const task of [...tasks].reverse()) {
-    messages.push({ id: nextId++, role: "user", content: task.prompt });
+    const fromMochi = task.source === "delegated";
+    if (fromMochi) {
+      delegated.set(task.id, { chiefId: "", coworkerId: agentId, message: task.prompt });
+    }
+    messages.push({
+      id: nextId++,
+      role: "user",
+      content: fromMochi ? `${t("From Mochi")}\n\n${task.prompt}` : task.prompt,
+    });
     if (task.result?.summary) {
       messages.push({ id: nextId++, role: "assistant", content: task.result.summary });
     } else if (task.error?.message) {
       messages.push({ id: nextId++, role: "assistant", content: task.error.message });
     } else if (task.question) {
       messages.push({ id: nextId++, role: "assistant", content: task.question.text });
-      question = {
-        taskId: task.id,
-        questionId: task.question.id,
-        text: task.question.text,
-        options: task.question.options ?? [],
-      };
+      if (!fromMochi) {
+        question = {
+          taskId: task.id,
+          questionId: task.question.id,
+          text: task.question.text,
+          options: task.question.options ?? [],
+        };
+      }
     }
   }
   return { messages, question };
@@ -84,7 +106,7 @@ export function loadAgentHistory(agentId: string, force = false): Promise<void> 
     .then(({ tasks }) => {
       // Do not erase a turn that arrived while this request was in flight.
       if ((revisions.get(agentId) ?? 0) !== revision) return;
-      const history = rebuilt(tasks ?? []);
+      const history = rebuilt(agentId, tasks ?? []);
       State.agentChats.set(agentId, history.messages);
       if (history.question) State.agentQuestions.set(agentId, history.question);
       else State.agentQuestions.delete(agentId);
@@ -167,11 +189,63 @@ export function onAgentEvent(e: OrchEvent) {
   if (!e.taskId) return;
   const p = e.payload;
   const str = (v: unknown) => (typeof v === "string" ? v : "");
+  if (e.type === "agent.delegated") {
+    const coworkerId = str(p.toAgentId);
+    const childTaskId = str(p.childTaskId);
+    const message = str(p.message);
+    if (!coworkerId || !childTaskId || !message) return;
+    delegated.set(childTaskId, { chiefId: e.agentId, coworkerId, message });
+    append(e.agentId, "assistant", t("Asked {name}: {message}", { name: agentName(coworkerId), message }));
+    append(coworkerId, "user", `${t("From Mochi")}\n\n${message}`);
+    State.notify();
+    return;
+  }
+  if (e.type === "agent.reported") {
+    const coworkerId = str(p.fromAgentId);
+    const childTaskId = str(p.childTaskId);
+    const summary = str(p.summary);
+    if (!coworkerId || !summary) return;
+    const name = agentName(coworkerId);
+    const asks = str(p.status) === "waiting_for_answer";
+    append(
+      e.agentId,
+      "assistant",
+      asks ? t("{name} asks: {message}", { name, message: summary }) : `${name}: ${summary}`,
+    );
+    if (!asks) append(coworkerId, "assistant", summary);
+    if (childTaskId && !delegated.has(childTaskId)) {
+      delegated.set(childTaskId, { chiefId: e.agentId, coworkerId, message: "" });
+    }
+    State.notify();
+    return;
+  }
+  if (e.type === "task.waiting_for_agents") {
+    const ids = Array.isArray(p.childTaskIds) ? p.childTaskIds.map(String) : [];
+    const names = ids
+      .map((id) => delegated.get(id)?.coworkerId)
+      .filter((id): id is string => Boolean(id))
+      .map(agentName);
+    const run = State.agentRuns.get(e.agentId);
+    if (run) {
+      run.line = names.length
+        ? t("Waiting for {names}…", { names: names.join(", ") })
+        : t("Waiting for agents");
+    }
+    pillState(e.agentId, "idle");
+    State.notify();
+    return;
+  }
   if (e.type === "task.question") {
     const question = str(p.question);
     const questionId = str(p.questionId);
     if (!question || !questionId) return;
     reply(e.agentId, question);
+    if (delegated.has(e.taskId) || p.source === "delegated") {
+      State.agentQuestions.delete(e.agentId);
+      pillState(e.agentId, "idle");
+      State.notify();
+      return;
+    }
     State.agentQuestions.set(e.agentId, {
       taskId: e.taskId,
       questionId,
@@ -185,6 +259,13 @@ export function onAgentEvent(e: OrchEvent) {
     return;
   }
   if (e.type === "task.answered") {
+    if (delegated.has(e.taskId) || p.source === "delegated") {
+      const answer = str(p.answer);
+      if (answer) append(e.agentId, "user", `${t("From Mochi")}\n\n${answer}`);
+      pillState(e.agentId, "working");
+      State.notify();
+      return;
+    }
     const pending = State.agentQuestions.get(e.agentId);
     if (!pending || pending.questionId === str(p.questionId)) State.agentQuestions.delete(e.agentId);
     const run = State.agentRuns.get(e.agentId);
@@ -246,10 +327,10 @@ export function onAgentEvent(e: OrchEvent) {
 
 export function registerAgentChat() {
   void onEvent<OrchEvent>("orchestrator-event", onAgentEvent);
-  void onEvent<{ agentId: string; state: "idle" | "working" | "question" }>(
+  void onEvent<{ agentId: string; state: "idle" | "working" | "question" | "waiting_for_agents" }>(
     "orchestrator-task-state",
     ({ agentId, state }) => {
-      pillState(agentId, state);
+      pillState(agentId, state === "waiting_for_agents" ? "idle" : state);
       State.notify();
     },
   );

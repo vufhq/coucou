@@ -204,8 +204,8 @@ export class BotEngine {
   sx = 1; sy = 1; oy = 0; ox = 0;
   tint = 0; morph = 0; hands = 0; blush = 0; es = 1; badgeS = 0;
 
-  // Outfit (the main Mochi only — minis never wear one). `outfit` is what is
-  // drawn; it changes only once the previous one has left.
+  // Outfit. Most minis keep "none"; orchestrator coworkers may wear one.
+  // `outfit` is what is drawn; it changes only once the previous one has left.
   outfit: Outfit = "none";
   /** 0 = gone, 1 = fully on. */
   outfitPresence = 0;
@@ -534,7 +534,7 @@ export class BotEngine {
 
   /** Wearing something visible: the body then turns as one piece when it rolls. */
   private get rigidRoll(): boolean {
-    return !this.isMini && this.outfit !== "none" && this.outfitPresence > 0.05;
+    return this.outfit !== "none" && this.outfitPresence > 0.05;
   }
 
   /** True while anything is still moving — lets the island stop its RAF loop. */
@@ -793,7 +793,7 @@ export class BotEngine {
     if (this.tilt !== 0) x.rotate(this.tilt);
     x.scale(this.sx, this.sy);
 
-    const dressed = !this.isMini && this.outfit !== "none";
+    const dressed = this.outfit !== "none";
     const head = dressed ? makeHead(R, this.yaw, this.pitch, this.physDx, this.physDy) : null;
     const outfitState = { presence: this.outfitPresence, morph: this.morph };
     if (head) drawOutfitBehind(x, this.outfit, head, outfitState);
@@ -859,7 +859,7 @@ export class BotEngine {
 
   /** How much of the pumpkin's orange shows on the body (it comes and goes with the outfit). */
   private get pumpkinAlpha(): number {
-    if (this.isMini || this.outfit !== "pumpkin") return 0;
+    if (this.outfit !== "pumpkin") return 0;
     return Math.min(1, this.outfitPresence * 2.5) * (1 - this.morph);
   }
 

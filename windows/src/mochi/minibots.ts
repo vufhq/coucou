@@ -3,6 +3,7 @@
 
 import { BotEngine, hexToRGB } from "./engine";
 import type { AgentTask } from "../core/state";
+import type { Outfit } from "./wardrobe";
 
 interface MiniBot {
   canvas: HTMLCanvasElement;
@@ -14,6 +15,10 @@ interface MiniBot {
 }
 
 const live = new Map<HTMLCanvasElement, MiniBot>();
+
+export function miniOutfit(task: AgentTask): Outfit {
+  return task.orchestrator?.outfit ?? "none";
+}
 
 /**
  * Creates a mini Mochi whose **body** is `bodySize` CSS pixels across.
@@ -42,6 +47,7 @@ export function createMiniBot(task: AgentTask, bodySize: number, dancing?: () =>
   const engine = new BotEngine();
   engine.isMini = true;
   engine.bodyColor = hexToRGB(task.color);
+  engine.setOutfit(miniOutfit(task), false);
   engine.setState(task.state, true);
   if (task.emote) engine.setPermanentEmote(task.emote);
   if (task.miniEye) {
@@ -71,6 +77,7 @@ export function syncMiniBotStates(tasks: AgentTask[]) {
     if (!task) continue;
     mb.engine.setState(task.state);
     mb.engine.bodyColor = hexToRGB(task.color);
+    mb.engine.setOutfit(miniOutfit(task));
   }
 }
 
