@@ -6,7 +6,7 @@
 
 import { h, dot, svg } from "./dom";
 import { ICONS } from "./icons";
-import type { AgentTask } from "../core/state";
+import { State, type AgentTask } from "../core/state";
 import { OrchestratorBridge, agentLine, type AgentProblem } from "../core/orchestrator";
 import { t } from "../i18n/i18n";
 import { loadAgentHistory } from "../island/agent-chat";
@@ -29,7 +29,8 @@ export function buildAgentCard(task: AgentTask, openChat: (agentId: string) => v
   let currentTask = task;
   const nameEl = h("b", { text: task.name });
   const headDot = h("span", {});
-  const head = h("div", { class: "int-head" }, headDot, nameEl, h("span", { text: t("Agent") }));
+  const identity = h("span", {});
+  const head = h("div", { class: "int-head" }, headDot, nameEl, identity);
   const statusDot = h("span", {});
   const statusText = h("span", {});
   const status = h("div", { class: "int-status" }, statusDot, statusText);
@@ -66,16 +67,18 @@ export function buildAgentCard(task: AgentTask, openChat: (agentId: string) => v
       headDot.replaceChildren(dot(current.color, 7));
       statusDot.replaceChildren(dot(STATUS_COLORS[o.status] ?? STATUS_COLORS.offline, 5));
       const line = agentLine({
-        id: o.agentId,
-        name: current.name,
         status: o.status,
         problems: o.problems as AgentProblem[],
         paused: o.paused,
-        limits: o.limits,
-        usage: o.usage,
       });
+      identity.textContent = `${o.role || t("Agent")} · ${o.teamName || t("No team")}`;
+      const activity = o.kind === "chief" ? State.agentRuns.get(o.agentId)?.line : null;
       // What is wrong comes first; how the last task ended when nothing is.
-      statusText.textContent = o.last && o.problems.length === 0 ? `${line} · ${t("Last: {text}", { text: o.last })}` : line;
+      statusText.textContent = activity
+        ? `${line} · ${activity}`
+        : o.last && o.problems.length === 0
+          ? `${line} · ${t("Last: {text}", { text: o.last })}`
+          : line;
       chatLabel.textContent = t("Chat with {name}", { name: current.name });
       chat.style.setProperty("--accent", current.color);
       pause.textContent = o.paused ? t("Resume") : t("Pause");

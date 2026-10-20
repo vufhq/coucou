@@ -4,37 +4,56 @@
 // connection and whenever an agent changes (orchestrator-agents).
 
 import { onEvent } from "../core/bridge";
-import { OrchestratorBridge, type OrchAgent } from "../core/orchestrator";
+import { OrchestratorBridge, type OrchAgent, type OrchTeam } from "../core/orchestrator";
 import { State } from "../core/state";
 import { agentColor } from "./agents";
 import { loadAgentHistory } from "./agent-chat";
 
 type StatusEvent = { state: "off" | "connecting" | "connected" | "noToken" | "unreachable" };
 
-function apply(agents: OrchAgent[] | null) {
+function apply(agents: OrchAgent[] | null, teams: OrchTeam[] = []) {
+  const byTeam = new Map(teams.map((team) => [team.id, team]));
   State.syncOrchestratorAgents(
-    agents?.map((a) => ({
+    agents?.map((a, index) => {
+      const team = a.teamId ? byTeam.get(a.teamId) : undefined;
+      return {
       agentId: a.id,
       name: a.name,
       color: a.color ?? agentColor(a.id),
-      status: a.status,
+      kind: a.kind ?? (index === 0 ? "chief" : "coworker"),
+      role: a.role ?? null,
+      outfit: a.outfit ?? null,
+      teamId: a.teamId ?? null,
+      teamName: team?.name ?? null,
+      teamOrder: team?.order ?? null,
+      order: a.order ?? 0,
+      computerId: a.computerId ?? a.id,
+      status: a.status ?? "offline",
       problems: a.problems ?? [],
       paused: a.paused ?? false,
       limits: a.limits ?? { tasksPerDay: 30, stepsPerDay: 300 },
       usage: a.usage ?? { tasksToday: 0, stepsToday: 0 },
-    })) ?? null,
+      };
+    }) ?? null,
   );
   for (const agent of agents ?? []) void loadAgentHistory(agent.id);
 }
 
 export function registerOrchestratorAgents() {
-  void onEvent<{ agents: OrchAgent[] | null }>("orchestrator-agents", (e) => apply(e.agents ?? []));
+  void onEvent<{ agents: OrchAgent[] | null; teams?: OrchTeam[] | null }>(
+    "orchestrator-agents",
+    (e) => apply(e.agents ?? [], e.teams ?? []),
+  );
   void onEvent<StatusEvent>("orchestrator-status", (s) => {
     if (s.state === "off") apply(null);
     else if (s.state !== "connected" && s.state !== "connecting") State.markOrchestratorOffline();
   });
   // Coucou opened while the backend was already connected.
   void OrchestratorBridge.status()
-    .then((s) => (s.status.state === "connected" ? OrchestratorBridge.agents().then((r) => apply(r.agents)) : undefined))
+    .then((s) => (
+      s.status.state === "connected"
+        ? OrchestratorBridge.agents().then((r) => apply(r.agents, r.teams ?? []))
+        : undefined
+    ))
     .catch(() => {});
 }

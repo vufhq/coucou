@@ -49,6 +49,14 @@ export interface AgentTask {
 
 export interface OrchestratorPill {
   agentId: string;
+  kind: "chief" | "coworker";
+  role: string | null;
+  outfit: Outfit | null;
+  teamId: string | null;
+  teamName: string | null;
+  teamOrder: number | null;
+  order: number;
+  computerId: string;
   status: "offline" | "starting" | "ready" | "busy" | "error";
   /** What is wrong with its computer, as codes (AgentProblem). */
   problems: string[];
@@ -64,6 +72,14 @@ export interface OrchestratorAgentInfo {
   agentId: string;
   name: string;
   color: string;
+  kind: OrchestratorPill["kind"];
+  role: string | null;
+  outfit: Outfit | null;
+  teamId: string | null;
+  teamName: string | null;
+  teamOrder: number | null;
+  order: number;
+  computerId: string;
   status: OrchestratorPill["status"];
   problems: string[];
   paused: boolean;
@@ -464,7 +480,15 @@ class AppState {
    * switched off) takes them all away the same way.
    */
   syncOrchestratorAgents(agents: OrchestratorAgentInfo[] | null) {
-    const want = new Map((agents ?? []).map((a) => [`agent_${a.agentId}`, a]));
+    const hadAgents = this.tasks.some((t) => t.orchestrator);
+    const sorted = [...(agents ?? [])].sort((a, b) =>
+      Number(b.kind === "chief") - Number(a.kind === "chief") ||
+      (a.teamOrder ?? Number.MAX_SAFE_INTEGER) - (b.teamOrder ?? Number.MAX_SAFE_INTEGER) ||
+      a.order - b.order ||
+      a.name.localeCompare(b.name) ||
+      a.agentId.localeCompare(b.agentId),
+    );
+    const want = new Map(sorted.map((a) => [`agent_${a.agentId}`, a]));
     this.tasks = this.tasks.filter((t) => {
       if (!t.orchestrator || want.has(t.id)) return true;
       t.orchestrator = null;
@@ -480,6 +504,14 @@ class AppState {
       t.color = a.color;
       t.orchestrator = {
         agentId: a.agentId,
+        kind: a.kind,
+        role: a.role,
+        outfit: a.outfit,
+        teamId: a.teamId,
+        teamName: a.teamName,
+        teamOrder: a.teamOrder,
+        order: a.order,
+        computerId: a.computerId,
         status: a.status,
         problems: a.problems,
         paused: a.paused,
@@ -489,6 +521,13 @@ class AppState {
       };
     }
     this.tasks = orderPills(this.tasks, this.mainPillId);
+    const orderedAgents = sorted
+      .map((a) => this.tasks.find((task) => task.orchestrator?.agentId === a.agentId))
+      .filter((task): task is AgentTask => Boolean(task));
+    this.tasks = [...this.tasks.filter((task) => !task.orchestrator), ...orderedAgents];
+    if (!hadAgents && this.chatAgent == null) {
+      this.chatAgent = sorted.find((agent) => agent.kind === "chief")?.agentId ?? null;
+    }
     if (!this.focusId || !this.tasks.some((t) => t.id === this.focusId)) this.focusId = this.tasks[0]?.id ?? this.mainPillId;
     this.notify();
   }
