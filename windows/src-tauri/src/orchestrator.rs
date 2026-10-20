@@ -1,0 +1,554 @@
+// Coucou as the control surface of the orchestrator backend (orchestrator/ at
+// the repository root): tasks run there and in the agent's own Linux VM, never
+// here. See orchestrator/README.md.
+//
+// Off until the user turns it on from the Tasks page. Once on, one background
+// task keeps an event stream open to the backend and turns each event into
+// the hook payload the island already understands — an `agent_<id>` pill, its
+// steps, the approval card, the final line — so the island needs no new view.
+// Heartbeats and tool output stay out of the island: a hidden island still
+// costs nothing. The Tasks page gets every event as `orchestrator-event`.
+//
+// The access token is the backend's own: it writes it to the Credential
+// Manager on its first start, under Coucou's service name, and only Rust reads
+// it. The backend's address must be this machine, so the token cannot be sent
+// anywhere else.
+
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::Duration;
+
+use reqwest::{Method, Url};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::Notify;
+
+use crate::i18n::{t, tf};
+use crate::island::WINDOW_LABEL;
+use crate::{integrations, log, net, platform, secrets};
+
+/// Credential Manager entry the backend writes (orchestrator/server/src/tokens.ts).
+pub const TOKEN_KEY: &str = "orchestrator-token";
+pub const DEFAULT_URL: &str = "http://127.0.0.1:47620";
+/// Approval request ids handed to the island: `orch:<agent>:<approval>`.
+const REQUEST_PREFIX: &str = "orch:";
+/// A file request waits up to 30 s for the worker on the backend's side.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(40);
+/// The backend pings every 15 s; this long without a byte means the stream is dead.
+const STREAM_IDLE: Duration = Duration::from_secs(45);
+const MAX_EVENT: usize = 1 << 20;
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Prefs {
+    pub enabled: bool,
+    pub url: String,
+}
+
+impl Default for Prefs {
+    fn default() -> Self {
+        Self { enabled: false, url: DEFAULT_URL.into() }
+    }
+}
+
+/// How the connection is, for the Tasks page. Never the token.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    /// "off", "connecting", "connected", "noToken" or "unreachable".
+    pub state: &'static str,
+    pub error: Option<String>,
+}
+
+pub struct Orchestrator {
+    prefs: Mutex<Prefs>,
+    status: Mutex<Status>,
+    wake: Notify,
+}
+
+fn state(app: &AppHandle) -> tauri::State<'_, Orchestrator> {
+    app.state::<Orchestrator>()
+}
+
+fn prefs_path() -> PathBuf {
+    platform::config_dir().join("orchestrator.json")
+}
+
+fn load_prefs() -> Prefs {
+    std::fs::read(prefs_path())
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+fn save_prefs(prefs: &Prefs) -> Result<(), String> {
+    let path = prefs_path();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let bytes = serde_json::to_vec_pretty(prefs).map_err(|e| e.to_string())?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+}
+
+/// The backend's address, refused unless it is this machine.
+pub fn base_url(raw: &str) -> Result<Url, String> {
+    let url = Url::parse(raw.trim()).map_err(|_| t("The backend must run on this computer, e.g. http://127.0.0.1:47620"))?;
+    if url.scheme() != "http" || !net::is_loopback_url(&url) {
+        return Err(t("The backend must run on this computer, e.g. http://127.0.0.1:47620"));
+    }
+    Ok(url)
+}
+
+fn set_status(app: &AppHandle, state_name: &'static str, error: Option<String>) {
+    let next = Status { state: state_name, error };
+    let orchestrator = state(app);
+    let changed = {
+        let mut status = orchestrator.status.lock().unwrap();
+        let changed = status.state != next.state || status.error != next.error;
+        *status = next.clone();
+        changed
+    };
+    if changed {
+        let _ = app.emit("orchestrator-status", next);
+    }
+}
+
+// ── Requests ──────────────────────────────────────────────────────────────────
+
+/// The backend's error message: `message` when it gives one, else `error`.
+fn detail(body: &[u8]) -> String {
+    serde_json::from_slice::<Value>(body)
+        .ok()
+        .and_then(|v| v.get("message").or_else(|| v.get("error")).and_then(|m| m.as_str()).map(str::to_string))
+        .unwrap_or_else(|| String::from_utf8_lossy(body).chars().take(200).collect())
+}
+
+fn token() -> Result<String, String> {
+    secrets::get_internal(TOKEN_KEY).ok_or_else(|| t("Start the orchestrator backend once: it creates the key Coucou needs."))
+}
+
+async fn request(app: &AppHandle, method: Method, path: &str, body: Option<Value>) -> Result<Vec<u8>, String> {
+    let url = state(app).prefs.lock().unwrap().url.clone();
+    let base = base_url(&url)?;
+    let client = net::client(&base, REQUEST_TIMEOUT)?;
+    let mut req = client.request(method, net::join(&base, path)).bearer_auth(token()?);
+    if let Some(body) = body {
+        req = req.json(&body);
+    }
+    let response = req
+        .send()
+        .await
+        .map_err(|e| tf("Network error: {error}", &[("error", &e.to_string())]))?;
+    let status = response.status();
+    let bytes = net::read_capped(response, net::MAX_BODY).await?;
+    if !status.is_success() {
+        return Err(format!("{} ({})", detail(&bytes), status.as_u16()));
+    }
+    Ok(bytes)
+}
+
+async fn api(app: &AppHandle, method: Method, path: &str, body: Option<Value>) -> Result<Value, String> {
+    let bytes = request(app, method, path, body).await?;
+    serde_json::from_slice(&bytes).map_err(|e| e.to_string())
+}
+
+/// A path segment from the webview: letters, digits, `-` and `_` only.
+fn segment(raw: &str) -> Result<&str, String> {
+    if !raw.is_empty() && raw.len() <= 64 && raw.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+        Ok(raw)
+    } else {
+        Err("invalid id".into())
+    }
+}
+
+// ── Events → island ───────────────────────────────────────────────────────────
+
+/// What the island is told about one backend event: `("hook", payload)` for
+/// the hook handler, or a card to take down. Pure, so it is tested below.
+pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
+    let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
+    let agent = event.get("agentId").and_then(Value::as_str).unwrap_or("");
+    let Some(task) = event.get("taskId").and_then(Value::as_str) else {
+        return Vec::new(); // Agent-level events (status) belong to the Tasks page.
+    };
+    let p = event.get("payload").cloned().unwrap_or_else(|| json!({}));
+    let text = |k: &str| p.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+    let hook = |name: &str, extra: Value| {
+        let mut payload = json!({
+            "hook_event_name": name,
+            "coucou_agent": agent,
+            "session_id": format!("{REQUEST_PREFIX}{task}"),
+        });
+        if let (Some(map), Value::Object(more)) = (payload.as_object_mut(), extra) {
+            map.extend(more);
+        }
+        ("hook", payload)
+    };
+    match kind {
+        "task.started" => vec![hook("UserPromptSubmit", json!({ "prompt": text("prompt") }))],
+        "tool.started" => vec![hook(
+            "PreToolUse",
+            json!({ "tool_name": island_tool(&text("op")), "tool_input": { "query": text("target") } }),
+        )],
+        "tool.completed" if p.get("ok") == Some(&Value::Bool(false)) => {
+            vec![hook("PostToolUseFailure", json!({ "tool_name": island_tool(&text("op")) }))]
+        }
+        "approval.requested" => vec![hook(
+            "PermissionRequest",
+            json!({
+                "request_id": format!("{REQUEST_PREFIX}{agent}:{}", text("approvalId")),
+                "tool_name": text("op"),
+                "tool_input": { "command": text("target") },
+            }),
+        )],
+        "approval.resolved" => vec![(
+            "orchestrator-approval-resolved",
+            json!({ "requestId": format!("{REQUEST_PREFIX}{agent}:{}", text("approvalId")) }),
+        )],
+        "task.completed" => vec![hook("Stop", json!({ "last_assistant_message": text("summary") }))],
+        "task.failed" => vec![hook("StopFailure", json!({ "message": text("message") }))],
+        "task.cancelled" => vec![hook("SessionEnd", json!({}))],
+        _ => Vec::new(),
+    }
+}
+
+/// The island's own tool names, so its steps read "Runs · …", "Fetches · …".
+fn island_tool(op: &str) -> &'static str {
+    match op {
+        "browser.navigate" | "browser.extract_text" => "WebFetch",
+        "browser.screenshot" => "Screenshot",
+        "fs.write_artifact" => "Write",
+        "fs.read" => "Read",
+        "fs.list" => "LS",
+        "terminal.run" => "Bash",
+        _ => "Tool",
+    }
+}
+
+fn deliver(app: &AppHandle, event: &Value) {
+    for (channel, payload) in translate(event) {
+        let _ = app.emit_to(WINDOW_LABEL, channel, payload);
+    }
+    // Every window that listens (the Tasks page) sees the raw event.
+    let _ = app.emit("orchestrator-event", event);
+}
+
+/// On (re)connection: the island learns what is running right now, without
+/// replaying history at it (the Tasks page shows that).
+async fn restore(app: &AppHandle, tasks: &[Value]) {
+    for task in tasks {
+        let Some(id) = task.get("id").and_then(Value::as_str) else { continue };
+        let agent = task.get("agentId").cloned().unwrap_or(Value::Null);
+        let started = json!({
+            "type": "task.started", "taskId": id, "agentId": agent,
+            "payload": { "prompt": task.get("prompt").cloned().unwrap_or(Value::Null) },
+        });
+        deliver_island_only(app, &started);
+        let Ok(detail) = api(app, Method::GET, &format!("/api/tasks/{}", segment(id).unwrap_or("-")), None).await else { continue };
+        if let Some(step) = detail.get("steps").and_then(Value::as_array).and_then(|s| s.last()) {
+            if step.get("status").and_then(Value::as_str) == Some("running") {
+                let event = json!({
+                    "type": "tool.started", "taskId": id, "agentId": agent,
+                    "payload": { "op": step.get("op"), "target": step.get("note") },
+                });
+                deliver_island_only(app, &event);
+            }
+        }
+        for approval in detail.get("approvals").and_then(Value::as_array).into_iter().flatten() {
+            let event = json!({
+                "type": "approval.requested", "taskId": id, "agentId": agent,
+                "payload": { "approvalId": approval.get("id"), "op": approval.get("op"), "target": approval.get("target") },
+            });
+            deliver_island_only(app, &event);
+        }
+    }
+}
+
+fn deliver_island_only(app: &AppHandle, event: &Value) {
+    for (channel, payload) in translate(event) {
+        let _ = app.emit_to(WINDOW_LABEL, channel, payload);
+    }
+}
+
+// ── The stream ────────────────────────────────────────────────────────────────
+
+pub fn setup(app: &AppHandle) {
+    app.manage(Orchestrator {
+        prefs: Mutex::new(load_prefs()),
+        status: Mutex::new(Status { state: "off", error: None }),
+        wake: Notify::new(),
+    });
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move { run(app).await });
+}
+
+async fn run(app: AppHandle) {
+    // Where the island's stream stands; 0 until the first connection of this run.
+    let mut last_seq: u64 = 0;
+    let mut backoff = Duration::from_secs(2);
+    loop {
+        let prefs = state(&app).prefs.lock().unwrap().clone();
+        if !prefs.enabled || integrations::PAUSED.load(std::sync::atomic::Ordering::Relaxed) {
+            set_status(&app, "off", None);
+            last_seq = 0;
+            sleep_or_wake(&app, Duration::from_secs(5)).await;
+            continue;
+        }
+        if secrets::get_internal(TOKEN_KEY).is_none() {
+            set_status(&app, "noToken", None);
+            sleep_or_wake(&app, Duration::from_secs(10)).await;
+            continue;
+        }
+        set_status(&app, "connecting", None);
+        match stream(&app, &prefs, &mut last_seq).await {
+            Ok(()) => backoff = Duration::from_secs(2),
+            Err(e) => {
+                log::line(format!("orchestrator: {e}"));
+                set_status(&app, "unreachable", Some(e));
+                sleep_or_wake(&app, backoff).await;
+                backoff = (backoff * 2).min(Duration::from_secs(30));
+            }
+        }
+    }
+}
+
+async fn sleep_or_wake(app: &AppHandle, d: Duration) {
+    let orchestrator = state(app);
+    tokio::select! {
+        _ = tokio::time::sleep(d) => {}
+        _ = orchestrator.wake.notified() => {}
+    }
+}
+
+/// One connection: catch up, then follow the stream until it drops or the
+/// preferences change (Ok) or the backend cannot be reached (Err).
+async fn stream(app: &AppHandle, prefs: &Prefs, last_seq: &mut u64) -> Result<(), String> {
+    if *last_seq == 0 {
+        let snapshot = api(app, Method::GET, "/api/tasks?active=1", None).await?;
+        *last_seq = snapshot.get("lastSeq").and_then(Value::as_u64).unwrap_or(0);
+        restore(app, snapshot.get("tasks").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[])).await;
+    }
+    let base = base_url(&prefs.url)?;
+    // No overall timeout: the stream is meant to stay open. Idle is checked below.
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .no_proxy()
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut response = client
+        .get(net::join(&base, "/api/events"))
+        .bearer_auth(token()?)
+        .header("Last-Event-ID", last_seq.to_string())
+        .header("Accept", "text/event-stream")
+        .send()
+        .await
+        .map_err(|e| tf("Network error: {error}", &[("error", &e.to_string())]))?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status().as_u16()));
+    }
+    set_status(app, "connected", None);
+
+    let orchestrator = state(app);
+    let mut buffer = String::new();
+    loop {
+        let chunk = tokio::select! {
+            c = tokio::time::timeout(STREAM_IDLE, response.chunk()) => c,
+            _ = orchestrator.wake.notified() => return Ok(()), // Preferences changed: start over.
+        };
+        let bytes = match chunk {
+            Err(_) => return Err(t("The backend stopped answering.")),
+            Ok(Err(e)) => return Err(tf("Network error: {error}", &[("error", &e.to_string())])),
+            Ok(Ok(None)) => return Err(t("The backend stopped answering.")),
+            Ok(Ok(Some(bytes))) => bytes,
+        };
+        buffer.push_str(&String::from_utf8_lossy(&bytes));
+        if buffer.len() > MAX_EVENT {
+            return Err(t("The server's answer is too large."));
+        }
+        while let Some(end) = buffer.find("\n\n") {
+            let block: String = buffer.drain(..end + 2).collect();
+            let Some(data) = block.lines().find_map(|l| l.strip_prefix("data: ")) else { continue };
+            let Ok(event) = serde_json::from_str::<Value>(data) else { continue };
+            if let Some(seq) = event.get("seq").and_then(Value::as_u64) {
+                if seq <= *last_seq {
+                    continue;
+                }
+                *last_seq = seq;
+            }
+            deliver(app, &event);
+        }
+    }
+}
+
+// ── The island's approval card ────────────────────────────────────────────────
+
+/// Approval requests that came from the backend rather than a hook relay.
+pub fn owns(request_id: &str) -> bool {
+    request_id.starts_with(REQUEST_PREFIX)
+}
+
+/// A click on the card: Allow or Deny goes to the backend, which owns the approval.
+pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
+    let Some((agent, approval)) = request_id.strip_prefix(REQUEST_PREFIX).and_then(|r| r.split_once(':')) else { return };
+    let (Ok(agent), Ok(approval)) = (segment(agent), segment(approval)) else { return };
+    let decision = if decision == "allow" { "approve" } else { "reject" };
+    let (app, agent, approval) = (app.clone(), agent.to_string(), approval.to_string());
+    tauri::async_runtime::spawn(async move {
+        let body = json!({ "approvalId": approval, "decision": decision });
+        if let Err(e) = api(&app, Method::POST, &format!("/api/agents/{agent}/approval"), Some(body)).await {
+            log::line(format!("orchestrator: approval not sent: {e}"));
+        }
+    });
+}
+
+// ── Commands for the Tasks page ───────────────────────────────────────────────
+
+#[tauri::command]
+pub fn orchestrator_status(app: AppHandle) -> Value {
+    let o = state(&app);
+    let prefs = o.prefs.lock().unwrap().clone();
+    let status = o.status.lock().unwrap().clone();
+    json!({ "prefs": prefs, "status": status, "hasToken": secrets::get_internal(TOKEN_KEY).is_some() })
+}
+
+#[tauri::command]
+pub fn orchestrator_set_prefs(app: AppHandle, enabled: bool, url: String) -> Result<(), String> {
+    let url = if url.trim().is_empty() { DEFAULT_URL.to_string() } else { base_url(&url)?.as_str().trim_end_matches('/').to_string() };
+    let prefs = Prefs { enabled, url };
+    save_prefs(&prefs)?;
+    *state(&app).prefs.lock().unwrap() = prefs;
+    state(&app).wake.notify_waiters();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn orchestrator_tasks(app: AppHandle) -> Result<Value, String> {
+    let tasks = api(&app, Method::GET, "/api/tasks?limit=50", None).await?;
+    let agents = api(&app, Method::GET, "/api/agents", None).await?;
+    Ok(json!({ "tasks": tasks.get("tasks"), "agents": agents.get("agents"), "approvals": agents.get("approvals") }))
+}
+
+#[tauri::command]
+pub async fn orchestrator_task(app: AppHandle, task_id: String) -> Result<Value, String> {
+    api(&app, Method::GET, &format!("/api/tasks/{}", segment(&task_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_submit(app: AppHandle, prompt: String, idempotency_key: String) -> Result<Value, String> {
+    let body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)?, "agentId": "agent-01" });
+    api(&app, Method::POST, "/api/tasks", Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_cancel(app: AppHandle, task_id: String) -> Result<Value, String> {
+    api(&app, Method::POST, &format!("/api/tasks/{}/cancel", segment(&task_id)?), None).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_decide(app: AppHandle, agent_id: String, approval_id: String, approve: bool) -> Result<Value, String> {
+    let body = json!({ "approvalId": segment(&approval_id)?, "decision": if approve { "approve" } else { "reject" } });
+    api(&app, Method::POST, &format!("/api/agents/{}/approval", segment(&agent_id)?), Some(body)).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_files(app: AppHandle, agent_id: String, task_id: String) -> Result<Value, String> {
+    let path = format!("/api/agents/{}/files?taskId={}", segment(&agent_id)?, segment(&task_id)?);
+    api(&app, Method::GET, &path, None).await
+}
+
+/// Saves one of a task's files to Downloads\Coucou\<task> and returns where it went.
+#[tauri::command]
+pub async fn orchestrator_save_file(app: AppHandle, agent_id: String, task_id: String, path: String) -> Result<String, String> {
+    let valid = !path.is_empty()
+        && path.len() <= 200
+        && path.split('/').all(|s| !s.is_empty() && !s.starts_with('.') && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)));
+    if !valid {
+        return Err("invalid path".into());
+    }
+    let route = format!("/api/agents/{}/files/{}/{}", segment(&agent_id)?, segment(&task_id)?, path);
+    let bytes = request(&app, Method::GET, &route, None).await?;
+    let dir = platform::home_dir().join("Downloads").join("Coucou").join(&task_id[..8.min(task_id.len())]);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let name = path.rsplit('/').next().unwrap_or("file");
+    let target = dir.join(name);
+    std::fs::write(&target, bytes).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn event(kind: &str, payload: Value) -> Value {
+        json!({ "v": 1, "seq": 7, "type": kind, "taskId": "t-1", "agentId": "agent-01", "payload": payload })
+    }
+
+    #[test]
+    fn a_running_task_becomes_the_hook_events_the_island_already_handles() {
+        let started = translate(&event("task.started", json!({ "prompt": "Summarise the docs" })));
+        assert_eq!(started.len(), 1);
+        assert_eq!(started[0].0, "hook");
+        assert_eq!(started[0].1["hook_event_name"], "UserPromptSubmit");
+        assert_eq!(started[0].1["coucou_agent"], "agent-01");
+        assert_eq!(started[0].1["session_id"], "orch:t-1");
+        assert_eq!(started[0].1["prompt"], "Summarise the docs");
+
+        let step = translate(&event("tool.started", json!({ "jobId": "j", "op": "browser.navigate", "target": "Open the docs" })));
+        assert_eq!(step[0].1["hook_event_name"], "PreToolUse");
+        assert_eq!(step[0].1["tool_name"], "WebFetch");
+        assert_eq!(step[0].1["tool_input"]["query"], "Open the docs");
+
+        let done = translate(&event("task.completed", json!({ "summary": "Saved report.md", "artifacts": [] })));
+        assert_eq!(done[0].1["hook_event_name"], "Stop");
+        assert_eq!(done[0].1["last_assistant_message"], "Saved report.md");
+    }
+
+    #[test]
+    fn an_approval_carries_an_id_only_the_backend_answers() {
+        let asked = translate(&event(
+            "approval.requested",
+            json!({ "approvalId": "a-9", "op": "browser.navigate", "target": "https://docs.python.org", "reason": "first visit" }),
+        ));
+        assert_eq!(asked[0].1["hook_event_name"], "PermissionRequest");
+        let id = asked[0].1["request_id"].as_str().unwrap();
+        assert_eq!(id, "orch:agent-01:a-9");
+        assert!(owns(id));
+        assert!(!owns("7f3c-from-the-pipe"));
+        assert_eq!(asked[0].1["tool_input"]["command"], "https://docs.python.org");
+
+        let resolved = translate(&event("approval.resolved", json!({ "approvalId": "a-9", "decision": "approve" })));
+        assert_eq!(resolved[0].0, "orchestrator-approval-resolved");
+        assert_eq!(resolved[0].1["requestId"], "orch:agent-01:a-9");
+    }
+
+    #[test]
+    fn noise_and_agent_events_stay_out_of_the_island() {
+        for kind in ["tool.output", "browser.navigation", "artifact.created", "agent.heartbeat"] {
+            assert!(translate(&event(kind, json!({}))).is_empty(), "{kind}");
+        }
+        let status = json!({ "type": "agent.status_changed", "taskId": null, "agentId": "agent-01", "payload": { "status": "ready" } });
+        assert!(translate(&status).is_empty());
+        let ok = translate(&event("tool.completed", json!({ "ok": true })));
+        assert!(ok.is_empty());
+        let failed = translate(&event("tool.completed", json!({ "ok": false, "op": "terminal.run" })));
+        assert_eq!(failed[0].1["hook_event_name"], "PostToolUseFailure");
+    }
+
+    #[test]
+    fn the_token_only_ever_goes_to_this_machine() {
+        assert!(base_url("http://127.0.0.1:47620").is_ok());
+        assert!(base_url("http://localhost:47620").is_ok());
+        assert!(base_url("http://192.168.1.20:47620").is_err());
+        assert!(base_url("https://example.com").is_err());
+        assert!(base_url("not a url").is_err());
+    }
+
+    #[test]
+    fn ids_from_the_webview_cannot_reach_another_route() {
+        assert!(segment("2f1c9e2a-3b4c-4d5e-8f90-1234567890ab").is_ok());
+        assert!(segment("../agents").is_err());
+        assert!(segment("a/b").is_err());
+        assert!(segment("").is_err());
+    }
+}

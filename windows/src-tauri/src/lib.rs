@@ -20,6 +20,7 @@ mod log;
 mod net;
 mod notes;
 mod openai_compat;
+mod orchestrator;
 mod phone_link;
 mod pipe;
 mod platform;
@@ -447,6 +448,11 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
 #[tauri::command]
 fn approval_decision(app: AppHandle, request_id: String, decision: String) {
     recap::record_decision(&app, &request_id, &decision);
+    // The orchestrator's approvals belong to its backend, not to a waiting relay.
+    if orchestrator::owns(&request_id) {
+        orchestrator::answer(&app, &request_id, &decision);
+        return;
+    }
     pipe::answer(&app, &request_id, &decision);
 }
 
@@ -467,6 +473,9 @@ fn approval_answer(
 /// what stops a paused or unresponsive island from freezing Claude Code.
 #[tauri::command]
 fn approval_ack(app: AppHandle, request_id: String) {
+    if orchestrator::owns(&request_id) {
+        return; // The backend waits for as long as it takes; nothing to start.
+    }
     pipe::acknowledge(&app, &request_id);
 }
 
@@ -475,6 +484,11 @@ fn approval_ack(app: AppHandle, request_id: String) {
 #[tauri::command]
 fn approval_decline(app: AppHandle, request_id: String) {
     recap::forget_request(&app, &request_id);
+    // Declining only means "not on the island now": an orchestrator approval
+    // stays pending in the backend, and the Tasks page can still answer it.
+    if orchestrator::owns(&request_id) {
+        return;
+    }
     pipe::decline(&app, &request_id);
 }
 
@@ -803,6 +817,15 @@ pub fn run() {
             set_paused,
             shortcuts_status,
             shortcuts_suspend,
+            orchestrator::orchestrator_status,
+            orchestrator::orchestrator_set_prefs,
+            orchestrator::orchestrator_tasks,
+            orchestrator::orchestrator_task,
+            orchestrator::orchestrator_submit,
+            orchestrator::orchestrator_cancel,
+            orchestrator::orchestrator_decide,
+            orchestrator::orchestrator_files,
+            orchestrator::orchestrator_save_file,
             phone_link::phone_link_status,
             phone_link::phone_link_set_enabled,
             phone_link::phone_link_pairing,
@@ -929,6 +952,7 @@ pub fn run() {
             pipe::start(handle.clone());
             phone_link::start_if_enabled(&handle);
             integrations::start(handle.clone());
+            orchestrator::setup(&handle);
             spotify::sync(&handle, &loaded.active_integrations);
             shortcuts::apply(&handle, &loaded.shortcuts);
             if loaded.autostart {

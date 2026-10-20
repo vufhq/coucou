@@ -4372,6 +4372,171 @@
    "pt-BR": "A data e a hora no meio da ilha quando ela está compacta.",
    "ru": "Дата и время в середине острова, когда он свёрнут.",
    "id": "Tanggal dan jam di tengah pulau saat ringkas."
+  },
+  "Give agent-01 a task. It works in its own Linux computer and asks you before anything risky.": {
+   "zh-Hans": "给 agent-01 一个任务。它在自己的 Linux 电脑里工作，做任何有风险的事之前都会先问你。",
+   "hi": "agent-01 को कोई काम दें। यह अपने ख़ुद के Linux कंप्यूटर में काम करता है और कुछ भी जोखिम भरा करने से पहले आपसे पूछता है।",
+   "es": "Dale una tarea a agent-01. Trabaja en su propio ordenador Linux y te pregunta antes de hacer algo arriesgado.",
+   "ar": "أعطِ agent-01 مهمة. يعمل على حاسوب Linux الخاص به ويسألك قبل أي خطوة فيها مخاطرة.",
+   "fr": "Confiez une tâche à agent-01. Il travaille dans son propre ordinateur Linux et vous demande avant toute action risquée.",
+   "bn": "agent-01 কে একটি কাজ দিন। এটি নিজের Linux কম্পিউটারে কাজ করে এবং ঝুঁকিপূর্ণ কিছু করার আগে আপনাকে জিজ্ঞেস করে।",
+   "pt-BR": "Dê uma tarefa ao agent-01. Ele trabalha no próprio computador Linux e pergunta a você antes de qualquer coisa arriscada.",
+   "ru": "Дайте agent-01 задачу. Он работает на своём собственном компьютере с Linux и спрашивает вас перед любым рискованным действием.",
+   "id": "Beri agent-01 sebuah tugas. Ia bekerja di komputer Linux miliknya sendiri dan bertanya kepada Anda sebelum melakukan hal yang berisiko."
+  },
+  "Orchestrator backend": {
+   "zh-Hans": "编排后端",
+   "hi": "ऑर्केस्ट्रेटर बैकएंड",
+   "es": "Backend del orquestador",
+   "ar": "الخادم الخلفي للمنسّق",
+   "fr": "Backend de l’orchestrateur",
+   "bn": "অর্কেস্ট্রেটর ব্যাকএন্ড",
+   "pt-BR": "Backend do orquestrador",
+   "ru": "Бэкенд оркестратора",
+   "id": "Backend orkestrator"
+  },
+  "Start the orchestrator backend once: it creates the key Coucou needs.": {
+   "zh-Hans": "请先启动一次编排后端：它会创建 Coucou 所需的密钥。",
+   "hi": "ऑर्केस्ट्रेटर बैकएंड को एक बार शुरू करें: यह वह कुंजी बनाता है जिसकी Coucou को ज़रूरत है।",
+   "es": "Inicia el backend del orquestador una vez: crea la clave que Coucou necesita.",
+   "ar": "شغّل الخادم الخلفي للمنسّق مرة واحدة: فهو ينشئ المفتاح الذي يحتاجه Coucou.",
+   "fr": "Lancez une fois le backend de l’orchestrateur : il crée la clé dont Coucou a besoin.",
+   "bn": "অর্কেস্ট্রেটর ব্যাকএন্ড একবার চালু করুন: এটি Coucou-র প্রয়োজনীয় কী তৈরি করে।",
+   "pt-BR": "Inicie o backend do orquestrador uma vez: ele cria a chave de que o Coucou precisa.",
+   "ru": "Запустите бэкенд оркестратора один раз: он создаст ключ, который нужен Coucou.",
+   "id": "Jalankan backend orkestrator sekali: backend itu membuat kunci yang dibutuhkan Coucou."
+  },
+  "The backend stopped answering.": {
+   "zh-Hans": "后端没有响应了。",
+   "hi": "बैकएंड ने जवाब देना बंद कर दिया।",
+   "es": "El backend dejó de responder.",
+   "ar": "توقف الخادم الخلفي عن الاستجابة.",
+   "fr": "Le backend ne répond plus.",
+   "bn": "ব্যাকএন্ড সাড়া দেওয়া বন্ধ করেছে।",
+   "pt-BR": "O backend parou de responder.",
+   "ru": "Бэкенд перестал отвечать.",
+   "id": "Backend berhenti merespons."
+  },
+  "The backend must run on this computer, e.g. http://127.0.0.1:47620": {
+   "zh-Hans": "后端必须运行在这台电脑上，例如 http://127.0.0.1:47620",
+   "hi": "बैकएंड इसी कंप्यूटर पर चलना चाहिए, जैसे http://127.0.0.1:47620",
+   "es": "El backend debe ejecutarse en este ordenador, p. ej. http://127.0.0.1:47620",
+   "ar": "يجب أن يعمل الخادم الخلفي على هذا الحاسوب، مثل http://127.0.0.1:47620",
+   "fr": "Le backend doit tourner sur cet ordinateur, par ex. http://127.0.0.1:47620",
+   "bn": "ব্যাকএন্ড এই কম্পিউটারেই চলতে হবে, যেমন http://127.0.0.1:47620",
+   "pt-BR": "O backend precisa rodar neste computador, por ex. http://127.0.0.1:47620",
+   "ru": "Бэкенд должен работать на этом компьютере, например http://127.0.0.1:47620",
+   "id": "Backend harus berjalan di komputer ini, mis. http://127.0.0.1:47620"
+  },
+  "What should agent-01 do?": {
+   "zh-Hans": "agent-01 应该做什么？",
+   "hi": "agent-01 को क्या करना चाहिए?",
+   "es": "¿Qué debe hacer agent-01?",
+   "ar": "ماذا يجب أن يفعل agent-01؟",
+   "fr": "Que doit faire agent-01 ?",
+   "bn": "agent-01 কী করবে?",
+   "pt-BR": "O que o agent-01 deve fazer?",
+   "ru": "Что должен сделать agent-01?",
+   "id": "Apa yang harus dilakukan agent-01?"
+  },
+  "Start task": {
+   "zh-Hans": "开始任务",
+   "hi": "काम शुरू करें",
+   "es": "Iniciar tarea",
+   "ar": "ابدأ المهمة",
+   "fr": "Lancer la tâche",
+   "bn": "কাজ শুরু করুন",
+   "pt-BR": "Iniciar tarefa",
+   "ru": "Запустить задачу",
+   "id": "Mulai tugas"
+  },
+  "No task yet.": {
+   "zh-Hans": "还没有任务。",
+   "hi": "अभी कोई काम नहीं।",
+   "es": "Todavía no hay tareas.",
+   "ar": "لا توجد مهام بعد.",
+   "fr": "Aucune tâche pour l’instant.",
+   "bn": "এখনো কোনো কাজ নেই।",
+   "pt-BR": "Nenhuma tarefa ainda.",
+   "ru": "Задач пока нет.",
+   "id": "Belum ada tugas."
+  },
+  "Files": {
+   "zh-Hans": "文件",
+   "hi": "फ़ाइलें",
+   "es": "Archivos",
+   "ar": "الملفات",
+   "fr": "Fichiers",
+   "bn": "ফাইল",
+   "pt-BR": "Arquivos",
+   "ru": "Файлы",
+   "id": "Berkas"
+  },
+  "Saved to {path}": {
+   "zh-Hans": "已保存到 {path}",
+   "hi": "{path} में सहेजा गया",
+   "es": "Guardado en {path}",
+   "ar": "حُفظ في {path}",
+   "fr": "Enregistré dans {path}",
+   "bn": "{path}-এ সংরক্ষিত",
+   "pt-BR": "Salvo em {path}",
+   "ru": "Сохранено в {path}",
+   "id": "Disimpan ke {path}"
+  },
+  "Queued": {
+   "zh-Hans": "排队中",
+   "hi": "कतार में",
+   "es": "En cola",
+   "ar": "في قائمة الانتظار",
+   "fr": "En attente",
+   "bn": "সারিতে",
+   "pt-BR": "Na fila",
+   "ru": "В очереди",
+   "id": "Dalam antrean"
+  },
+  "Running": {
+   "zh-Hans": "运行中",
+   "hi": "चल रहा है",
+   "es": "En curso",
+   "ar": "قيد التشغيل",
+   "fr": "En cours",
+   "bn": "চলছে",
+   "pt-BR": "Em andamento",
+   "ru": "Выполняется",
+   "id": "Berjalan"
+  },
+  "Waiting for approval": {
+   "zh-Hans": "等待批准",
+   "hi": "मंज़ूरी का इंतज़ार",
+   "es": "Esperando aprobación",
+   "ar": "بانتظار الموافقة",
+   "fr": "En attente d’approbation",
+   "bn": "অনুমোদনের অপেক্ষায়",
+   "pt-BR": "Aguardando aprovação",
+   "ru": "Ждёт одобрения",
+   "id": "Menunggu persetujuan"
+  },
+  "Cancelled": {
+   "zh-Hans": "已取消",
+   "hi": "रद्द किया गया",
+   "es": "Cancelada",
+   "ar": "أُلغيت",
+   "fr": "Annulée",
+   "bn": "বাতিল",
+   "pt-BR": "Cancelada",
+   "ru": "Отменена",
+   "id": "Dibatalkan"
+  },
+  "Rejected": {
+   "zh-Hans": "已拒绝",
+   "hi": "अस्वीकार किया गया",
+   "es": "Rechazada",
+   "ar": "مرفوضة",
+   "fr": "Refusée",
+   "bn": "প্রত্যাখ্যাত",
+   "pt-BR": "Recusada",
+   "ru": "Отклонено",
+   "id": "Ditolak"
   }
  }
 }

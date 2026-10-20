@@ -19,6 +19,14 @@ import { N_, t } from "../i18n/i18n";
 const CLAUDE_ID = "integration_claude";
 const CURSOR_ID = "agent_cursor";
 
+/**
+ * Approvals from the orchestrator backend (src-tauri/src/orchestrator.rs): any
+ * agent it runs may ask, and the backend, not a relay, waits for the answer.
+ */
+export function isOrchestratorRequest(requestId: string | undefined): boolean {
+  return requestId?.startsWith("orch:") ?? false;
+}
+
 /** Clears the approval card if no decision was made before the hook gave up. */
 let pendingTimeout: number | null = null;
 
@@ -241,6 +249,13 @@ export function registerHookHandlers(island: Island) {
   // The last plan numbers seen survive a restart, as on the Mac.
   State.planUsage ??= restorePlanUsage(storedClaudePlanUsage());
   void onEvent<HookPayload>("hook", (payload) => handleHook(island, payload));
+  // An orchestrator approval answered elsewhere (the Tasks page): the card goes.
+  void onEvent<{ requestId: string }>("orchestrator-approval-resolved", ({ requestId }) => {
+    if (State.pendingApproval?.requestId !== requestId) return;
+    if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+    dropPendingCard(island);
+  });
 }
 
 function handleHook(island: Island, payload: HookPayload) {
@@ -478,7 +493,7 @@ function handleHook(island: Island, payload: HookPayload) {
       // Only Claude Code and the agents the relay can answer for (Codex, Copilot
       // CLI, Muse Code — same as the Mac) get a card. Anyone else's request is
       // declined at once, so the agent asks in its own terminal.
-      if (isExternalAgent && !APPROVAL_AGENTS.has(validAgent!)) {
+      if (isExternalAgent && !APPROVAL_AGENTS.has(validAgent!) && !isOrchestratorRequest(payload.request_id)) {
         if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
         break;
       }

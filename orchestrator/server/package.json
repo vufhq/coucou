@@ -1,0 +1,11 @@
+{
+  "name": "@coucou-orchestrator/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@coucou-orchestrator/protocol": "*",
+    "@napi-rs/keyring": "2.1.0",
+    "fastify": "5.12.5",
+    "zod": "4.6.5"
+  }
+}
