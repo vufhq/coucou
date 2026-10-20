@@ -237,9 +237,11 @@ export function chooseMainPill(d: Declared, id: string, os: HostOs = HOST_OS): D
  * rank keep their order. Mirrors sortTasksByCatalog on macOS, with the main
  * pill (not always VS Code here) leading.
  */
-export function orderPills<T extends { id: string }>(tasks: T[], mainPill: string): T[] {
+export function orderPills<T extends { id: string; orchestrator?: unknown }>(tasks: T[], mainPill: string): T[] {
   const index = new Map(PILL_CATALOG.map((p, i) => [p.id, i]));
-  const rank = (t: T) => (t.id === mainPill ? -2 : index.has(t.id) ? index.get(t.id)! : -1);
+  // The orchestrator's agents come last, in the backend's order.
+  const rank = (t: T) =>
+    t.id === mainPill ? -2 : t.orchestrator ? PILL_CATALOG.length : index.has(t.id) ? index.get(t.id)! : -1;
   return tasks
     .map((t, i) => ({ t, i }))
     .sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i)

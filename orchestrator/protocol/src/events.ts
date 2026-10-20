@@ -19,6 +19,7 @@ export const EVENT_TYPES = [
   "task.cancelled",
   "agent.heartbeat",
   "agent.status_changed",
+  "agent.updated",
   "tool.started",
   "tool.output",
   "tool.completed",
@@ -40,6 +41,8 @@ export const EVENT_PAYLOADS = {
   "task.cancelled": z.object({}).strict(),
   "agent.heartbeat": z.object({}).strict(),
   "agent.status_changed": z.object({ status: z.enum(["offline", "starting", "ready", "busy", "error"]) }).strict(),
+  /** The user renamed or recoloured the agent; read it again from /api/agents. */
+  "agent.updated": z.object({}).strict(),
   "tool.started": z.object({ jobId: z.string(), op: OpName, target: z.string() }).strict(),
   "tool.output": z.object({ jobId: z.string(), text: z.string().max(4_096) }).strict(),
   "tool.completed": z

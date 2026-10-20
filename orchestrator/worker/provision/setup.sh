@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Sets up agent-01 from inside the distro, as root. provision.ps1 runs it after
-# copying the worker to /opt/coucou-worker; running it again updates in place.
+# Sets up an agent's distro from inside it, as root: `setup.sh agent-02`.
+# provision.ps1 runs it after copying the worker to /opt/coucou-worker;
+# running it again updates in place.
 #
 #   - patched Ubuntu, an unprivileged `agent` user (no sudo), /workspace
 #   - Node.js from nodejs.org, checked against its published SHA-256
@@ -11,9 +12,15 @@ set -euo pipefail
 
 NODE_VERSION="24.18.0"
 APP=/opt/coucou-worker
+AGENT_ID="${1:-agent-01}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "setup.sh must run as root" >&2
+  exit 1
+fi
+# Same rule as the backend's AgentId.
+if [[ ! "$AGENT_ID" =~ ^[a-z0-9-]{1,24}$ || "$AGENT_ID" == "claude" ]]; then
+  echo "setup.sh: invalid agent id: $AGENT_ID" >&2
   exit 1
 fi
 
@@ -56,6 +63,8 @@ echo "==> wsl.conf and the service"
 install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
 install -m 0644 "$APP/worker/provision/coucou-worker.service" /etc/systemd/system/coucou-worker.service
 install -d -m 0700 /etc/coucou-worker
+printf 'ORCH_AGENT_ID=%s\n' "$AGENT_ID" > /etc/coucou-worker/agent.env
+chmod 0600 /etc/coucou-worker/agent.env
 # Enabled by hand: on the very first run systemd may not be PID 1 yet.
 install -d /etc/systemd/system/multi-user.target.wants
 ln -sf /etc/systemd/system/coucou-worker.service /etc/systemd/system/multi-user.target.wants/coucou-worker.service
@@ -63,4 +72,4 @@ if [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
 fi
 
-echo "==> Done. Restart the distro (wsl --terminate agent-01) to apply wsl.conf."
+echo "==> Done. Restart the distro (wsl --terminate $AGENT_ID) to apply wsl.conf."

@@ -1,5 +1,5 @@
 [Unit]
-Description=Coucou orchestrator worker (agent-01)
+Description=Coucou orchestrator worker
 After=network-online.target
 Wants=network-online.target
 
@@ -7,7 +7,8 @@ Wants=network-online.target
 User=agent
 Group=agent
 WorkingDirectory=/opt/coucou-worker
-Environment=ORCH_AGENT_ID=agent-01
+# ORCH_AGENT_ID: which agent this VM is, written by setup.sh.
+EnvironmentFile=/etc/coucou-worker/agent.env
 Environment=ORCH_WORKSPACE=/workspace
 Environment=HOME=/workspace/.coucou/home
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/coucou-worker/browsers
@@ -21,6 +22,10 @@ RestartSec=3
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/workspace
+# Folders WSL shares between every distro on the PC: other agents, and the
+# sockets of Podman, Docker or WSLg (whose user ids can equal ours). Never
+# reachable from here.
+InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix
 ProtectHome=yes
 PrivateTmp=yes
 ProtectKernelTunables=yes

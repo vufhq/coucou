@@ -233,6 +233,8 @@ export const Bridge = {
   quit: () => call<void>("quit_app"),
 
   openSettingsWindow: () => call<void>("open_settings_window"),
+  /** Opens the Coucou window on one page: "tasks", or "tasks?agent=agent-02". */
+  openHubPage: (page: string) => call<void>("open_settings_window", { page }),
 
   /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),

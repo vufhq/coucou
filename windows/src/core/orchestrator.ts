@@ -43,6 +43,8 @@ export interface OrchAgent {
   id: string;
   name: string;
   status: "offline" | "starting" | "ready" | "busy" | "error";
+  /** The user's colour for it, or null for the default. */
+  color?: string | null;
   /** Absent from a backend older than the health checks. */
   problems?: AgentProblem[];
 }
@@ -68,10 +70,23 @@ export const OrchestratorBridge = {
   tasks: () => callOrThrow<{ tasks: OrchTask[] | null; agents: OrchAgent[] | null; approvals: OrchApproval[] | null }>("orchestrator_tasks"),
   task: (taskId: string) =>
     callOrThrow<{ task: OrchTask; approvals: OrchApproval[]; events: OrchEvent[] }>("orchestrator_task", { taskId }),
-  submit: (prompt: string, idempotencyKey: string, modelProfileId: string | null) =>
-    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", { prompt, idempotencyKey, modelProfileId }),
+  /** `agentId` null: the backend picks a free agent. */
+  submit: (
+    prompt: string,
+    idempotencyKey: string,
+    modelProfileId: string | null,
+    agentId: string | null = null,
+    context: string | null = null,
+  ) =>
+    callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", {
+      prompt, idempotencyKey, modelProfileId, agentId, context,
+    }),
   models: () => callOrThrow<{ profiles: { id: string }[]; default: string | null }>("orchestrator_models"),
   cancel: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_cancel", { taskId }),
+  agents: () => callOrThrow<{ agents: OrchAgent[] | null }>("orchestrator_agents"),
+  /** Renames or recolours an agent; null puts the default back, a missing field is left alone. */
+  updateAgent: (agentId: string, identity: { name?: string | null; color?: string | null }) =>
+    callOrThrow<{ agent: OrchAgent }>("orchestrator_update_agent", { agentId, identity }),
   decide: (agentId: string, approvalId: string, approve: boolean) =>
     callOrThrow<unknown>("orchestrator_decide", { agentId, approvalId, approve }),
   files: (agentId: string, taskId: string) =>

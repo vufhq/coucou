@@ -11,6 +11,8 @@ import { Sound } from "../core/sound";
 import { State, type AskedQuestion } from "../core/state";
 import { pillDefinition } from "../core/pills";
 import { APPROVAL_AGENTS, agentColor, agentName, validateAgent } from "./agents";
+import { registerOrchestratorAgents } from "./orchestrator-agents";
+import { registerAgentChat } from "./agent-chat";
 import type { Island } from "./island";
 import { parseClaudePlan, restorePlanUsage } from "../core/plan";
 import { setClaudePlanUsage, storedClaudePlanUsage } from "../views/usage";
@@ -249,6 +251,8 @@ export function registerHookHandlers(island: Island) {
   // The last plan numbers seen survive a restart, as on the Mac.
   State.planUsage ??= restorePlanUsage(storedClaudePlanUsage());
   void onEvent<HookPayload>("hook", (payload) => handleHook(island, payload));
+  registerOrchestratorAgents();
+  registerAgentChat();
   // An orchestrator approval answered elsewhere (the Tasks page): the card goes.
   void onEvent<{ requestId: string }>("orchestrator-approval-resolved", ({ requestId }) => {
     if (State.pendingApproval?.requestId !== requestId) return;

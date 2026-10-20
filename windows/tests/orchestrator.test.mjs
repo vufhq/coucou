@@ -129,3 +129,123 @@ test("an agent's line says its state, then what is wrong with its computer", () 
     "Ready · Its disk is almost full. · Chromium is missing: web steps will fail.",
   );
 });
+
+// ── Agents that stay in the island, like ChatGPT's dots ──────────────────────
+
+const agentInfo = (id, extra = {}) => ({ agentId: id, name: id, color: "#4ADE80", status: "ready", problems: [], ...extra });
+
+test("the backend's agents get pills that stay, after the catalog's", () => {
+  emit("orchestrator-agents", {
+    agents: [
+      { id: "agent-01", name: "Scout", status: "ready", color: "#38BDF8", problems: [] },
+      { id: "agent-02", name: "agent-02", status: "offline", color: null, problems: ["vm_stopped"] },
+    ],
+  });
+  const ids = State.tasks.map((t) => t.id);
+  assert.deepEqual(ids.slice(-2), ["agent_agent-01", "agent_agent-02"]);
+  assert.equal(ids[0], State.settings.mainPill);
+  const one = State.tasks.find((t) => t.id === "agent_agent-01");
+  assert.equal(one.name, "Scout");
+  assert.equal(one.color, "#38BDF8");
+  assert.deepEqual(one.orchestrator, { agentId: "agent-01", status: "ready", problems: [], last: null });
+  const two = State.tasks.find((t) => t.id === "agent_agent-02");
+  assert.equal(two.orchestrator.status, "offline");
+  assert.match(two.color, /^#[0-9A-F]{6}$/i); // the default colour for that id
+});
+
+test("a finished task leaves the agent's pill at rest, remembering how it ended", () => {
+  State.syncOrchestratorAgents([agentInfo("agent-01")]);
+  hook("UserPromptSubmit", { prompt: "go" });
+  hook("Stop", { last_assistant_message: "Saved report.md." });
+  mock.timers.tick(6_000);
+  const pill = task();
+  assert.ok(pill, "the pill is still there");
+  assert.equal(pill.state, "idle");
+  assert.deepEqual(pill.steps, []);
+  assert.equal(pill.orchestrator.last, "Saved report.md.");
+  hook("SessionEnd");
+  assert.ok(task(), "a cancelled task does not take it away either");
+});
+
+test("an agent the backend drops goes once at rest; switching the orchestrator off takes them all", () => {
+  State.syncOrchestratorAgents([agentInfo("agent-01"), agentInfo("agent-02")]);
+  hook("UserPromptSubmit", { prompt: "go" });
+  State.syncOrchestratorAgents([agentInfo("agent-02")]);
+  assert.ok(task(), "busy: it stays until its session ends");
+  assert.equal(task().orchestrator, null);
+  hook("SessionEnd");
+  assert.equal(task(), undefined);
+
+  emit("orchestrator-status", { state: "unreachable", error: "x" });
+  assert.equal(State.tasks.find((t) => t.id === "agent_agent-02").orchestrator.status, "offline");
+  emit("orchestrator-status", { state: "off", error: null });
+  assert.equal(State.tasks.some((t) => t.orchestrator), false);
+});
+
+test("renaming an agent renames its pill in place", () => {
+  State.syncOrchestratorAgents([agentInfo("agent-01")]);
+  State.syncOrchestratorAgents([agentInfo("agent-01", { name: "Scout", color: "#F4505E" })]);
+  assert.equal(State.tasks.filter((t) => t.id === AGENT).length, 1);
+  assert.equal(task().name, "Scout");
+  assert.equal(task().color, "#F4505E");
+});
+
+// ── Chatting with an agent in the island's chat ──────────────────────────────
+
+import { internals } from "./tauri.mjs";
+import { agentHistory, conversationContext, sendToAgent } from "../src/island/agent-chat.ts";
+
+test("a message to an agent is a task for it, with the conversation so far, and its answer comes back", async () => {
+  State.agentChats.clear();
+  State.agentRuns.clear();
+  agentHistory("agent-01").push(
+    { id: 1, role: "user", content: "summarise the httpx docs" },
+    { id: 2, role: "assistant", content: "Saved report.md." },
+  );
+  const invoke = internals.invoke;
+  internals.invoke = async (cmd, args) =>
+    cmd === "orchestrator_submit" ? (calls.push([cmd, args]), { task: { id: "t-9" }, created: true }) : invoke(cmd, args);
+  try {
+    await sendToAgent("agent-01", "now make it shorter");
+  } finally {
+    internals.invoke = invoke;
+  }
+  const [submitted] = sent("orchestrator_submit");
+  assert.equal(submitted.prompt, "now make it shorter");
+  assert.equal(submitted.agentId, "agent-01");
+  assert.equal(submitted.context, "User: summarise the httpx docs\nYou (agent): Saved report.md.");
+  assert.equal(State.agentRuns.get("agent-01").taskId, "t-9");
+
+  const event = (type, payload = {}) => emit("orchestrator-event", { seq: 1, taskId: "t-9", agentId: "agent-01", type, timestamp: "", payload });
+  event("tool.started", { jobId: "j", op: "fs.write_artifact", target: "Shortening report.md" });
+  assert.equal(State.agentRuns.get("agent-01").line, "Shortening report.md");
+  event("approval.requested", { approvalId: "a", op: "fs.write_artifact", target: "report.md", reason: "overwrite" });
+  assert.match(State.agentRuns.get("agent-01").line, /report\.md/);
+  event("task.completed", { summary: "Cut it to five lines.", artifacts: ["report.md"] });
+  assert.equal(State.agentRuns.has("agent-01"), false);
+  const last = agentHistory("agent-01").at(-1);
+  assert.equal(last.role, "assistant");
+  assert.match(last.content, /^Cut it to five lines\.\n\n.*`report\.md`/);
+  // Another task's events change nothing here.
+  emit("orchestrator-event", { seq: 2, taskId: "t-other", agentId: "agent-01", type: "task.failed", timestamp: "", payload: { reason: "timeout", message: "x" } });
+  assert.equal(agentHistory("agent-01").length, 4);
+});
+
+test("a send that fails says so in the chat, and a failed task says why", async () => {
+  State.agentChats.clear();
+  State.agentRuns.clear();
+  await sendToAgent("agent-02", "hello"); // the stand-in answers null: no task came back
+  assert.equal(State.agentRuns.get("agent-02").taskId, null);
+  State.agentRuns.get("agent-02").taskId = "t-1";
+  emit("orchestrator-event", { seq: 3, taskId: "t-1", agentId: "agent-02", type: "task.failed", timestamp: "", payload: { reason: "rate_limited", message: "usage limit reached" } });
+  assert.match(agentHistory("agent-02").at(-1).content, /usage limit reached/);
+});
+
+test("the conversation sent along keeps the newest turns, each cut short", () => {
+  const long = "x".repeat(5_000);
+  const history = Array.from({ length: 10 }, (_, i) => ({ id: i, role: i % 2 ? "assistant" : "user", content: `${i} ${long}` }));
+  const context = conversationContext(history);
+  assert.ok(context.length <= 6_000);
+  assert.match(context, /^You \(agent\): 9 x+…$/m);
+  assert.doesNotMatch(context, /: 0 x/);
+});

@@ -265,6 +265,22 @@ async fn restore(app: &AppHandle, tasks: &[Value]) {
     }
 }
 
+/// The agents, for the island's pills and the Tasks page: on every connection
+/// and whenever one changes (status, name, colour).
+async fn push_agents(app: &AppHandle) {
+    match api(app, Method::GET, "/api/agents", None).await {
+        Ok(body) => {
+            let _ = app.emit("orchestrator-agents", json!({ "agents": body.get("agents") }));
+        }
+        Err(e) => log::line(format!("orchestrator: agents not read: {e}")),
+    }
+}
+
+/// Agent-level events change the agents' pills, not a task's.
+pub fn is_agent_event(event: &Value) -> bool {
+    event.get("type").and_then(Value::as_str).is_some_and(|k| k.starts_with("agent.") && k != "agent.heartbeat")
+}
+
 fn deliver_island_only(app: &AppHandle, event: &Value) {
     for (channel, payload) in translate(event) {
         let _ = app.emit_to(WINDOW_LABEL, channel, payload);
@@ -348,6 +364,7 @@ async fn stream(app: &AppHandle, prefs: &Prefs, last_seq: &mut u64) -> Result<()
         return Err(format!("HTTP {}", response.status().as_u16()));
     }
     set_status(app, "connected", None);
+    push_agents(app).await;
 
     let orchestrator = state(app);
     let mut buffer = String::new();
@@ -377,6 +394,9 @@ async fn stream(app: &AppHandle, prefs: &Prefs, last_seq: &mut u64) -> Result<()
                 *last_seq = seq;
             }
             deliver(app, &event);
+            if is_agent_event(&event) {
+                push_agents(app).await;
+            }
         }
     }
 }
@@ -440,10 +460,20 @@ pub async fn orchestrator_submit(
     prompt: String,
     idempotency_key: String,
     model_profile_id: Option<String>,
+    agent_id: Option<String>,
+    context: Option<String>,
 ) -> Result<Value, String> {
-    let mut body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)?, "agentId": "agent-01" });
+    let mut body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)? });
     if let Some(profile) = model_profile_id {
         body["modelProfileId"] = json!(segment(&profile)?);
+    }
+    // No agent: the backend sends the task to a free one.
+    if let Some(agent) = agent_id {
+        body["agentId"] = json!(segment(&agent)?);
+    }
+    // The chat it comes from: background for the model (the backend caps it).
+    if let Some(context) = context.filter(|c| !c.trim().is_empty()) {
+        body["context"] = json!(context);
     }
     api(&app, Method::POST, "/api/tasks", Some(body)).await
 }
@@ -452,6 +482,25 @@ pub async fn orchestrator_submit(
 #[tauri::command]
 pub async fn orchestrator_models(app: AppHandle) -> Result<Value, String> {
     api(&app, Method::GET, "/api/models", None).await
+}
+
+/// The agents and the approvals waiting on them, read now.
+#[tauri::command]
+pub async fn orchestrator_agents(app: AppHandle) -> Result<Value, String> {
+    api(&app, Method::GET, "/api/agents", None).await
+}
+
+/// Renames or recolours an agent. Only `name` and `color` go through; the
+/// backend checks both, and null puts its default back.
+#[tauri::command]
+pub async fn orchestrator_update_agent(app: AppHandle, agent_id: String, identity: Value) -> Result<Value, String> {
+    let mut body = serde_json::Map::new();
+    for key in ["name", "color"] {
+        if let Some(v) = identity.get(key) {
+            body.insert(key.to_string(), v.clone());
+        }
+    }
+    api(&app, Method::PATCH, &format!("/api/agents/{}", segment(&agent_id)?), Some(Value::Object(body))).await
 }
 
 #[tauri::command]
@@ -534,6 +583,29 @@ mod tests {
         let resolved = translate(&event("approval.resolved", json!({ "approvalId": "a-9", "decision": "approve" })));
         assert_eq!(resolved[0].0, "orchestrator-approval-resolved");
         assert_eq!(resolved[0].1["requestId"], "orch:agent-01:a-9");
+    }
+
+    #[test]
+    fn each_agent_gets_its_own_pill_and_its_own_approvals() {
+        let of = |agent: &str, kind: &str, payload: Value| {
+            translate(&json!({ "v": 1, "seq": 1, "type": kind, "taskId": format!("t-{agent}"), "agentId": agent, "payload": payload }))
+        };
+        let one = of("agent-01", "task.started", json!({ "prompt": "a", "modelProfileId": "claude-cli" }));
+        let two = of("agent-02", "task.started", json!({ "prompt": "b", "modelProfileId": "claude-cli" }));
+        assert_eq!(one[0].1["coucou_agent"], "agent-01");
+        assert_eq!(two[0].1["coucou_agent"], "agent-02");
+        assert_ne!(one[0].1["session_id"], two[0].1["session_id"]);
+        let asked = of("agent-02", "approval.requested", json!({ "approvalId": "a-1", "op": "fs.write_artifact", "target": "x", "reason": "overwrite" }));
+        assert_eq!(asked[0].1["request_id"], "orch:agent-02:a-1");
+    }
+
+    #[test]
+    fn agent_events_refresh_the_pills_but_heartbeats_do_not() {
+        let of = |kind: &str| json!({ "type": kind, "taskId": null, "agentId": "agent-01", "payload": {} });
+        assert!(is_agent_event(&of("agent.status_changed")));
+        assert!(is_agent_event(&of("agent.updated")));
+        assert!(!is_agent_event(&of("agent.heartbeat")));
+        assert!(!is_agent_event(&of("task.started")));
     }
 
     #[test]

@@ -54,6 +54,7 @@ export function createBackend(
   const runner = new Runner(store, events, models, {
     leaseMs: config.leaseMs,
     defaultModelProfile: config.defaultModelProfile,
+    maxParallel: config.maxParallel,
     pollMs: opts.pollMs,
     modelRetries: opts.modelRetries,
     transientRetryDelaysMs: opts.transientRetryDelaysMs,
@@ -65,7 +66,7 @@ export function createBackend(
     runner,
     signals,
     downloads,
-    token: tokens.worker,
+    tokens: tokens.workers,
     leaseMs: config.leaseMs,
     claimWaitMs: config.claimWaitMs,
     retentionDays: config.retentionDays,

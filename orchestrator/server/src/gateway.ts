@@ -1,7 +1,8 @@
-// The worker's side door: its own listener, its own token, and only the
+// The worker's side door: its own listener, a token per agent, and only the
 // handful of calls in the worker protocol. A worker can claim jobs, report
 // what they did and say it is alive. It cannot create tasks, approve
-// anything or read another agent's jobs.
+// anything or touch another agent's jobs: which agent is calling comes from
+// its token, and an agent id in a request must match it.
 
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import type { z } from "zod";
@@ -21,7 +22,7 @@ import type { Downloads, JobSignals } from "./jobs.ts";
 import { redact } from "./redact.ts";
 import type { Runner } from "./runner.ts";
 import type { JobRow, Store } from "./store.ts";
-import { bearerMatches } from "./tokens.ts";
+import { agentForBearer } from "./tokens.ts";
 
 export interface GatewayDeps {
   store: Store;
@@ -29,7 +30,8 @@ export interface GatewayDeps {
   runner: Runner;
   signals: JobSignals;
   downloads: Downloads;
-  token: string;
+  /** Agent id → its worker token. */
+  tokens: ReadonlyMap<string, string>;
   leaseMs: number;
   claimWaitMs: number;
   retentionDays: number;
@@ -47,11 +49,17 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     done(null, body),
   );
 
+  const callers = new WeakMap<object, string>();
   app.addHook("onRequest", async (req, reply) => {
-    if (!bearerMatches(req.headers.authorization, deps.token)) {
-      return reply.code(401).send({ error: "unauthorized" });
-    }
+    const agentId = agentForBearer(req.headers.authorization, deps.tokens);
+    if (!agentId) return reply.code(401).send({ error: "unauthorized" });
+    callers.set(req.raw, agentId);
   });
+  /** The agent the token belongs to. */
+  const caller = (req: { raw: object }): string => callers.get(req.raw)!;
+  /** A request naming another agent than its token's. */
+  const impostor = (req: { raw: object }, reply: FastifyReply, agentId: string) =>
+    agentId !== caller(req) ? reply.code(403).send({ error: "wrong_agent" }) : null;
 
   const setStatus = (agentId: string, status: "ready" | "busy") => {
     if (store.setAgentStatus(agentId, status)) events.emit("agent.status_changed", agentId, null, { status });
@@ -74,6 +82,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     const hello = Hello.safeParse(req.body);
     if (!hello.success) return bad(reply, hello.error);
     const { agentId, journal, health } = hello.data;
+    if (impostor(req, reply, agentId)) return reply;
     if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
     store.touchAgent(agentId);
     if (health) store.setAgentHealth(agentId, health);
@@ -110,6 +119,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     const body = ClaimRequest.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
     const { agentId, health } = body.data;
+    if (impostor(req, reply, agentId)) return reply;
     if (!store.agent(agentId)) return reply.code(404).send({ error: "unknown_agent" });
     if (health) store.setAgentHealth(agentId, health);
     const until = Date.now() + deps.claimWaitMs;
@@ -137,6 +147,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   app.post("/worker/v1/heartbeat", async (req, reply) => {
     const body = Heartbeat.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
+    if (impostor(req, reply, body.data.agentId)) return reply;
     store.touchAgent(body.data.agentId);
     const cancel = new Set([
       ...store.renewLeases(body.data.agentId, body.data.running, deps.leaseMs),
@@ -148,7 +159,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   app.post<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/events", async (req, reply) => {
     const body = WorkerEvents.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
-    const job = heldJob(String(req.query.agentId), req.params.id);
+    const job = heldJob(caller(req), req.params.id);
     if (!job) return reply.code(409).send({ error: "not_held" });
     store.renewLeases(job.agentId, [job.id], deps.leaseMs);
     for (const e of body.data.events) {
@@ -162,7 +173,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   // A download's bytes, for a job the backend itself asked for. Held for the
   // API answer only; never stored, never in an event.
   app.post<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/file", async (req, reply) => {
-    const job = heldJob(String(req.query.agentId), req.params.id);
+    const job = heldJob(caller(req), req.params.id);
     if (!job || job.op !== "fs.fetch") return reply.code(409).send({ error: "not_held" });
     if (!Buffer.isBuffer(req.body)) return reply.code(415).send({ error: "invalid", message: "expected application/octet-stream" });
     store.renewLeases(job.agentId, [job.id], deps.leaseMs);
@@ -174,7 +185,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     const outcome = JobOutcome.safeParse(req.body);
     if (!outcome.success) return bad(reply, outcome.error);
     const job = store.job(req.params.id);
-    if (!job || job.agentId !== req.query.agentId) return reply.code(404).send({ error: "not_found" });
+    if (!job || job.agentId !== caller(req)) return reply.code(404).send({ error: "not_found" });
     // A repeated report (the worker retrying after a lost answer) is fine.
     if (job.status === "claimed") finish(job, outcome.data);
     if (!store.db.prepare("SELECT 1 FROM jobs WHERE agent_id = ? AND status = 'claimed' LIMIT 1").get(job.agentId)) {

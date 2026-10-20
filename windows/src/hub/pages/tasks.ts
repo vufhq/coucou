@@ -1,4 +1,4 @@
-// Tasks: give agent-01 something to do, follow it, answer its questions, get
+// Tasks: give an agent something to do, follow it, answer its questions, get
 // its files. The work runs in the orchestrator backend and the agent's own
 // Linux VM (orchestrator/ at the repository root); this page only asks and
 // shows, in the Notetaker's list-and-detail layout.
@@ -22,6 +22,16 @@ import {
 } from "../../core/orchestrator";
 import type { HubContext } from "../shell";
 import { button, card, row, segmented, toggle } from "../ui";
+import { colorDot } from "../../settings/colors";
+import { agentColor } from "../../island/agents";
+
+/** The agent the island's Activity link asked for, picked up by the next draw. */
+let agentFilter: string | null = null;
+
+/** Shows only this agent's tasks (null: everyone's). */
+export function showAgentTasks(agentId: string | null) {
+  agentFilter = agentId && /^[a-z0-9-]{1,24}$/.test(agentId) ? agentId : null;
+}
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(document.documentElement.lang || undefined, { hour: "2-digit", minute: "2-digit" });
 
@@ -39,8 +49,12 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let draft = "";
   let models: string[] = [];
   let model: string | null = null;
+  /** The agent picked for the next task; null lets the backend choose a free one. */
+  let agentChoice: string | null = null;
+  /** An agent's name, for the task list once there is more than one. */
+  const agentLabel = (id: string) => (agents.length > 1 ? ` · ${agents.find((a) => a.id === id)?.name ?? id}` : "");
 
-  page.append(ctx.hero("tasks", t("Tasks"), t("Give agent-01 a task. It works in its own Linux computer and asks you before anything risky."), [], true));
+  page.append(ctx.hero("tasks", t("Tasks"), t("Give your agents a task. Each one works in its own Linux computer and asks you before anything risky."), [], true));
 
   const connection = h("div", {});
   const composer = h("div", {});
@@ -100,14 +114,50 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     connection.append(card(row(t("Orchestrator backend"), line, sw)));
     if (!connected()) return;
     // The agent's computer: its state, and in words what is wrong with it if anything.
-    for (const agent of agents) connection.append(card(row(agent.name, agentLine(agent))));
+    for (const agent of agents) connection.append(card(agentRow(agent)));
+  }
+
+  /**
+   * An agent: its state, and its name and colour, which are the user's to
+   * change. They are the backend's, so the island and every window agree.
+   */
+  function agentRow(agent: OrchAgent): HTMLElement {
+    const name = h("input", { class: "hub-input", placeholder: t("Name"), style: "width:130px", spellcheck: "false" }) as HTMLInputElement;
+    name.value = agent.name;
+    name.maxLength = 24;
+    const save = () => {
+      const next = name.value.trim();
+      if (next === agent.name) return;
+      // Empty: back to the agent's own id.
+      OrchestratorBridge.updateAgent(agent.id, { name: next || null }).then(reload, (err) => {
+        note = String(err);
+        void reload();
+      });
+    };
+    name.addEventListener("change", save);
+    name.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") name.blur();
+    });
+    const pillId = `agent_${agent.id}`;
+    const color = colorDot(
+      { id: pillId, name: agent.name, color: agentColor(agent.id) },
+      "width:14px;height:14px",
+      () => (agent.color ? { [pillId]: agent.color } : {}),
+      (next) => {
+        OrchestratorBridge.updateAgent(agent.id, { color: next[pillId] ?? null }).then(reload, (err) => {
+          note = String(err);
+          void reload();
+        });
+      },
+    );
+    return row(agent.name, agentLine(agent), name, color);
   }
 
   function drawComposer() {
     const hadFocus = composer.contains(document.activeElement);
     clear(composer);
     if (!connected()) return;
-    const text = h("textarea", { class: "hub-textarea", placeholder: t("What should agent-01 do?") }) as HTMLTextAreaElement;
+    const text = h("textarea", { class: "hub-textarea", placeholder: t("What should the agent do?") }) as HTMLTextAreaElement;
     text.value = draft;
     text.addEventListener("input", () => {
       draft = text.value;
@@ -116,7 +166,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       const prompt = text.value.trim();
       if (!prompt) return;
       start.disabled = true;
-      OrchestratorBridge.submit(prompt, pendingKey, model).then(
+      OrchestratorBridge.submit(prompt, pendingKey, model, agentChoice).then(
         ({ task }) => {
           // A new key for the next task; this one stays with the task just made.
           pendingKey = newTaskKey();
@@ -141,7 +191,26 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
             model = id;
           })
         : null;
-    const label = picker ? h("div", { class: "text" }, h("div", { class: "detail", text: t("Model") }), picker) : h("div", { class: "text" });
+    // Which agent, once there are several: Automatic sends it to a free one.
+    if (agentChoice && !agents.some((a) => a.id === agentChoice)) agentChoice = null;
+    const agentPicker =
+      agents.length > 1
+        ? segmented(
+            [["auto", t("Automatic")] as [string, string], ...agents.map((a) => [a.id, a.name] as [string, string])],
+            agentChoice ?? "auto",
+            (id) => {
+              agentChoice = id === "auto" ? null : id;
+            },
+          )
+        : null;
+    const label = h(
+      "div",
+      { class: "text" },
+      agentPicker ? h("div", { class: "detail", text: t("Agent") }) : null,
+      agentPicker,
+      picker ? h("div", { class: "detail", text: t("Model") }) : null,
+      picker,
+    );
     composer.append(card(text, h("div", { class: "hub-row" }, label, start), note ? h("div", { class: "hub-warn", text: note }) : null));
     if (hadFocus) {
       text.focus();
@@ -168,14 +237,29 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   function drawList() {
     clear(listEl);
     if (!connected()) return;
-    if (tasks.length === 0) {
+    // One agent's tasks, or everyone's: offered once there are several agents.
+    if (agentFilter && !agents.some((a) => a.id === agentFilter)) agentFilter = null;
+    if (agents.length > 1) {
+      listEl.append(
+        segmented(
+          [["all", t("All")] as [string, string], ...agents.map((a) => [a.id, a.name] as [string, string])],
+          agentFilter ?? "all",
+          (id) => {
+            agentFilter = id === "all" ? null : id;
+            drawList();
+          },
+        ),
+      );
+    }
+    const shown = agentFilter ? tasks.filter((x) => x.agentId === agentFilter) : tasks;
+    if (shown.length === 0) {
       listEl.append(h("div", { class: "hub-note", style: "padding:14px 4px", text: t("No task yet.") }));
       return;
     }
-    for (const task of tasks) {
+    for (const task of shown) {
       const item = h("button", { class: task.id === selected ? "hub-note-item on" : "hub-note-item" },
         h("span", { class: "t", text: task.prompt }),
-        h("span", { class: "m", text: `${statusLabel(task.status)} · ${modelLabel(task.modelProfileId)} · ${time(task.createdAt)}` }),
+        h("span", { class: "m", text: `${statusLabel(task.status)}${agentLabel(task.agentId)} · ${modelLabel(task.modelProfileId)} · ${time(task.createdAt)}` }),
       );
       item.addEventListener("click", () => {
         selected = task.id;
@@ -192,7 +276,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     const task = detail.task;
     detailEl.append(
       h("h2", { text: task.prompt }),
-      h("span", { class: "hub-tag", text: `${statusLabel(task.status)} · ${modelLabel(task.modelProfileId)}` }),
+      h("span", { class: "hub-tag", text: `${statusLabel(task.status)}${agentLabel(task.agentId)} · ${modelLabel(task.modelProfileId)}` }),
     );
     if (task.result) detailEl.append(h("div", { class: "hub-ok", style: "white-space:pre-wrap", text: task.result.summary }));
     if (task.error) detailEl.append(h("div", { class: "hub-warn", text: task.error.message }));
