@@ -17,6 +17,7 @@ import {
   sanitizeDeclared, toggleDeclared, type PillDefinition,
 } from "../core/pills";
 import { h, clear } from "../views/dom";
+import { mountTitleBar } from "../views/titlebar";
 import { startHub, type PageId } from "../hub/shell";
 import { FLOW_PAGE_RENDERERS } from "../hub/pages";
 import { agentsSection } from "./agents";
@@ -1287,6 +1288,8 @@ async function main() {
   }
   setLanguage(resolveLanguage(settings.language, systemLanguages()));
   applyDirection();
+  // The window is borderless (lib.rs): its title bar is drawn here.
+  mountTitleBar({ title: "Coucou" });
   hub = await startHub(windowRoot, {
     version,
     flowPages: FLOW_PAGE_RENDERERS,

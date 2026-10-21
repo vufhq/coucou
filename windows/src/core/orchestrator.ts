@@ -219,6 +219,14 @@ export const OrchestratorBridge = {
     callOrThrow<string>("orchestrator_save_file", { agentId, taskId, path }),
   chatHistory: (agentId: string) =>
     callOrThrow<{ tasks: OrchTask[] | null }>("orchestrator_chat_history", { agentId }),
+  /** Tasks filtered by agent, source ("chat", "delegated", "goal", "user", comma separated) and parent. */
+  listTasks: (q: { agentId?: string | null; source?: string | null; parentTaskId?: string | null; limit?: number | null }) =>
+    callOrThrow<{ tasks: OrchTask[] | null }>("orchestrator_list_tasks", {
+      agentId: q.agentId ?? null,
+      source: q.source ?? null,
+      parentTaskId: q.parentTaskId ?? null,
+      limit: q.limit ?? null,
+    }),
   goals: (agentId: string) =>
     callOrThrow<{ goals: OrchGoal[] | null }>("orchestrator_goals", { agentId }),
   createGoal: (

@@ -235,6 +235,10 @@ export const Bridge = {
   openSettingsWindow: () => call<void>("open_settings_window"),
   /** Opens the Coucou window on one page: "tasks", or "tasks?agent=agent-02". */
   openHubPage: (page: string) => call<void>("open_settings_window", { page }),
+  /** Shows Coucou HQ, on that agent's thread when given. */
+  showHq: (agentId?: string | null) => call<void>("show_hq", { agentId: agentId ?? null }),
+  /** Whether Coucou HQ is on screen; false outside Tauri. Asked once at load, then `hq-visible`. */
+  hqShown: async (): Promise<boolean> => (await call<boolean>("hq_shown")) ?? false,
 
   /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),

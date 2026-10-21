@@ -704,3 +704,81 @@ pub fn pill_action(app: AppHandle, flow: State<Arc<Flow>>, action: String, id: O
         _ => {}
     }
 }
+
+// ── Dictation into Coucou HQ's message box ────────────────────────────────────
+//
+// The mic button in HQ's composer: start listening on a click, and on the next
+// click the words go to Parakeet on this computer and through the dictionary
+// and the snippets, then back to the box (not pasted, and no clean-up: nothing
+// leaves the computer). Independent of the Flow key, which may be off.
+
+static HQ_TAKE: Mutex<Option<(audio::Capture, Arc<Mutex<audio::Take>>)>> = Mutex::new(None);
+
+/// Opens the microphone. Err("models") when the voice model isn't downloaded.
+#[tauri::command]
+pub fn hq_dictation_start(flow: State<Arc<Flow>>) -> Result<(), String> {
+    if !speech::is_ready() {
+        return Err("models".into());
+    }
+    let mut slot = HQ_TAKE.lock().unwrap();
+    if slot.is_some() {
+        return Ok(());
+    }
+    let mic = flow.store.lock().unwrap().prefs.mic.clone();
+    let take = Arc::new(Mutex::new(audio::Take::default()));
+    let sink_take = take.clone();
+    let source = audio::Source::Mic(if mic.is_empty() { None } else { Some(mic) });
+    let capture = audio::Capture::start(source, move |samples| {
+        let mut t = sink_take.lock().unwrap();
+        // Ten minutes at most, as for Flow.
+        if t.samples.len() < 16_000 * 600 {
+            t.samples.extend_from_slice(samples);
+        }
+        t.peak = samples.iter().fold(t.peak, |m, &s| m.max(s.abs()));
+    })?;
+    // Loaded while the user speaks, so the words come back sooner.
+    speech::preload();
+    *slot = Some((capture, take));
+    Ok(())
+}
+
+/// Closes the microphone and returns what was said ("" for silence).
+#[tauri::command]
+pub async fn hq_dictation_stop(app: AppHandle, flow: State<'_, Arc<Flow>>) -> Result<String, String> {
+    let Some((mut capture, take)) = HQ_TAKE.lock().unwrap().take() else {
+        return Ok(String::new());
+    };
+    capture.stop();
+    let (samples, peak) = {
+        let mut t = take.lock().unwrap();
+        (std::mem::take(&mut t.samples), t.peak)
+    };
+    if samples.len() < 16_000 / 4 || peak < 0.004 {
+        return Ok(String::new());
+    }
+    let flow = flow.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let transcript = speech::transcribe(&samples);
+        // Nothing else needs the model: give its memory back, as Flow does when turned off.
+        if flow.running.lock().unwrap().is_none() && !crate::notes::is_recording(&app) && !crate::voice::is_listening() {
+            speech::unload();
+        }
+        let raw = transcript.ok_or("the voice model is not loaded")?.text.trim().to_string();
+        if raw.is_empty() {
+            return Ok(String::new());
+        }
+        let prepared = flow.store.lock().unwrap().prepare(&raw);
+        Ok(text::finish(&prepared.text, &prepared.snippets))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Closes the microphone and drops what was heard.
+#[tauri::command]
+pub fn hq_dictation_cancel() {
+    let taken = HQ_TAKE.lock().unwrap().take();
+    if let Some((mut capture, _)) = taken {
+        capture.stop();
+    }
+}

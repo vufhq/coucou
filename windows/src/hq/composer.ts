@@ -1,0 +1,346 @@
+// Coucou HQ: the box at the bottom of the conversation. Enter sends, Shift+Enter
+// makes a new line; the + holds Pause / Resume and "New goal…"; the mic
+// dictates into the box, on this computer (Coucou's voice model). Above it, a
+// slim line says when the agent is working (with Stop) or waiting. Other
+// parts prefill it with `document.dispatchEvent(new CustomEvent("hq-compose",
+// { detail: { text } }))`.
+
+import { Bridge, onEvent } from "../core/bridge";
+import { FlowBridge } from "../core/flow";
+import type { OrchAgent, OrchTask } from "../core/orchestrator";
+import { OrchestratorBridge } from "../core/orchestrator";
+import { language, t, tl } from "../i18n/i18n";
+import { h, svg } from "../views/dom";
+import { ICONS } from "../views/icons";
+import type { HqStore } from "./types";
+
+export interface Composer {
+  el: HTMLElement;
+  /** The agent the box writes to; undefined hides nothing but disables sending. */
+  setAgent(agent: OrchAgent | undefined): void;
+  /** Puts `text` in the box, caret at the end, and focuses it. */
+  fill(text: string): void;
+  focus(): void;
+}
+
+const MAX_HEIGHT = 200;
+
+/** A microphone, stroked. */
+const MIC = "M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v3.5";
+
+/** What the line above the box says about the agent's current task. */
+export type WorkState = "working" | "computer" | "queued" | "team" | "paused";
+
+/**
+ * The line for `task` (the agent's current one). `computerTaken`: another
+ * agent is using the shared computer. Null when nothing is said: no task, or
+ * one waiting for the user (the thread shows the card).
+ */
+export function workState(task: Pick<OrchTask, "status"> | null, computerTaken: boolean): WorkState | null {
+  switch (task?.status) {
+    case "starting":
+    case "running":
+      return "working";
+    case "queued":
+      return computerTaken ? "computer" : "queued";
+    case "waiting_for_agents":
+      return "team";
+    case "paused":
+      return "paused";
+    default:
+      return null;
+  }
+}
+
+/** Statuses during which a task holds its computer. */
+const ON_COMPUTER = new Set<OrchTask["status"]>(["starting", "running", "waiting_for_approval"]);
+
+/** `onSent` runs as soon as a message leaves, so the thread can jump to the bottom. */
+export function createComposer(store: HqStore, onSent: () => void): Composer {
+  let agent: OrchAgent | undefined;
+  let sending = false;
+  /** The mic: off, listening, or turning what was heard into words. */
+  let dictation: "off" | "listening" | "thinking" = "off";
+
+  const area = h("textarea", { class: "hq-composer-input", rows: "1", spellcheck: "true" }) as HTMLTextAreaElement;
+  const send = h("button", { class: "hq-send", title: tl("Send"), "aria-label": tl("Send") }, svg(ICONS.arrowUp, 18));
+  const plus = h("button", { class: "hq-composer-plus", title: tl("More"), "aria-label": tl("More"), "aria-haspopup": "menu" }, svg(ICONS.plus, 18));
+  const note = h("div", { class: "hq-composer-note", role: "status" });
+  const status = h("div", { class: "hq-composer-status", hidden: true });
+  const mic = h("button", { class: "hq-mic", title: tl("Dictate"), "aria-label": tl("Dictate"), "aria-pressed": "false" }, svg(MIC, 18, { stroke: 1.8 }));
+  const pill = h("div", { class: "hq-composer" }, plus, area, mic, send);
+  const el = h("div", { class: "hq-composer-wrap" }, status, note, pill);
+
+  const sync = () => {
+    area.style.height = "auto";
+    area.style.height = `${Math.min(MAX_HEIGHT, area.scrollHeight)}px`;
+    area.style.overflowY = area.scrollHeight > MAX_HEIGHT ? "auto" : "hidden";
+    send.disabled = !agent || sending || dictation !== "off" || !area.value.trim();
+  };
+
+  const submit = () => {
+    const text = area.value.trim();
+    if (!agent || sending || !text) return;
+    const to = agent.id;
+    sending = true;
+    note.textContent = "";
+    area.value = "";
+    sync();
+    onSent();
+    void store.send(to, text).then(
+      () => {},
+      (err) => {
+        // Nothing lost: what was typed comes back, unless something new was typed since.
+        if (!area.value.trim()) area.value = text;
+        note.textContent = t("Couldn't send: {error}", { error: String(err) });
+      },
+    ).finally(() => {
+      sending = false;
+      sync();
+    });
+  };
+
+  area.addEventListener("input", sync);
+  area.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    submit();
+  });
+  send.addEventListener("click", submit);
+  pill.addEventListener("mousedown", (e) => {
+    // A click on the pill's padding goes to the box.
+    if (e.target === pill) {
+      e.preventDefault();
+      area.focus();
+    }
+  });
+
+  // ── Dictation ───────────────────────────────────────────────────────────────
+
+  function drawMic() {
+    mic.classList.toggle("listening", dictation === "listening");
+    mic.classList.toggle("thinking", dictation === "thinking");
+    mic.setAttribute("aria-pressed", String(dictation === "listening"));
+    const label = dictation === "listening" ? t("Stop dictating") : dictation === "thinking" ? t("Writing it down…") : t("Dictate");
+    mic.title = label;
+    mic.setAttribute("aria-label", label);
+    mic.disabled = !agent || dictation === "thinking";
+    area.classList.toggle("dictating", dictation !== "off");
+    const placeholder =
+      dictation === "listening" ? t("Listening…") : agent ? t("Message {name}", { name: agent.name }) : "";
+    if (area.placeholder !== placeholder) area.placeholder = placeholder;
+    sync();
+  }
+
+  /** Puts the dictated words where the caret is, with a space on each side as needed. */
+  function insert(words: string) {
+    const start = area.selectionStart ?? area.value.length;
+    const end = area.selectionEnd ?? start;
+    const before = area.value.slice(0, start);
+    const after = area.value.slice(end);
+    const lead = before && !/\s$/.test(before) ? " " : "";
+    const tail = after && !/^\s/.test(after) ? " " : "";
+    area.value = before + lead + words + tail + after;
+    const caret = (before + lead + words).length;
+    area.focus();
+    area.setSelectionRange(caret, caret);
+  }
+
+  async function startDictation() {
+    note.replaceChildren();
+    try {
+      await FlowBridge.hqDictationStart();
+      dictation = "listening";
+    } catch (err) {
+      if (String(err).includes("models")) {
+        // The voice model is downloaded once, in Coucou's settings.
+        const open = h("button", { class: "hq-composer-note-link", text: tl("Open Settings") });
+        open.addEventListener("click", () => void Bridge.openHubPage("settings"));
+        note.replaceChildren(h("span", { text: t("Dictation needs Coucou's voice model. Download it in Settings → Recognition.") }), " ", open);
+      } else {
+        note.textContent = t("Couldn't open the microphone: {error}", { error: String(err) });
+      }
+    }
+    drawMic();
+  }
+
+  async function stopDictation() {
+    dictation = "thinking";
+    drawMic();
+    try {
+      const words = (await FlowBridge.hqDictationStop()).trim();
+      if (words) insert(words);
+    } catch (err) {
+      note.textContent = t("Couldn't write it down: {error}", { error: String(err) });
+    }
+    dictation = "off";
+    drawMic();
+  }
+
+  /** Drops what was heard: the window went away, Escape, or another agent. */
+  function cancelDictation() {
+    if (dictation !== "listening") return;
+    dictation = "off";
+    void FlowBridge.hqDictationCancel();
+    drawMic();
+  }
+
+  mic.addEventListener("click", () => {
+    if (dictation === "off") void startDictation();
+    else if (dictation === "listening") void stopDictation();
+  });
+  area.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && dictation === "listening") {
+      e.preventDefault();
+      cancelDictation();
+    }
+  });
+  // The microphone never stays open behind a hidden window.
+  void onEvent<boolean>("hq-visible", (shown) => {
+    if (!shown) cancelDictation();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") cancelDictation();
+  });
+
+  // ── The + menu ──────────────────────────────────────────────────────────────
+
+  let closeMenu: (() => void) | null = null;
+
+  function openMenu() {
+    if (!agent) return;
+    const current = agent;
+    const menu = h("div", { class: "hq-composer-menu", role: "menu" });
+    const item = (label: string, action: () => void) => {
+      const b = h("button", { class: "hq-composer-menu-item", role: "menuitem", text: label });
+      b.addEventListener("click", () => {
+        close();
+        action();
+      });
+      menu.append(b);
+    };
+    item(current.paused ? t("Resume") : t("Pause"), () => {
+      const action = current.paused
+        ? OrchestratorBridge.resumeAgent(current.id)
+        : OrchestratorBridge.pauseAgent(current.id);
+      void action.then(() => store.reload(), (err) => (note.textContent = String(err)));
+    });
+    // The side panel opens on this agent with the form (panel.ts).
+    item(t("New goal…"), () => document.dispatchEvent(new CustomEvent("hq-new-goal")));
+
+    const close = () => {
+      menu.remove();
+      document.removeEventListener("mousedown", outside, true);
+      document.removeEventListener("keydown", onKey, true);
+      plus.setAttribute("aria-expanded", "false");
+      closeMenu = null;
+    };
+    const outside = (e: Event) => {
+      const at = e.target as Node;
+      if (!menu.contains(at) && !plus.contains(at)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        close();
+        plus.focus();
+      }
+    };
+    el.append(menu);
+    plus.setAttribute("aria-expanded", "true");
+    document.addEventListener("mousedown", outside, true);
+    document.addEventListener("keydown", onKey, true);
+    closeMenu = close;
+    menu.querySelector<HTMLElement>("button")?.focus();
+  }
+
+  plus.addEventListener("click", () => (closeMenu ? closeMenu() : openMenu()));
+
+  // ── Working or waiting ──────────────────────────────────────────────────────
+
+  let statusSig = "";
+  /** The task a Stop click is cancelling, so the button stays disabled meanwhile. */
+  let stopping: string | null = null;
+
+  /** Another agent's task holds the computer `agent` shares. */
+  function computerTaken(of: OrchAgent): boolean {
+    return store.snapshot().agents.some((other) => {
+      if (other.id === of.id || other.computerId !== of.computerId) return false;
+      const task = store.current(other.id);
+      return !!task && ON_COMPUTER.has(task.status);
+    });
+  }
+
+  function drawStatus() {
+    const task = agent ? store.current(agent.id) : null;
+    const state = agent ? workState(task, computerTaken(agent)) : null;
+    const sig = state && agent && task ? `${language()}|${agent.name}|${state}|${task.id}|${stopping === task.id}` : "";
+    if (sig === statusSig) return;
+    statusSig = sig;
+    status.hidden = !state;
+    if (!state || !agent || !task) return status.replaceChildren();
+    const words: Record<WorkState, string> = {
+      working: t("{name} is working…", { name: agent.name }),
+      computer: t("Waiting for the computer"),
+      queued: t("Queued"),
+      team: t("Waiting for the team"),
+      paused: t("Paused"),
+    };
+    const children: Node[] = [];
+    if (state === "working") children.push(h("span", { class: "hq-typing small", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
+    children.push(h("span", { class: "hq-composer-status-line", text: words[state] }));
+    if (state === "working") {
+      // Cancels the task: only ever from this click.
+      const stop = h("button", { class: "hq-composer-stop", text: tl("Stop"), disabled: stopping === task.id });
+      stop.addEventListener("click", () => {
+        stopping = task.id;
+        note.textContent = "";
+        drawStatus();
+        void store.stop(task.id).catch((err) => {
+          note.textContent = t("Couldn't stop: {error}", { error: String(err) });
+        }).finally(() => {
+          stopping = null;
+          drawStatus();
+        });
+      });
+      children.push(stop);
+    }
+    status.replaceChildren(...children);
+  }
+
+  // ── Outside ─────────────────────────────────────────────────────────────────
+
+  const focus = () => {
+    area.focus();
+    const end = area.value.length;
+    area.setSelectionRange(end, end);
+  };
+
+  const fill = (text: string) => {
+    area.value = text;
+    sync();
+    focus();
+  };
+
+  document.addEventListener("hq-compose", (e) => {
+    const text = (e as CustomEvent<{ text?: unknown }>).detail?.text;
+    fill(typeof text === "string" ? text : "");
+  });
+
+  function setAgent(next: OrchAgent | undefined) {
+    if (next?.id !== agent?.id) {
+      closeMenu?.();
+      cancelDictation();
+      note.textContent = "";
+    }
+    agent = next;
+    const placeholder = next ? t("Message {name}", { name: next.name }) : "";
+    if (area.placeholder !== placeholder) area.placeholder = placeholder;
+    area.disabled = !next;
+    plus.disabled = !next;
+    drawMic();
+    drawStatus();
+  }
+
+  sync();
+  return { el, setAgent, fill, focus };
+}

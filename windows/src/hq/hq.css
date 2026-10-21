@@ -1,0 +1,118 @@
+/* Coucou HQ: the frame. The sidebar's look is in sidebar.css, the
+   conversation's in thread.css; both use only these tokens. */
+
+:root {
+  --font: system-ui, "Segoe UI Variable Text", "Segoe UI", "Segoe UI Emoji", "Nirmala UI", sans-serif;
+  --hq-bg: #121212;
+  --hq-sidebar: #171717;
+  --hq-raised: #212121;
+  --hq-hover: #262626;
+  --hq-selected: #2a2a2a;
+  --hq-line: rgba(255, 255, 255, 0.08);
+  --hq-text: #f3f3f3;
+  --hq-body: #e3e3e3;
+  --hq-secondary: #9a9a9a;
+  --hq-muted: #6e6e6e;
+  --hq-accent: #fb923c;
+  --hq-on-accent: #170c04;
+  --hq-link: #6ea8fe;
+  --hq-green: #34d399;
+  --hq-red: #ff453a;
+  --hq-radius: 18px;
+  --hq-sidebar-width: 282px;
+  --hq-panel-width: 320px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--hq-bg);
+  color: var(--hq-text);
+  font: 400 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+#hq {
+  display: grid;
+  grid-template-columns: var(--hq-sidebar-width) minmax(0, 1fr);
+  /* One row the height of the window: the panes scroll inside it. */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+}
+
+#hq.with-panel {
+  grid-template-columns: var(--hq-sidebar-width) minmax(0, 1fr) var(--hq-panel-width);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.hq-sidebar {
+  min-width: 0;
+  height: 100%;
+  background: var(--hq-sidebar);
+  border-right: 1px solid var(--hq-line);
+  display: flex;
+  flex-direction: column;
+}
+
+.hq-conversation,
+.hq-activity {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.hq-panel {
+  min-width: 0;
+  height: 100%;
+  background: var(--hq-sidebar);
+  border-left: 1px solid var(--hq-line);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Shared bits any part may use. */
+.hq-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--hq-raised);
+  color: var(--hq-text);
+  display: inline-grid;
+  place-items: center;
+  cursor: default;
+}
+
+.hq-icon-btn:hover {
+  background: var(--hq-hover);
+}
+
+.hq-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.hq-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+.hq-empty {
+  color: var(--hq-secondary);
+  text-align: center;
+  padding: 24px;
+}

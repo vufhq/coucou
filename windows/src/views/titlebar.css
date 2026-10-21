@@ -1,0 +1,122 @@
+/* The title bar of the borderless windows (titlebar.ts). It sits above the
+   page, which loses its height: the pages below size themselves to 100vh. */
+
+:root {
+  --cc-titlebar-h: 36px;
+}
+
+.cc-titlebar {
+  height: var(--cc-titlebar-h);
+  display: flex;
+  align-items: stretch;
+  background: #0d0d0d;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #d6d6d6;
+  font: 500 12.5px/1 system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  z-index: 50;
+}
+
+.cc-tb-drag {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+}
+
+/* The drag region is the bar itself: what is in it lets the mouse through. */
+.cc-tb-drag > * {
+  pointer-events: none;
+}
+
+.cc-tb-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.cc-tb-icon canvas {
+  width: 18px;
+  height: 18px;
+}
+
+.cc-tb-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-tb-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+}
+
+.cc-tb-action {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #cfcfcf;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  cursor: default;
+}
+
+.cc-tb-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.cc-tb-action svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.cc-tb-controls {
+  display: flex;
+}
+
+.cc-tb-btn {
+  width: 46px;
+  border: none;
+  background: transparent;
+  color: #cfcfcf;
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.cc-tb-btn svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.cc-tb-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.cc-tb-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+/* The page under the bar keeps the rest of the window. */
+body.framed #hub,
+body.framed #hq {
+  height: calc(100vh - var(--cc-titlebar-h));
+}
