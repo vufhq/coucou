@@ -50,9 +50,12 @@ export function createBackend(
   } = {},
 ): Backend {
   const store = new Store(join(config.dataDir, "orchestrator.db"));
-  for (const computer of config.agents) store.ensureComputer(computer);
   const firstComputer = config.agents[0];
   if (!firstComputer) throw new Error("at least one computer is required");
+  // Every agent shares the configured computer(s); agents left on one that was
+  // dropped from ORCH_AGENTS move to the first.
+  const moved = store.useComputers(config.agents);
+  if (moved > 0) console.log(`orchestrator: moved ${moved} agent(s) to ${firstComputer.id}`);
   store.ensureChief({ ...firstComputer, modelProfileId: config.defaultModelProfile });
   const events = new EventLog(store);
   const signals = new JobSignals();

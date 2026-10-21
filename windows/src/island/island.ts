@@ -182,7 +182,8 @@ export class Island {
         const task = State.focusTask;
         if (!task) return;
         if (task.orchestrator) {
-          void Bridge.openHubPage(`tasks?agent=${task.orchestrator.agentId}`);
+          // Coucou HQ, on that agent's thread.
+          void Bridge.showHq(task.orchestrator.agentId);
           return;
         }
         const urls: Record<string, string> = {

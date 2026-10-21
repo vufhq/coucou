@@ -3,8 +3,8 @@
 The backend that turns Coucou into the control surface for Mochi and a team of
 AI coworkers. Provisioned Linux VMs are **computers** (`agent-01`,
 `agent-02`…), while the characters the user names, colours and chats with are
-**agents**. Several agents may share a computer; that computer runs one task at
-a time. Activity remains reconnectable and durable.
+**agents**. Every agent shares one computer, `agent-01`, which runs one task
+at a time; the others' tasks queue. Activity remains reconnectable and durable.
 
 ```
 Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (this folder, Node on Windows)
@@ -18,8 +18,9 @@ Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend
 ## Mochi and the team
 
 On first start the only agent is Mochi, the chief. Its stable id is the first
-computer id and it cannot be retired. Extra configured computers stay empty
-until the user or Mochi creates a coworker on one.
+computer id and it cannot be retired. Every agent Mochi or the user creates goes
+on the first configured computer: Mochi's team proposals don't pick a computer
+(a `computerId` in one is ignored).
 
 Mochi can propose a team, organize it, delegate work, answer a coworker's
 question and wait for reports. Creating or retiring a coworker always pauses
@@ -27,8 +28,7 @@ for an explicit user approval. Coworker reports, personas, names and team data
 are fenced as untrusted data in model prompts. Coworkers cannot use Mochi's
 management operations or delegate to each other.
 
-Delegated tasks run on each coworker's assigned computer and appear in that
-coworker's chat. While Mochi waits, its task uses neither a parallel slot nor
+Delegated tasks run on the shared computer and appear in that coworker's chat. While Mochi waits, its task uses neither a parallel slot nor
 its timeout budget. A computer still runs only one task at a time, even when
 several coworkers share it.
 
@@ -88,7 +88,26 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    `/workspace` are kept. (After a backend update that changes the worker, as
    0.2 did for downloads and health reports, run `-Update` once.)
 
-   **More computers.** Each one is its own distro, with its own worker token:
+   **One shared computer.** Every agent shares `agent-01`, so `ORCH_AGENTS`
+   should name only it:
+
+   ```
+   ORCH_AGENTS=agent-01
+   ```
+
+   If you set up `agent-02` before, drop it from `ORCH_AGENTS` in
+   `orchestrator\.env` and restart the backend. At startup, every agent
+   (retired ones too) on a computer that is no longer listed moves to the first
+   listed one, and only listed computers are shown. Old tasks keep pointing at
+   `agent-02` in the history. Removing its VM is your own choice and frees
+   about 3.5 GB; it deletes that distro and its disk for good:
+
+   ```powershell
+   wsl --unregister agent-02
+   ```
+
+   **More computers (optional).** The backend can still drive several, each its
+   own distro with its own worker token, but new agents always go on the first:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-02
@@ -202,7 +221,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
 | `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
 | `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distros running |
-| `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name` |
+| `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name`. Every agent shares the first; agents on a computer dropped from the list move to it at startup |
 | `ORCH_MAX_PARALLEL` | `2` | How many computers may work at the same time. The others' tasks wait their turn |
 
 ## Safety model
@@ -283,7 +302,7 @@ npm run typecheck
 ## Known limits
 
 - Each computer does one task at a time; at most `ORCH_MAX_PARALLEL` computers work at once.
-- At most 12 live character agents can share those computers.
+- At most 12 live character agents share the computer, so their tasks queue.
 - All agents share WSL's memory (half the PC's by default) and your plan's limits.
 - Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
   with `provision.ps1 -Update`.

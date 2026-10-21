@@ -1,0 +1,460 @@
+/* Coucou HQ: the side panel on the right (panel.ts). The agent's computer,
+   goals, memory and files, or its settings. Only the --hq-* tokens. */
+
+.hq-pnl-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 60px;
+  padding: 12px 12px 8px 20px;
+}
+
+.hq-pnl-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hq-secondary);
+  font-size: 14px;
+}
+
+.hq-pnl-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  color: var(--hq-secondary);
+}
+
+.hq-pnl-icon:hover {
+  color: var(--hq-text);
+}
+
+.hq-pnl-icon.small {
+  width: 26px;
+  height: 26px;
+}
+
+.hq-pnl-icon:disabled {
+  opacity: 0.5;
+}
+
+.hq-pnl-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.hq-pnl-section,
+.hq-pnl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hq-pnl-label {
+  color: var(--hq-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hq-pnl-muted {
+  color: var(--hq-muted);
+  font-size: 12.5px;
+}
+
+.hq-pnl-error {
+  color: var(--hq-red);
+  font-size: 12.5px;
+}
+
+.hq-pnl-error:empty {
+  display: none;
+}
+
+.hq-pnl-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--hq-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── The computer ─────────────────────────────────────────────────────────── */
+
+.hq-pnl-computer-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hq-pnl-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hq-muted);
+}
+
+.hq-pnl-dot.ready {
+  background: var(--hq-green);
+}
+
+.hq-pnl-dot.busy,
+.hq-pnl-dot.starting {
+  background: var(--hq-accent);
+}
+
+.hq-pnl-dot.error {
+  background: var(--hq-red);
+}
+
+.hq-pnl-computer-name {
+  color: var(--hq-text);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.hq-pnl-tag {
+  margin-left: auto;
+  color: var(--hq-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.hq-pnl-computer-state,
+.hq-pnl-line {
+  color: var(--hq-secondary);
+  font-size: 12.5px;
+}
+
+.hq-pnl-mine {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hq-line);
+  color: var(--hq-body);
+  font-size: 13px;
+}
+
+.hq-pnl-mine.using {
+  color: var(--hq-accent);
+}
+
+.hq-pnl-mine.free {
+  color: var(--hq-green);
+}
+
+/* ── Goals ────────────────────────────────────────────────────────────────── */
+
+.hq-pnl-goal.dim .hq-pnl-goal-title {
+  color: var(--hq-secondary);
+}
+
+.hq-pnl-goal-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hq-pnl-goal-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hq-pnl-goal-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hq-text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.hq-pnl-goal-meta {
+  color: var(--hq-secondary);
+  font-size: 12px;
+}
+
+.hq-pnl-goal-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Buttons and fields ───────────────────────────────────────────────────── */
+
+.hq-pnl-btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--hq-line);
+  border-radius: 999px;
+  background: var(--hq-hover);
+  color: var(--hq-text);
+  font: 600 12.5px/1 var(--font);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.hq-pnl-btn:hover {
+  background: var(--hq-selected);
+}
+
+.hq-pnl-btn.accent {
+  border-color: transparent;
+  background: var(--hq-accent);
+  color: var(--hq-on-accent);
+}
+
+.hq-pnl-btn.accent:hover {
+  filter: brightness(1.08);
+}
+
+.hq-pnl-btn.danger {
+  color: var(--hq-red);
+}
+
+.hq-pnl-btn:disabled {
+  opacity: 0.5;
+}
+
+.hq-pnl-add {
+  align-self: flex-start;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--hq-secondary);
+  font: 400 13.5px/1.4 var(--font);
+  cursor: default;
+}
+
+.hq-pnl-add:hover {
+  color: var(--hq-text);
+}
+
+.hq-pnl-input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hq-line);
+  border-radius: 10px;
+  background: var(--hq-bg);
+  color: var(--hq-text);
+  font: 400 13px/1 var(--font);
+  outline: none;
+}
+
+.hq-pnl-input:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hq-pnl-input:disabled {
+  opacity: 0.6;
+}
+
+.hq-pnl-textarea {
+  height: auto;
+  padding: 8px 10px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.hq-pnl-narrow {
+  width: 96px;
+}
+
+.hq-pnl-form {
+  gap: 8px;
+}
+
+.hq-pnl-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hq-pnl-schedule .hq-pnl-select {
+  width: auto;
+  flex: 1;
+}
+
+.hq-pnl-schedule-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hq-pnl-schedule-value:empty {
+  display: none;
+}
+
+.hq-pnl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hq-pnl-actions.split {
+  padding-top: 14px;
+  border-top: 1px solid var(--hq-line);
+}
+
+/* ── Memory ───────────────────────────────────────────────────────────────── */
+
+.hq-pnl-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 6px 8px 12px;
+  border-radius: 12px;
+  background: var(--hq-raised);
+  color: var(--hq-body);
+  font-size: 13px;
+}
+
+.hq-pnl-note-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hq-pnl-note-meta {
+  color: var(--hq-muted);
+  font-size: 11.5px;
+}
+
+.hq-pnl-note .hq-pnl-icon {
+  opacity: 0;
+}
+
+.hq-pnl-note:hover .hq-pnl-icon,
+.hq-pnl-note .hq-pnl-icon:focus-visible {
+  opacity: 1;
+}
+
+.hq-pnl-note-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Files ────────────────────────────────────────────────────────────────── */
+
+.hq-pnl-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 12px;
+  background: var(--hq-raised);
+  color: var(--hq-body);
+  font: 400 13px/1.3 var(--font);
+  text-align: start;
+  cursor: default;
+}
+
+.hq-pnl-file:hover {
+  background: var(--hq-hover);
+}
+
+.hq-pnl-file-icon {
+  flex: none;
+  display: grid;
+  color: var(--hq-secondary);
+}
+
+.hq-pnl-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hq-pnl-file-status {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hq-muted);
+  font-size: 12px;
+}
+
+/* ── Settings ─────────────────────────────────────────────────────────────── */
+
+.hq-pnl-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hq-pnl-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.hq-pnl-who-text {
+  min-width: 0;
+}
+
+.hq-pnl-who-name {
+  color: var(--hq-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hq-pnl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hq-pnl-field-label {
+  color: var(--hq-secondary);
+  font-size: 12px;
+}
+
+.hq-pnl-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 2px;
+}
+
+.hq-pnl-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: default;
+}
+
+.hq-pnl-swatch.on {
+  box-shadow: 0 0 0 2px var(--hq-sidebar), 0 0 0 4px var(--hq-text);
+}
+
+.hq-pnl-swatch-reset {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--hq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hq-secondary);
+  font: 400 12px/1 var(--font);
+  cursor: default;
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "frames",
+  "description": "The borderless windows (Coucou and Coucou HQ) draw their own title bar: they may drag, minimise, maximise and close (which only hides) themselves.",
+  "windows": ["settings", "hq"],
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-minimize",
+    "core:window:allow-close"
+  ]
+}

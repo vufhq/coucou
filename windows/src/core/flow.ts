@@ -221,6 +221,10 @@ export const FlowBridge = {
   pillAction: (action: string, id?: number) => call<void>("pill_action", { action, id: id ?? null }),
   /** The pill has said what « OK Coucou » answered. */
   voiceDone: (id: number) => call<void>("voice_done", { id, text: null }),
+  /** Coucou HQ's mic button: listen, then the words, on this computer (flow/mod.rs). */
+  hqDictationStart: () => callOrThrow<void>("hq_dictation_start"),
+  hqDictationStop: () => callOrThrow<string>("hq_dictation_stop"),
+  hqDictationCancel: () => call<void>("hq_dictation_cancel"),
   /** speech-dispatcher or espeak-ng, where the webview has no voice. */
   sayNative: (text: string, lang: string | null) => call<boolean>("voice_say_native", { text, lang }),
 };

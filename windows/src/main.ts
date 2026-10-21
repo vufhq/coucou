@@ -13,11 +13,29 @@ import { registerVoiceHandlers } from "./island/voice";
 import { applySpotify, registerSpotifyHandlers } from "./island/spotify";
 import { SPOTIFY_ID } from "./core/spotify";
 import { Recap } from "./recap/recap";
+import { OrchestratorBridge } from "./core/orchestrator";
+import { GREETING_END } from "./mochi/greeting";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
 /** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
 function applyLanguage() {
   setLanguage(resolveLanguage(State.settings.language, systemLanguages()));
+}
+
+/** Once per launch, after the greeting: Coucou's Settings window opens, then
+ *  Coucou HQ in front of it when the orchestrator is on. */
+let hqOpened = false;
+async function openHqOnce() {
+  if (hqOpened) return;
+  hqOpened = true;
+  await Bridge.openHubPage("general");
+  try {
+    const { prefs } = await OrchestratorBridge.status();
+    // HQ selects Mochi itself.
+    if (prefs.enabled) await Bridge.showHq(null);
+  } catch {
+    // Outside Tauri, or the backend's settings can't be read: no HQ.
+  }
 }
 
 async function main() {
@@ -148,11 +166,17 @@ async function main() {
 
   // Monday recap: app start (greeting over), an agent starting work, waking up.
   const checkRecap = () => void Recap.check(island);
-  island.onGreetingDone = checkRecap;
+  island.onGreetingDone = () => {
+    checkRecap();
+    void openHqOnce();
+  };
   island.onWake = checkRecap;
   await onEvent<null>("recap-check", checkRecap);
 
   island.launch();
+  // Moving the mouse out of the greeting cuts it short, and then it never says
+  // it is done: HQ still opens when it would have ended.
+  window.setTimeout(() => void openHqOnce(), (GREETING_END + 0.1) * 1000);
 
   // In a plain browser there is no wake strip behind the cursor: make the whole
   // page wake the island so the visuals can be checked with `npm run dev`.

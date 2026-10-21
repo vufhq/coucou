@@ -637,13 +637,17 @@ pub(crate) const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,ms
 /// In a dev build the pages are served by Vite, so the second window needs the
 /// absolute dev URL; a bundled build resolves it inside the app bundle.
 fn settings_page_url(app: &AppHandle) -> WebviewUrl {
+    page_url(app, "settings.html")
+}
+
+fn page_url(app: &AppHandle, page: &str) -> WebviewUrl {
     #[cfg(dev)]
     if let Some(mut base) = app.config().build.dev_url.clone() {
-        base.set_path("/settings.html");
+        base.set_path(&format!("/{page}"));
         return WebviewUrl::External(base);
     }
     let _ = app;
-    WebviewUrl::App("settings.html".into())
+    WebviewUrl::App(page.into())
 }
 
 /// The Coucou window (Flow dictation, the Notetaker and every setting of the
@@ -662,6 +666,9 @@ fn create_settings_window(app: &AppHandle) {
         .inner_size(1100.0, 720.0)
         .min_inner_size(820.0, 560.0)
         .resizable(true)
+        // Borderless: the page draws its own title bar (views/titlebar.ts).
+        .decorations(false)
+        .shadow(true)
         .visible(false)
         .center()
         .build()
@@ -725,6 +732,79 @@ pub fn show_hub(app: &AppHandle, page: Option<&str>) {
     set_hub_shown(&win, true);
 }
 
+// ── Coucou HQ ─────────────────────────────────────────────────────────────────
+
+/// Coucou HQ: the agents and their teams, out of the notch, with room to talk to them.
+pub const HQ_LABEL: &str = "hq";
+
+/// Created hidden at launch like the Coucou window, for the same reason (see
+/// create_settings_window).
+fn create_hq_window(app: &AppHandle) {
+    match WebviewWindowBuilder::new(app, HQ_LABEL, page_url(app, "hq.html"))
+        .additional_browser_args(BROWSER_ARGS)
+        .title("Coucou HQ")
+        .inner_size(1100.0, 760.0)
+        .min_inner_size(820.0, 560.0)
+        .resizable(true)
+        .decorations(false)
+        .shadow(true)
+        .visible(false)
+        .center()
+        .build()
+    {
+        Ok(win) => {
+            let this = win.clone();
+            win.on_window_event(move |event| match event {
+                // Closing it must only hide it, or it could never be reopened.
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let _ = this.hide();
+                    set_hq_shown(&this, false);
+                }
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Focused(true) => {
+                    let on = this.is_visible().unwrap_or(false) && !this.is_minimized().unwrap_or(false);
+                    set_hq_shown(&this, on);
+                }
+                _ => {}
+            });
+        }
+        Err(err) => log::line(format!("Coucou HQ window failed: {err}")),
+    }
+}
+
+/// Whether Coucou HQ is on screen, so its minis animate only then (like HUB_SHOWN).
+static HQ_SHOWN: AtomicBool = AtomicBool::new(false);
+
+fn set_hq_shown(win: &tauri::WebviewWindow, shown: bool) {
+    if HQ_SHOWN.swap(shown, Ordering::Relaxed) != shown {
+        let _ = win.emit_to(HQ_LABEL, "hq-visible", shown);
+    }
+}
+
+/// The page asks once at load, in case it missed the event.
+#[tauri::command]
+fn hq_shown() -> bool {
+    HQ_SHOWN.load(Ordering::Relaxed)
+}
+
+/// Shows Coucou HQ, on `agent_id`'s thread when given.
+pub fn show_hq_window(app: &AppHandle, agent_id: Option<&str>) {
+    let Some(win) = app.get_webview_window(HQ_LABEL) else {
+        log::line("Coucou HQ window missing");
+        return;
+    };
+    let _ = win.emit_to(HQ_LABEL, "hq-open", serde_json::json!({ "agentId": agent_id }));
+    let _ = win.unminimize();
+    let _ = win.show();
+    let _ = win.set_focus();
+    set_hq_shown(&win, true);
+}
+
+#[tauri::command]
+fn show_hq(app: AppHandle, agent_id: Option<String>) {
+    show_hq_window(&app, agent_id.as_deref());
+}
+
 /// The argument the login item starts Coucou with.
 const AUTOSTART_ARG: &str = "--autostart";
 
@@ -779,6 +859,8 @@ pub fn run() {
             reposition,
             fit_zoom,
             hub_shown,
+            hq_shown,
+            show_hq,
             list_monitors,
             open_url,
             open_in_vscode,
@@ -820,6 +902,7 @@ pub fn run() {
             orchestrator::orchestrator_status,
             orchestrator::orchestrator_set_prefs,
             orchestrator::orchestrator_tasks,
+            orchestrator::orchestrator_list_tasks,
             orchestrator::orchestrator_task,
             orchestrator::orchestrator_submit,
             orchestrator::orchestrator_models,
@@ -922,6 +1005,9 @@ pub fn run() {
             flow::pill_hot,
             flow::pill_hover,
             flow::pill_action,
+            flow::hq_dictation_start,
+            flow::hq_dictation_stop,
+            flow::hq_dictation_cancel,
             notes::notes_state,
             notes::notes_start,
             notes::notes_stop,
@@ -942,6 +1028,7 @@ pub fn run() {
             tray::build(&handle)?;
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
+            create_hq_window(&handle);
             // Same rule for Mochi's desktop window and the dictation pill.
             desktop::setup(&handle);
             flow::setup(&handle);

@@ -5428,6 +5428,829 @@
    "pt-BR": "Aguardando {names}…",
    "ru": "Ожидание: {names}…",
    "id": "Menunggu {names}…"
+  },
+  "Search agents": {
+   "zh-Hans": "搜索代理",
+   "hi": "एजेंट खोजें",
+   "es": "Buscar agentes",
+   "ar": "البحث عن وكلاء",
+   "fr": "Rechercher des agents",
+   "bn": "এজেন্ট খুঁজুন",
+   "pt-BR": "Buscar agentes",
+   "ru": "Поиск агентов",
+   "id": "Cari agen"
+  },
+  "New": {
+   "zh-Hans": "新建",
+   "hi": "नया",
+   "es": "Nuevo",
+   "ar": "جديد",
+   "fr": "Nouveau",
+   "bn": "নতুন",
+   "pt-BR": "Novo",
+   "ru": "Создать",
+   "id": "Baru"
+  },
+  "Ask Mochi to hire…": {
+   "zh-Hans": "让 Mochi 招人…",
+   "hi": "Mochi से भर्ती करने को कहें…",
+   "es": "Pedir a Mochi que contrate…",
+   "ar": "اطلب من Mochi التوظيف…",
+   "fr": "Demander à Mochi d’embaucher…",
+   "bn": "Mochi-কে নিয়োগ দিতে বলুন…",
+   "pt-BR": "Pedir ao Mochi para contratar…",
+   "ru": "Попросить Mochi нанять…",
+   "id": "Minta Mochi merekrut…"
+  },
+  "Create agent…": {
+   "zh-Hans": "创建代理…",
+   "hi": "एजेंट बनाएँ…",
+   "es": "Crear agente…",
+   "ar": "إنشاء وكيل…",
+   "fr": "Créer un agent…",
+   "bn": "এজেন্ট তৈরি করুন…",
+   "pt-BR": "Criar agente…",
+   "ru": "Создать агента…",
+   "id": "Buat agen…"
+  },
+  "Hire ": {
+   "zh-Hans": "招一个",
+   "hi": "भर्ती करो ",
+   "es": "Contrata ",
+   "ar": "وظِّف ",
+   "fr": "Embauche ",
+   "bn": "নিয়োগ দাও ",
+   "pt-BR": "Contrate ",
+   "ru": "Найми ",
+   "id": "Rekrut "
+  },
+  "Pin": {
+   "zh-Hans": "置顶",
+   "hi": "पिन करें",
+   "es": "Fijar",
+   "ar": "تثبيت",
+   "fr": "Épingler",
+   "bn": "পিন করুন",
+   "pt-BR": "Fixar",
+   "ru": "Закрепить",
+   "id": "Sematkan"
+  },
+  "Unpin": {
+   "zh-Hans": "取消置顶",
+   "hi": "पिन हटाएँ",
+   "es": "Desfijar",
+   "ar": "إلغاء التثبيت",
+   "fr": "Désépingler",
+   "bn": "পিন সরান",
+   "pt-BR": "Desafixar",
+   "ru": "Открепить",
+   "id": "Lepas sematan"
+  },
+  "Needs you": {
+   "zh-Hans": "需要你",
+   "hi": "आपकी ज़रूरत है",
+   "es": "Te necesita",
+   "ar": "يحتاج إليك",
+   "fr": "A besoin de vous",
+   "bn": "আপনাকে দরকার",
+   "pt-BR": "Precisa de você",
+   "ru": "Нужны вы",
+   "id": "Butuh Anda"
+  },
+  "No agents match.": {
+   "zh-Hans": "没有匹配的代理。",
+   "hi": "कोई एजेंट मेल नहीं खाता।",
+   "es": "Ningún agente coincide.",
+   "ar": "لا يوجد وكلاء مطابقون.",
+   "fr": "Aucun agent ne correspond.",
+   "bn": "কোনো এজেন্ট মেলেনি।",
+   "pt-BR": "Nenhum agente corresponde.",
+   "ru": "Нет подходящих агентов.",
+   "id": "Tidak ada agen yang cocok."
+  },
+  "Connect apps": {
+   "zh-Hans": "连接应用",
+   "hi": "ऐप्स जोड़ें",
+   "es": "Conectar apps",
+   "ar": "ربط التطبيقات",
+   "fr": "Connecter des apps",
+   "bn": "অ্যাপ সংযুক্ত করুন",
+   "pt-BR": "Conectar apps",
+   "ru": "Подключить приложения",
+   "id": "Hubungkan aplikasi"
+  },
+  "Yesterday {time}": {
+   "zh-Hans": "昨天 {time}",
+   "hi": "कल {time}",
+   "es": "Ayer {time}",
+   "ar": "أمس {time}",
+   "fr": "Hier {time}",
+   "bn": "গতকাল {time}",
+   "pt-BR": "Ontem {time}",
+   "ru": "Вчера {time}",
+   "id": "Kemarin {time}"
+  },
+  "Saved": {
+   "zh-Hans": "已保存",
+   "hi": "सहेजा गया",
+   "es": "Guardado",
+   "ar": "تم الحفظ",
+   "fr": "Enregistré",
+   "bn": "সংরক্ষিত",
+   "pt-BR": "Salvo",
+   "ru": "Сохранено",
+   "id": "Tersimpan"
+  },
+  "Couldn't save: {error}": {
+   "zh-Hans": "无法保存：{error}",
+   "hi": "सहेजा नहीं जा सका: {error}",
+   "es": "No se pudo guardar: {error}",
+   "ar": "تعذّر الحفظ: {error}",
+   "fr": "Impossible d'enregistrer : {error}",
+   "bn": "সংরক্ষণ করা যায়নি: {error}",
+   "pt-BR": "Não foi possível salvar: {error}",
+   "ru": "Не удалось сохранить: {error}",
+   "id": "Tidak bisa menyimpan: {error}"
+  },
+  "{from} to {to}": {
+   "zh-Hans": "{from} 致 {to}",
+   "hi": "{from} से {to} को",
+   "es": "De {from} a {to}",
+   "ar": "من {from} إلى {to}",
+   "fr": "De {from} à {to}",
+   "bn": "{from} থেকে {to}-কে",
+   "pt-BR": "De {from} para {to}",
+   "ru": "{from} → {to}",
+   "id": "Dari {from} ke {to}"
+  },
+  "Approve": {
+   "zh-Hans": "批准",
+   "hi": "स्वीकृत करें",
+   "es": "Aprobar",
+   "ar": "موافقة",
+   "fr": "Approuver",
+   "bn": "অনুমোদন করুন",
+   "pt-BR": "Aprovar",
+   "ru": "Одобрить",
+   "id": "Setujui"
+  },
+  "Reject": {
+   "zh-Hans": "拒绝",
+   "hi": "अस्वीकार करें",
+   "es": "Rechazar",
+   "ar": "رفض",
+   "fr": "Refuser",
+   "bn": "প্রত্যাখ্যান করুন",
+   "pt-BR": "Rejeitar",
+   "ru": "Отклонить",
+   "id": "Tolak"
+  },
+  "{name} needs your approval": {
+   "zh-Hans": "{name} 需要你的批准",
+   "hi": "{name} को आपकी स्वीकृति चाहिए",
+   "es": "{name} necesita tu aprobación",
+   "ar": "يحتاج {name} إلى موافقتك",
+   "fr": "{name} a besoin de ton accord",
+   "bn": "{name}-এর আপনার অনুমোদন দরকার",
+   "pt-BR": "{name} precisa da sua aprovação",
+   "ru": "{name} ждёт вашего одобрения",
+   "id": "{name} perlu persetujuanmu"
+  },
+  "Answer in the box below": {
+   "zh-Hans": "在下面的输入框中回答",
+   "hi": "नीचे वाले बॉक्स में जवाब दें",
+   "es": "Responde en el cuadro de abajo",
+   "ar": "أجب في المربع أدناه",
+   "fr": "Réponds dans la zone ci-dessous",
+   "bn": "নিচের বাক্সে উত্তর দিন",
+   "pt-BR": "Responda na caixa abaixo",
+   "ru": "Ответьте в поле ниже",
+   "id": "Jawab di kotak di bawah"
+  },
+  "{count} messages with": {
+   "zh-Hans": {
+    "other": "{count} 条消息，与"
+   },
+   "hi": {
+    "one": "{count} संदेश, इनके साथ",
+    "other": "{count} संदेश, इनके साथ"
+   },
+   "es": {
+    "one": "{count} mensaje con",
+    "other": "{count} mensajes con"
+   },
+   "ar": {
+    "zero": "{count} رسالة مع",
+    "one": "رسالة واحدة مع",
+    "two": "رسالتان مع",
+    "few": "{count} رسائل مع",
+    "many": "{count} رسالة مع",
+    "other": "{count} رسالة مع"
+   },
+   "fr": {
+    "one": "{count} message avec",
+    "other": "{count} messages avec"
+   },
+   "bn": {
+    "one": "{count}টি বার্তা, সঙ্গে",
+    "other": "{count}টি বার্তা, সঙ্গে"
+   },
+   "pt-BR": {
+    "one": "{count} mensagem com",
+    "other": "{count} mensagens com"
+   },
+   "ru": {
+    "one": "{count} сообщение с",
+    "few": "{count} сообщения с",
+    "many": "{count} сообщений с",
+    "other": "{count} сообщения с"
+   },
+   "id": {
+    "other": "{count} pesan dengan"
+   }
+  },
+  "More": {
+   "zh-Hans": "更多",
+   "hi": "और",
+   "es": "Más",
+   "ar": "المزيد",
+   "fr": "Plus",
+   "bn": "আরও",
+   "pt-BR": "Mais",
+   "ru": "Ещё",
+   "id": "Lainnya"
+  },
+  "Couldn't send: {error}": {
+   "zh-Hans": "无法发送：{error}",
+   "hi": "भेजा नहीं जा सका: {error}",
+   "es": "No se pudo enviar: {error}",
+   "ar": "تعذّر الإرسال: {error}",
+   "fr": "Impossible d'envoyer : {error}",
+   "bn": "পাঠানো যায়নি: {error}",
+   "pt-BR": "Não foi possível enviar: {error}",
+   "ru": "Не удалось отправить: {error}",
+   "id": "Tidak bisa mengirim: {error}"
+  },
+  "New goal…": {
+   "zh-Hans": "新目标…",
+   "hi": "नया लक्ष्य…",
+   "es": "Nuevo objetivo…",
+   "ar": "هدف جديد…",
+   "fr": "Nouvel objectif…",
+   "bn": "নতুন লক্ষ্য…",
+   "pt-BR": "Nova meta…",
+   "ru": "Новая цель…",
+   "id": "Tujuan baru…"
+  },
+  "Message {name}": {
+   "zh-Hans": "给 {name} 发消息",
+   "hi": "{name} को संदेश भेजें",
+   "es": "Mensaje para {name}",
+   "ar": "راسل {name}",
+   "fr": "Écrire à {name}",
+   "bn": "{name}-কে বার্তা পাঠান",
+   "pt-BR": "Mensagem para {name}",
+   "ru": "Сообщение для {name}",
+   "id": "Kirim pesan ke {name}"
+  },
+  "Build me a developer team": {
+   "zh-Hans": "帮我组建一个开发团队",
+   "hi": "मेरे लिए एक डेवलपर टीम बनाओ",
+   "es": "Créame un equipo de desarrollo",
+   "ar": "كوّن لي فريق مطوّرين",
+   "fr": "Monte-moi une équipe de développeurs",
+   "bn": "আমার জন্য একটি ডেভেলপার টিম বানাও",
+   "pt-BR": "Monte uma equipe de desenvolvedores para mim",
+   "ru": "Собери мне команду разработчиков",
+   "id": "Buatkan aku tim developer"
+  },
+  "What is everyone working on?": {
+   "zh-Hans": "大家都在做什么？",
+   "hi": "सब लोग किस पर काम कर रहे हैं?",
+   "es": "¿En qué está trabajando cada uno?",
+   "ar": "على ماذا يعمل الجميع؟",
+   "fr": "Sur quoi tout le monde travaille ?",
+   "bn": "সবাই কী নিয়ে কাজ করছে?",
+   "pt-BR": "No que todo mundo está trabalhando?",
+   "ru": "Кто над чем сейчас работает?",
+   "id": "Semua orang sedang mengerjakan apa?"
+  },
+  "Hire a research assistant": {
+   "zh-Hans": "招一名研究助理",
+   "hi": "एक रिसर्च असिस्टेंट रखो",
+   "es": "Contrata a un asistente de investigación",
+   "ar": "وظّف مساعد أبحاث",
+   "fr": "Embauche un assistant de recherche",
+   "bn": "একজন গবেষণা সহকারী নিয়োগ করো",
+   "pt-BR": "Contrate um assistente de pesquisa",
+   "ru": "Найми ассистента-исследователя",
+   "id": "Rekrut asisten riset"
+  },
+  "I'm {name}, your head of staff.": {
+   "zh-Hans": "我是 {name}，你的幕僚长。",
+   "hi": "मैं {name} हूँ, आपका चीफ़ ऑफ़ स्टाफ़।",
+   "es": "Soy {name}, tu jefe de equipo.",
+   "ar": "أنا {name}، رئيس فريق عملك.",
+   "fr": "Je suis {name}, ton chef d'équipe.",
+   "bn": "আমি {name}, তোমার চিফ অফ স্টাফ।",
+   "pt-BR": "Sou {name}, seu chefe de equipe.",
+   "ru": "Я {name}, руководитель вашей команды.",
+   "id": "Aku {name}, kepala stafmu."
+  },
+  "Coucou HQ": {
+   "zh-Hans": "Coucou 总部",
+   "hi": "Coucou मुख्यालय",
+   "es": "Sede de Coucou",
+   "ar": "مقر Coucou",
+   "fr": "QG Coucou",
+   "bn": "Coucou সদর দপ্তর",
+   "pt-BR": "QG do Coucou",
+   "ru": "Штаб Coucou",
+   "id": "Markas Coucou"
+  },
+  "The orchestrator is turned off. Turn it on in Tasks.": {
+   "zh-Hans": "编排器已关闭。请在“任务”中将其打开。",
+   "hi": "ऑर्केस्ट्रेटर बंद है। इसे कार्य में चालू करें।",
+   "es": "El orquestador está desactivado. Actívalo en Tareas.",
+   "ar": "المنسّق متوقف. شغّله من صفحة المهام.",
+   "fr": "L’orchestrateur est désactivé. Activez-le dans Tâches.",
+   "bn": "অর্কেস্ট্রেটর বন্ধ আছে। কাজ পাতায় এটি চালু করুন।",
+   "pt-BR": "O orquestrador está desativado. Ative-o em Tarefas.",
+   "ru": "Оркестратор выключен. Включите его в разделе «Задачи».",
+   "id": "Orkestrator dimatikan. Nyalakan di Tugas."
+  },
+  "{name}'s computer": {
+   "zh-Hans": "{name} 的电脑",
+   "hi": "{name} का कंप्यूटर",
+   "es": "Ordenador de {name}",
+   "ar": "حاسوب {name}",
+   "fr": "Ordinateur de {name}",
+   "bn": "{name}-এর কম্পিউটার",
+   "pt-BR": "Computador de {name}",
+   "ru": "Компьютер {name}",
+   "id": "Komputer {name}"
+  },
+  "Free": {
+   "zh-Hans": "空闲",
+   "hi": "खाली",
+   "es": "Libre",
+   "ar": "متاح",
+   "fr": "Libre",
+   "bn": "খালি",
+   "pt-BR": "Livre",
+   "ru": "Свободен",
+   "id": "Kosong"
+  },
+  "Shared by every agent": {
+   "zh-Hans": "所有智能体共用",
+   "hi": "सभी एजेंटों का साझा",
+   "es": "Compartido por todos los agentes",
+   "ar": "مشترك بين جميع الوكلاء",
+   "fr": "Partagé par tous les agents",
+   "bn": "সব এজেন্টের জন্য একটাই",
+   "pt-BR": "Compartilhado por todos os agentes",
+   "ru": "Общий для всех агентов",
+   "id": "Dipakai bersama semua agen"
+  },
+  "In use by {name}": {
+   "zh-Hans": "{name} 正在使用",
+   "hi": "{name} इस्तेमाल कर रहा है",
+   "es": "En uso por {name}",
+   "ar": "يستخدمه {name}",
+   "fr": "Utilisé par {name}",
+   "bn": "{name} ব্যবহার করছে",
+   "pt-BR": "Em uso por {name}",
+   "ru": "Сейчас занят: {name}",
+   "id": "Sedang dipakai {name}"
+  },
+  "Waiting: {names}": {
+   "zh-Hans": "等待中：{names}",
+   "hi": "इंतज़ार में: {names}",
+   "es": "En espera: {names}",
+   "ar": "في الانتظار: {names}",
+   "fr": "En attente : {names}",
+   "bn": "অপেক্ষায়: {names}",
+   "pt-BR": "Aguardando: {names}",
+   "ru": "Ждут: {names}",
+   "id": "Menunggu: {names}"
+  },
+  "{name} is using it": {
+   "zh-Hans": "{name} 正在使用",
+   "hi": "{name} इसे इस्तेमाल कर रहा है",
+   "es": "{name} lo está usando",
+   "ar": "{name} يستخدمه الآن",
+   "fr": "{name} l'utilise",
+   "bn": "{name} এটি ব্যবহার করছে",
+   "pt-BR": "{name} está usando",
+   "ru": "{name} работает на нём",
+   "id": "{name} sedang memakainya"
+  },
+  "{name} is waiting for the computer": {
+   "zh-Hans": "{name} 正在等待电脑",
+   "hi": "{name} कंप्यूटर का इंतज़ार कर रहा है",
+   "es": "{name} espera el ordenador",
+   "ar": "{name} ينتظر الحاسوب",
+   "fr": "{name} attend l'ordinateur",
+   "bn": "{name} কম্পিউটারের জন্য অপেক্ষা করছে",
+   "pt-BR": "{name} está aguardando o computador",
+   "ru": "{name} ждёт компьютер",
+   "id": "{name} menunggu komputer"
+  },
+  "New goal": {
+   "zh-Hans": "新目标",
+   "hi": "नया लक्ष्य",
+   "es": "Nuevo objetivo",
+   "ar": "هدف جديد",
+   "fr": "Nouvel objectif",
+   "bn": "নতুন লক্ষ্য",
+   "pt-BR": "Nova meta",
+   "ru": "Новая цель",
+   "id": "Tujuan baru"
+  },
+  "Add a note": {
+   "zh-Hans": "添加备注",
+   "hi": "नोट जोड़ें",
+   "es": "Añadir una nota",
+   "ar": "إضافة ملاحظة",
+   "fr": "Ajouter une note",
+   "bn": "একটি নোট যোগ করুন",
+   "pt-BR": "Adicionar uma nota",
+   "ru": "Добавить заметку",
+   "id": "Tambah catatan"
+  },
+  "No file yet.": {
+   "zh-Hans": "还没有文件。",
+   "hi": "अभी कोई फ़ाइल नहीं।",
+   "es": "Aún no hay archivos.",
+   "ar": "لا توجد ملفات بعد.",
+   "fr": "Aucun fichier pour l'instant.",
+   "bn": "এখনও কোনো ফাইল নেই।",
+   "pt-BR": "Nenhum arquivo ainda.",
+   "ru": "Файлов пока нет.",
+   "id": "Belum ada file."
+  },
+  "How should this agent work?": {
+   "zh-Hans": "这个智能体该如何工作？",
+   "hi": "यह एजेंट कैसे काम करे?",
+   "es": "¿Cómo debe trabajar este agente?",
+   "ar": "كيف يجب أن يعمل هذا الوكيل؟",
+   "fr": "Comment cet agent doit-il travailler ?",
+   "bn": "এই এজেন্ট কীভাবে কাজ করবে?",
+   "pt-BR": "Como este agente deve trabalhar?",
+   "ru": "Как должен работать этот агент?",
+   "id": "Bagaimana agen ini harus bekerja?"
+  },
+  "Instructions": {
+   "zh-Hans": "说明",
+   "hi": "निर्देश",
+   "es": "Instrucciones",
+   "ar": "التعليمات",
+   "fr": "Instructions",
+   "bn": "নির্দেশনা",
+   "pt-BR": "Instruções",
+   "ru": "Инструкции",
+   "id": "Instruksi"
+  },
+  "New team…": {
+   "zh-Hans": "新团队…",
+   "hi": "नई टीम…",
+   "es": "Nuevo equipo…",
+   "ar": "فريق جديد…",
+   "fr": "Nouvelle équipe…",
+   "bn": "নতুন দল…",
+   "pt-BR": "Nova equipe…",
+   "ru": "Новая команда…",
+   "id": "Tim baru…"
+  },
+  "Working": {
+   "zh-Hans": "进行中",
+   "hi": "काम जारी",
+   "es": "Trabajando",
+   "ar": "يعمل",
+   "fr": "En cours",
+   "bn": "কাজ চলছে",
+   "pt-BR": "Trabalhando",
+   "ru": "В работе",
+   "id": "Bekerja"
+  },
+  "Waiting": {
+   "zh-Hans": "等待中",
+   "hi": "प्रतीक्षा में",
+   "es": "En espera",
+   "ar": "في الانتظار",
+   "fr": "En attente",
+   "bn": "অপেক্ষমাণ",
+   "pt-BR": "Aguardando",
+   "ru": "Ожидают",
+   "id": "Menunggu"
+  },
+  "Search tasks": {
+   "zh-Hans": "搜索任务",
+   "hi": "कार्य खोजें",
+   "es": "Buscar tareas",
+   "ar": "ابحث في المهام",
+   "fr": "Rechercher des tâches",
+   "bn": "কাজ খুঁজুন",
+   "pt-BR": "Buscar tarefas",
+   "ru": "Поиск задач",
+   "id": "Cari tugas"
+  },
+  "from {name}": {
+   "zh-Hans": "来自 {name}",
+   "hi": "{name} से",
+   "es": "de {name}",
+   "ar": "من {name}",
+   "fr": "de {name}",
+   "bn": "{name}-এর কাছ থেকে",
+   "pt-BR": "de {name}",
+   "ru": "от {name}",
+   "id": "dari {name}"
+  },
+  "No tasks yet.": {
+   "zh-Hans": "还没有任务。",
+   "hi": "अभी कोई कार्य नहीं।",
+   "es": "Aún no hay tareas.",
+   "ar": "لا توجد مهام بعد.",
+   "fr": "Aucune tâche pour l'instant.",
+   "bn": "এখনও কোনো কাজ নেই।",
+   "pt-BR": "Nenhuma tarefa ainda.",
+   "ru": "Задач пока нет.",
+   "id": "Belum ada tugas."
+  },
+  "No tasks match.": {
+   "zh-Hans": "没有匹配的任务。",
+   "hi": "कोई कार्य मेल नहीं खाता।",
+   "es": "Ninguna tarea coincide.",
+   "ar": "لا توجد مهام مطابقة.",
+   "fr": "Aucune tâche ne correspond.",
+   "bn": "কোনো কাজ মেলেনি।",
+   "pt-BR": "Nenhuma tarefa corresponde.",
+   "ru": "Нет подходящих задач.",
+   "id": "Tidak ada tugas yang cocok."
+  },
+  "Show more": {
+   "zh-Hans": "显示更多",
+   "hi": "और दिखाएँ",
+   "es": "Mostrar más",
+   "ar": "عرض المزيد",
+   "fr": "Afficher plus",
+   "bn": "আরও দেখান",
+   "pt-BR": "Mostrar mais",
+   "ru": "Показать ещё",
+   "id": "Tampilkan lebih banyak"
+  },
+  "{name} is working…": {
+   "zh-Hans": "{name} 正在工作…",
+   "hi": "{name} काम कर रहा है…",
+   "es": "{name} está trabajando…",
+   "ar": "{name} يعمل…",
+   "fr": "{name} travaille…",
+   "bn": "{name} কাজ করছে…",
+   "pt-BR": "{name} está trabalhando…",
+   "ru": "{name} работает…",
+   "id": "{name} sedang bekerja…"
+  },
+  "Waiting for the computer": {
+   "zh-Hans": "等待电脑",
+   "hi": "कंप्यूटर का इंतज़ार",
+   "es": "Esperando el ordenador",
+   "ar": "في انتظار الكمبيوتر",
+   "fr": "En attente de l'ordinateur",
+   "bn": "কম্পিউটারের অপেক্ষায়",
+   "pt-BR": "Aguardando o computador",
+   "ru": "Ждёт компьютер",
+   "id": "Menunggu komputer"
+  },
+  "Waiting for the team": {
+   "zh-Hans": "等待团队",
+   "hi": "टीम का इंतज़ार",
+   "es": "Esperando al equipo",
+   "ar": "في انتظار الفريق",
+   "fr": "En attente de l'équipe",
+   "bn": "দলের অপেক্ষায়",
+   "pt-BR": "Aguardando a equipe",
+   "ru": "Ждёт команду",
+   "id": "Menunggu tim"
+  },
+  "Couldn't stop: {error}": {
+   "zh-Hans": "无法停止：{error}",
+   "hi": "रोका नहीं जा सका: {error}",
+   "es": "No se pudo detener: {error}",
+   "ar": "تعذّر الإيقاف: {error}",
+   "fr": "Impossible d'arrêter : {error}",
+   "bn": "থামানো যায়নি: {error}",
+   "pt-BR": "Não foi possível parar: {error}",
+   "ru": "Не удалось остановить: {error}",
+   "id": "Tidak dapat menghentikan: {error}"
+  },
+  "Load earlier messages": {
+   "zh-Hans": "加载更早的消息",
+   "hi": "पिछले संदेश लोड करें",
+   "es": "Cargar mensajes anteriores",
+   "ar": "تحميل الرسائل السابقة",
+   "fr": "Charger les messages précédents",
+   "bn": "আগের বার্তাগুলি লোড করুন",
+   "pt-BR": "Carregar mensagens anteriores",
+   "ru": "Загрузить предыдущие сообщения",
+   "id": "Muat pesan sebelumnya"
+  },
+  "Jump to latest": {
+   "zh-Hans": "跳到最新",
+   "hi": "नवीनतम पर जाएँ",
+   "es": "Ir a lo más reciente",
+   "ar": "الانتقال إلى الأحدث",
+   "fr": "Aller au plus récent",
+   "bn": "সর্বশেষে যান",
+   "pt-BR": "Ir para o mais recente",
+   "ru": "К последним",
+   "id": "Lompat ke terbaru"
+  },
+  "Settings for {name}": {
+   "zh-Hans": "{name} 的设置",
+   "hi": "{name} की सेटिंग्स",
+   "es": "Ajustes de {name}",
+   "ar": "إعدادات {name}",
+   "fr": "Réglages de {name}",
+   "bn": "{name}-এর সেটিংস",
+   "pt-BR": "Ajustes de {name}",
+   "ru": "Настройки {name}",
+   "id": "Pengaturan {name}"
+  },
+  "Each message is a task for {name}.": {
+   "zh-Hans": "每条消息都是给 {name} 的一项任务。",
+   "hi": "हर संदेश {name} के लिए एक काम है।",
+   "es": "Cada mensaje es una tarea para {name}.",
+   "ar": "كل رسالة مهمة لـ {name}.",
+   "fr": "Chaque message est une tâche pour {name}.",
+   "bn": "প্রতিটি বার্তা {name}-এর জন্য একটি কাজ।",
+   "pt-BR": "Cada mensagem é uma tarefa para {name}.",
+   "ru": "Каждое сообщение — задача для {name}.",
+   "id": "Setiap pesan adalah tugas untuk {name}."
+  },
+  "Search agents and actions": {
+   "zh-Hans": "搜索智能体和操作",
+   "hi": "एजेंट और कार्य खोजें",
+   "es": "Buscar agentes y acciones",
+   "ar": "ابحث عن الوكلاء والإجراءات",
+   "fr": "Chercher des agents et des actions",
+   "bn": "এজেন্ট ও কাজ খুঁজুন",
+   "pt-BR": "Buscar agentes e ações",
+   "ru": "Поиск агентов и действий",
+   "id": "Cari agen dan tindakan"
+  },
+  "Go to {name}": {
+   "zh-Hans": "前往 {name}",
+   "hi": "{name} पर जाएँ",
+   "es": "Ir a {name}",
+   "ar": "الانتقال إلى {name}",
+   "fr": "Aller à {name}",
+   "bn": "{name}-এ যান",
+   "pt-BR": "Ir para {name}",
+   "ru": "Перейти к {name}",
+   "id": "Buka {name}"
+  },
+  "Pause {name}": {
+   "zh-Hans": "暂停 {name}",
+   "hi": "{name} को रोकें",
+   "es": "Pausar a {name}",
+   "ar": "إيقاف {name} مؤقتًا",
+   "fr": "Mettre {name} en pause",
+   "bn": "{name}-কে বিরতি দিন",
+   "pt-BR": "Pausar {name}",
+   "ru": "Приостановить {name}",
+   "id": "Jeda {name}"
+  },
+  "Resume {name}": {
+   "zh-Hans": "恢复 {name}",
+   "hi": "{name} को फिर शुरू करें",
+   "es": "Reanudar a {name}",
+   "ar": "استئناف {name}",
+   "fr": "Reprendre {name}",
+   "bn": "{name}-কে আবার চালু করুন",
+   "pt-BR": "Retomar {name}",
+   "ru": "Возобновить {name}",
+   "id": "Lanjutkan {name}"
+  },
+  "New goal for {name}…": {
+   "zh-Hans": "为 {name} 设定新目标…",
+   "hi": "{name} के लिए नया लक्ष्य…",
+   "es": "Nuevo objetivo para {name}…",
+   "ar": "هدف جديد لـ {name}…",
+   "fr": "Nouvel objectif pour {name}…",
+   "bn": "{name}-এর জন্য নতুন লক্ষ্য…",
+   "pt-BR": "Nova meta para {name}…",
+   "ru": "Новая цель для {name}…",
+   "id": "Tujuan baru untuk {name}…"
+  },
+  "Nothing matches": {
+   "zh-Hans": "没有匹配项",
+   "hi": "कुछ नहीं मिला",
+   "es": "No hay coincidencias",
+   "ar": "لا توجد نتائج",
+   "fr": "Aucun résultat",
+   "bn": "কিছুই মেলেনি",
+   "pt-BR": "Nada encontrado",
+   "ru": "Ничего не найдено",
+   "id": "Tidak ada yang cocok"
+  },
+  "Dictate": {
+   "zh-Hans": "听写",
+   "hi": "बोलकर लिखें",
+   "es": "Dictar",
+   "ar": "إملاء",
+   "fr": "Dicter",
+   "bn": "বলে লিখুন",
+   "pt-BR": "Ditar",
+   "ru": "Диктовать",
+   "id": "Dikte"
+  },
+  "Stop dictating": {
+   "zh-Hans": "停止听写",
+   "hi": "बोलकर लिखना बंद करें",
+   "es": "Dejar de dictar",
+   "ar": "إيقاف الإملاء",
+   "fr": "Arrêter la dictée",
+   "bn": "বলে লেখা থামান",
+   "pt-BR": "Parar de ditar",
+   "ru": "Остановить диктовку",
+   "id": "Hentikan dikte"
+  },
+  "Writing it down…": {
+   "zh-Hans": "正在转成文字…",
+   "hi": "लिखा जा रहा है…",
+   "es": "Escribiéndolo…",
+   "ar": "جارٍ تدوينه…",
+   "fr": "Transcription…",
+   "bn": "লেখা হচ্ছে…",
+   "pt-BR": "Escrevendo…",
+   "ru": "Записываю…",
+   "id": "Sedang dituliskan…"
+  },
+  "Dictation needs Coucou's voice model. Download it in Settings → Recognition.": {
+   "zh-Hans": "听写需要 Coucou 的语音模型。请在 设置 → 识别 中下载。",
+   "hi": "बोलकर लिखने के लिए Coucou का वॉइस मॉडल चाहिए। इसे सेटिंग्स → पहचान में डाउनलोड करें।",
+   "es": "El dictado necesita el modelo de voz de Coucou. Descárgalo en Ajustes → Reconocimiento.",
+   "ar": "يحتاج الإملاء إلى نموذج الصوت في Coucou. نزّله من الإعدادات ← التعرّف.",
+   "fr": "La dictée a besoin du modèle vocal de Coucou. Téléchargez-le dans Réglages → Reconnaissance.",
+   "bn": "বলে লেখার জন্য Coucou-র ভয়েস মডেল দরকার। সেটিংস → রিকগনিশন থেকে এটি ডাউনলোড করুন।",
+   "pt-BR": "O ditado precisa do modelo de voz do Coucou. Baixe-o em Ajustes → Reconhecimento.",
+   "ru": "Для диктовки нужна голосовая модель Coucou. Скачайте её в Настройки → Распознавание.",
+   "id": "Dikte memerlukan model suara Coucou. Unduh di Pengaturan → Pengenalan."
+  },
+  "Couldn't open the microphone: {error}": {
+   "zh-Hans": "无法打开麦克风：{error}",
+   "hi": "माइक्रोफ़ोन नहीं खुल सका: {error}",
+   "es": "No se pudo abrir el micrófono: {error}",
+   "ar": "تعذّر فتح الميكروفون: {error}",
+   "fr": "Impossible d'ouvrir le micro : {error}",
+   "bn": "মাইক্রোফোন খোলা গেল না: {error}",
+   "pt-BR": "Não foi possível abrir o microfone: {error}",
+   "ru": "Не удалось открыть микрофон: {error}",
+   "id": "Tidak dapat membuka mikrofon: {error}"
+  },
+  "Couldn't write it down: {error}": {
+   "zh-Hans": "无法转成文字：{error}",
+   "hi": "लिखा नहीं जा सका: {error}",
+   "es": "No se pudo escribir: {error}",
+   "ar": "تعذّر تدوينه: {error}",
+   "fr": "Impossible de transcrire : {error}",
+   "bn": "লেখা গেল না: {error}",
+   "pt-BR": "Não foi possível escrever: {error}",
+   "ru": "Не удалось записать: {error}",
+   "id": "Tidak dapat dituliskan: {error}"
+  },
+  "Minimize": {
+   "zh-Hans": "最小化",
+   "hi": "छोटा करें",
+   "es": "Minimizar",
+   "ar": "تصغير",
+   "fr": "Réduire",
+   "bn": "ছোট করুন",
+   "pt-BR": "Minimizar",
+   "ru": "Свернуть",
+   "id": "Perkecil"
+  },
+  "Maximize": {
+   "zh-Hans": "最大化",
+   "hi": "बड़ा करें",
+   "es": "Maximizar",
+   "ar": "تكبير",
+   "fr": "Agrandir",
+   "bn": "বড় করুন",
+   "pt-BR": "Maximizar",
+   "ru": "Развернуть",
+   "id": "Perbesar"
+  },
+  "Restore": {
+   "zh-Hans": "还原",
+   "hi": "पहले जैसा करें",
+   "es": "Restaurar",
+   "ar": "استعادة",
+   "fr": "Restaurer",
+   "bn": "আগের আকারে ফেরান",
+   "pt-BR": "Restaurar",
+   "ru": "Восстановить",
+   "id": "Pulihkan"
   }
  }
 }

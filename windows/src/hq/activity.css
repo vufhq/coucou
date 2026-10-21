@@ -1,0 +1,228 @@
+/* Coucou HQ: Activity, every agent's tasks in the middle pane. */
+
+.hq-act-header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--hq-line);
+  flex: 0 0 auto;
+}
+
+.hq-act-title {
+  margin: 0;
+  font: 600 16px var(--font);
+  color: var(--hq-text);
+}
+
+/* ── Chips and search ────────────────────────────────────────────────────── */
+
+.hq-act-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 8px;
+  flex: 0 0 auto;
+}
+
+.hq-act-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hq-act-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--hq-line);
+  border-radius: 15px;
+  background: transparent;
+  color: var(--hq-body);
+  font: 500 13px var(--font);
+  cursor: default;
+}
+
+.hq-act-chip:hover {
+  background: var(--hq-hover);
+}
+
+.hq-act-chip.on {
+  border-color: transparent;
+  background: var(--hq-text);
+  color: var(--hq-bg);
+}
+
+.hq-act-count {
+  font-size: 11.5px;
+  color: var(--hq-secondary);
+}
+
+.hq-act-chip.on .hq-act-count {
+  color: var(--hq-muted);
+}
+
+.hq-act-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 220px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: var(--hq-raised);
+  color: var(--hq-secondary);
+}
+
+.hq-act-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--hq-text);
+  font: 400 13px var(--font);
+}
+
+.hq-act-search-input::placeholder {
+  color: var(--hq-muted);
+}
+
+.hq-act-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* ── The list ────────────────────────────────────────────────────────────── */
+
+.hq-act-list {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 14px 20px;
+}
+
+.hq-act-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--hq-text);
+  text-align: start;
+  cursor: default;
+}
+
+.hq-act-row:hover {
+  background: var(--hq-hover);
+}
+
+.hq-act-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--hq-line);
+}
+
+.hq-act-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.hq-act-head,
+.hq-act-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hq-act-name {
+  font: 600 14px var(--font);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hq-act-from {
+  flex: 0 0 auto;
+  font: 400 12px var(--font);
+  color: var(--hq-muted);
+}
+
+.hq-act-time {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  font: 400 12px var(--font);
+  color: var(--hq-secondary);
+}
+
+.hq-act-prompt {
+  flex: 1;
+  min-width: 0;
+  font: 400 13px var(--font);
+  color: var(--hq-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hq-act-status {
+  flex: 0 0 auto;
+  font: 500 12px var(--font);
+  color: var(--hq-secondary);
+}
+
+.hq-act-status.working {
+  color: var(--hq-green);
+}
+
+.hq-act-status.needs {
+  color: var(--hq-accent);
+}
+
+.hq-act-status.failed {
+  color: var(--hq-red);
+}
+
+.hq-act-status.done {
+  color: var(--hq-muted);
+}
+
+.hq-act-note {
+  padding: 32px 12px;
+  font-size: 13px;
+  color: var(--hq-secondary);
+  text-align: center;
+}
+
+.hq-act-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 12px;
+  font-size: 13px;
+  color: var(--hq-red);
+  text-align: center;
+}
+
+.hq-act-error.inline {
+  padding: 8px 10px;
+  align-items: flex-start;
+  font-size: 12.5px;
+}
+
+.hq-act-more {
+  display: block;
+  margin: 12px auto 0;
+}

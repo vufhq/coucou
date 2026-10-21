@@ -209,6 +209,31 @@ describe("phase 7 teams", () => {
     const coworkers = r.backend.store.agents().filter((agent) => agent.kind === "coworker");
     expect(coworkers.map((agent) => agent.id)).toEqual(["builder", "builder-2"]);
     expect(new Set(coworkers.map((agent) => agent.color)).size).toBe(2);
+    // One shared computer: the proposal's computerId is ignored.
+    expect(coworkers.map((agent) => agent.computerId)).toEqual(["agent-01", "agent-01"]);
+  });
+
+  it("moves every agent off a computer dropped from ORCH_AGENTS at startup, and lists only configured computers", async () => {
+    const dataDir = await tempDir("orch-phase7-");
+    dirs.push(dataDir);
+    const before = await startBackend(dataDir, new PerAgentModel({}), undefined, {}, { agents: ["agent-01", "agent-02"] });
+    const kept = await createAgent(before, { name: "Kept", computerId: "agent-02" });
+    const retired = await createAgent(before, { name: "Gone", computerId: "agent-02" });
+    expect((await before.api(`/api/agents/${retired.id}`, { method: "DELETE" })).status).toBe(200);
+    await before.backend.close();
+
+    const r = await startBackend(dataDir, new PerAgentModel({}), undefined, {}, { agents: ["agent-01"] });
+    running.push(r);
+    expect(r.backend.store.agent(kept.id)).toMatchObject({ computerId: "agent-01", vmId: "test:agent-01" });
+    expect(r.backend.store.agentIncludingRetired(retired.id)?.computerId).toBe("agent-01");
+    const listed = await r.api<any>("/api/agents");
+    expect(listed.body.computers).toEqual([
+      expect.objectContaining({ id: "agent-01", agentIds: ["agent-01", kept.id] }),
+    ]);
+    // The old row stays for history, but can't take new agents.
+    expect(r.backend.store.computer("agent-02")).not.toBeNull();
+    expect((await r.api("/api/agents", { body: { name: "Late", computerId: "agent-02" } })).status).toBe(400);
+    expect((await createAgent(r, { name: "Fresh" })).computerId).toBe("agent-01");
   });
 
   it("delegates on the coworkers' computer one at a time and returns fenced reports to Mochi", async () => {

@@ -256,7 +256,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     const current = store.agent(req.params.id);
     if (!current) return reply.code(404).send({ error: "not_found" });
     if (body.data.teamId && !store.team(body.data.teamId)) return bad(reply, `unknown team ${body.data.teamId}`);
-    if (body.data.computerId && !store.computer(body.data.computerId)) {
+    if (body.data.computerId && !store.isConfiguredComputer(body.data.computerId)) {
       return bad(reply, `unknown computer ${body.data.computerId}`);
     }
     store.setAgentIdentity(req.params.id, body.data);
@@ -269,10 +269,9 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     if (!body.success) return bad(reply, body.error);
     if (store.agents().length >= 12) return reply.code(409).send({ error: "too_many_agents" });
     if (body.data.teamId && !store.team(body.data.teamId)) return bad(reply, `unknown team ${body.data.teamId}`);
-    const computerId =
-      body.data.computerId ??
-      store.computers().sort((a, b) => a.agentIds.length - b.agentIds.length || a.id.localeCompare(b.id))[0]?.id;
-    if (!computerId || !store.computer(computerId)) return bad(reply, `unknown computer ${String(computerId)}`);
+    // One shared computer: a new agent goes on the first configured one.
+    const computerId = body.data.computerId ?? store.defaultComputerId();
+    if (!computerId || !store.isConfiguredComputer(computerId)) return bad(reply, `unknown computer ${String(computerId)}`);
     const agent = store.createAgent({
       ...body.data,
       computerId,

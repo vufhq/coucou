@@ -318,6 +318,8 @@ export const AGENT_COLORS = [
 
 export class Store {
   readonly db: DatabaseSync;
+  /** The computers ORCH_AGENTS names, in order; null lists every known one. */
+  private configured: string[] | null = null;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -387,9 +389,39 @@ export class Store {
     };
   }
 
+  /**
+   * Startup: the configured computers become the only ones listed, and every
+   * agent (retired ones too) on a computer that is no longer configured moves
+   * to the first one. The old rows stay, since history may point at them.
+   * Returns how many agents moved.
+   */
+  useComputers(computers: readonly { id: string; vmId: string }[]): number {
+    const first = computers[0];
+    if (!first) throw new Error("at least one computer is required");
+    for (const computer of computers) this.ensureComputer(computer);
+    this.configured = computers.map((computer) => computer.id);
+    const marks = this.configured.map(() => "?").join(", ");
+    const result = this.db
+      .prepare(`UPDATE agents SET computer_id = ?, vm_id = ? WHERE computer_id IS NULL OR computer_id NOT IN (${marks})`)
+      .run(first.id, first.vmId, ...this.configured);
+    return Number(result.changes);
+  }
+
+  /** Whether the computer is one the user configured (any known one before startup). */
+  isConfiguredComputer(id: string): boolean {
+    return this.configured ? this.configured.includes(id) : this.computer(id) !== null;
+  }
+
+  /** Where new agents go: the first configured computer. */
+  defaultComputerId(): string | null {
+    return this.configured?.[0] ?? this.computers()[0]?.id ?? null;
+  }
+
   computers(): ComputerRow[] {
-    return (this.db.prepare("SELECT id FROM computers ORDER BY rowid").all() as Row[])
-      .map((row) => this.computer(String(row.id)))
+    const ids = this.configured ??
+      (this.db.prepare("SELECT id FROM computers ORDER BY rowid").all() as Row[]).map((row) => String(row.id));
+    return ids
+      .map((id) => this.computer(id))
       .filter((computer): computer is ComputerRow => computer !== null);
   }
 

@@ -715,6 +715,46 @@ pub async fn orchestrator_chat_history(app: AppHandle, agent_id: String) -> Resu
     api(&app, Method::GET, &path, None).await
 }
 
+/// Where a task can come from, as the backend names it.
+const SOURCES: [&str; 4] = ["chat", "delegated", "goal", "user"];
+
+/// The `/api/tasks` query for a filtered list. Pure, so it is tested below.
+fn tasks_query(
+    agent_id: Option<&str>,
+    source: Option<&str>,
+    parent_task_id: Option<&str>,
+    limit: Option<u32>,
+) -> Result<String, String> {
+    let mut query = Vec::new();
+    if let Some(agent) = agent_id {
+        query.push(format!("agentId={}", segment(agent)?));
+    }
+    if let Some(source) = source {
+        if source.is_empty() || !source.split(',').all(|s| SOURCES.contains(&s)) {
+            return Err("invalid source".into());
+        }
+        query.push(format!("source={source}"));
+    }
+    if let Some(parent) = parent_task_id {
+        query.push(format!("parentTaskId={}", segment(parent)?));
+    }
+    query.push(format!("limit={}", limit.unwrap_or(50).clamp(1, 200)));
+    Ok(format!("/api/tasks?{}", query.join("&")))
+}
+
+/// Tasks filtered by agent, source and parent (Coucou HQ's threads).
+#[tauri::command]
+pub async fn orchestrator_list_tasks(
+    app: AppHandle,
+    agent_id: Option<String>,
+    source: Option<String>,
+    parent_task_id: Option<String>,
+    limit: Option<u32>,
+) -> Result<Value, String> {
+    let path = tasks_query(agent_id.as_deref(), source.as_deref(), parent_task_id.as_deref(), limit)?;
+    api(&app, Method::GET, &path, None).await
+}
+
 fn schedule(raw: &Value) -> Result<Value, String> {
     let kind = raw.get("kind").and_then(Value::as_str).ok_or("invalid schedule")?;
     match kind {
@@ -854,6 +894,22 @@ mod tests {
 
     fn event(kind: &str, payload: Value) -> Value {
         json!({ "v": 1, "seq": 7, "type": kind, "taskId": "t-1", "agentId": "agent-01", "payload": payload })
+    }
+
+    #[test]
+    fn a_task_list_query_only_carries_checked_filters() {
+        assert_eq!(tasks_query(None, None, None, None).unwrap(), "/api/tasks?limit=50");
+        assert_eq!(
+            tasks_query(Some("agent-01"), Some("chat,delegated"), Some("t_1"), Some(200)).unwrap(),
+            "/api/tasks?agentId=agent-01&source=chat,delegated&parentTaskId=t_1&limit=200"
+        );
+        assert_eq!(tasks_query(None, Some("goal"), None, Some(5000)).unwrap(), "/api/tasks?source=goal&limit=200");
+        assert_eq!(tasks_query(None, None, None, Some(0)).unwrap(), "/api/tasks?limit=1");
+        assert!(tasks_query(Some("a&b=c"), None, None, None).is_err());
+        assert!(tasks_query(None, Some("chat,evil"), None, None).is_err());
+        assert!(tasks_query(None, Some(""), None, None).is_err());
+        assert!(tasks_query(None, Some("chat,"), None, None).is_err());
+        assert!(tasks_query(None, None, Some("../x"), None).is_err());
     }
 
     #[test]
