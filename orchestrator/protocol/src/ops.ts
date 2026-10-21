@@ -38,6 +38,8 @@ const Member = z
     color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
     outfit: AgentOutfit.optional(),
     persona: z.string().trim().min(1).max(1_000),
+    // Ignored: every agent shares one computer. Still accepted so a reply
+    // that names one doesn't fail to parse.
     computerId: AgentId.optional(),
   })
   .strict();
