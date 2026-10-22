@@ -67,6 +67,8 @@ export const Job = z.object({
   op: WorkerOpName,
   args: z.record(z.string(), z.unknown()),
   deadlineMs: z.number().int().positive(),
+  /** The agent the task belongs to (not the computer): its own folder is `~`. */
+  agentId: AgentId.optional(),
 });
 export type Job = z.infer<typeof Job>;
 

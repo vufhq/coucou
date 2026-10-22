@@ -797,7 +797,9 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       ? t("Daily limit reached")
       : task.waitingReason === "agent_paused"
         ? t("Paused")
-        : "";
+        : task.waitingReason === "computer_offline"
+          ? t("Waiting for its computer")
+          : "";
     detailEl.append(
       h("h2", { text: task.prompt }),
       h("span", {

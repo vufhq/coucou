@@ -86,7 +86,7 @@ export const Task = z.object({
   parentTaskId: z.string().nullable(),
   goalId: z.string().nullable(),
   question: TaskQuestion.nullable(),
-  waitingReason: z.enum(["agent_paused", "daily_limit"]).nullable(),
+  waitingReason: z.enum(["agent_paused", "daily_limit", "computer_offline"]).nullable(),
   modelProfileId: z.string(),
   workspace: z.string(),
   budget: Budget,

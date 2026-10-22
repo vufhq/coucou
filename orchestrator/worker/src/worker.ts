@@ -21,10 +21,11 @@ import type { Journal } from "./journal.ts";
 import { PathError, ensureTaskDir } from "./paths.ts";
 import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } from "./ops/browser.ts";
 import { fetchFile, listFiles, readText, writeArtifact } from "./ops/fs.ts";
+import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.2.0";
+export const WORKER_VERSION = "0.3.0";
 
 const HEALTH_EVERY_MS = 60_000;
 const PRUNE_EVERY_MS = 6 * 60 * 60_000;
@@ -34,6 +35,8 @@ export interface OpContext {
   jobId: string;
   /** The task's folder, real path. */
   dir: string;
+  /** The agent's own folder on the computer, kept between tasks (`~` in a shell). */
+  home: string;
   deadlineMs: number;
   signal: AbortSignal;
   report(type: WorkerEvent["type"], payload: Record<string, unknown>): void;
@@ -52,6 +55,13 @@ export interface WorkerOptions {
   journal: Journal;
   browser: BrowserDriver;
   workspace: string;
+  /**
+   * The computer's shared folder, where task folders live so the runner can
+   * work in them (/computer in the VM). Defaults to the workspace.
+   */
+  computer?: string;
+  /** Runs terminal.shell commands; without one the operation is refused. */
+  shell?: ShellRunner | null;
   /** How often a running job's lease is renewed. */
   heartbeatMs?: number;
   claimWaitMs?: number;
@@ -67,7 +77,7 @@ export class Worker {
   private prunedAt = 0;
 
   constructor(options: WorkerOptions) {
-    this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, ...options };
+    this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, computer: options.workspace, shell: null, ...options };
   }
 
   stop(): void {
@@ -94,7 +104,7 @@ export class Worker {
   private async prune(): Promise<void> {
     if (Date.now() - this.prunedAt < PRUNE_EVERY_MS) return;
     this.prunedAt = Date.now();
-    const removed = await pruneTaskDirs(this.o.workspace, this.retentionDays).catch(() => []);
+    const removed = await pruneTaskDirs(this.o.computer, this.retentionDays).catch(() => []);
     if (removed.length) this.o.log(`removed ${removed.length} old task folder(s)`);
   }
 
@@ -194,9 +204,10 @@ export class Worker {
     }, this.o.heartbeatMs);
 
     try {
-      const dir = await ensureTaskDir(this.o.workspace, job.taskId);
+      const dir = await ensureTaskDir(this.o.computer, job.taskId);
+      const home = agentHome(this.o.computer, job.agentId ?? this.o.client.agentId);
       const upload = (bytes: Uint8Array) => this.o.client.upload(job.id, bytes);
-      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, deadlineMs: job.deadlineMs, signal: controller.signal, report, upload };
+      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, home, deadlineMs: job.deadlineMs, signal: controller.signal, report, upload };
       const run = this.dispatch(ctx, parsed.op.op, parsed.op.args);
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
@@ -241,6 +252,9 @@ export class Worker {
         return fetchFile(ctx, args as OpArgs<"fs.fetch">);
       case "terminal.run":
         return runCommand(ctx, args as OpArgs<"terminal.run">);
+      case "terminal.shell":
+        if (!this.o.shell) return Promise.reject(new CommandError("this computer has no shell runner"));
+        return runShell(ctx, args as OpArgs<"terminal.shell">, this.o.shell);
       default:
         return Promise.reject(new CommandError(`unsupported operation ${op}`));
     }

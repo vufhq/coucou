@@ -5,6 +5,8 @@
 //   ORCH_AGENT_ID      agent-01
 //   ORCH_BACKEND_URL   optional; default http://<default gateway>:47621
 //   ORCH_WORKSPACE     /workspace
+//   ORCH_COMPUTER      /computer, shared with coucou-runner (task folders, the agents' own folders)
+//   ORCH_RUNNER_SOCKET /run/coucou-runner.sock
 //   $CREDENTIALS_DIRECTORY/worker-token   (or ORCH_WORKER_TOKEN, for development)
 
 import { readFile } from "node:fs/promises";
@@ -12,6 +14,7 @@ import { join } from "node:path";
 import { BackendClient } from "./client.ts";
 import { Journal } from "./journal.ts";
 import { playwrightDriver } from "./ops/browser.ts";
+import { socketShell } from "./ops/shell.ts";
 import { Worker } from "./worker.ts";
 
 /** The default gateway is the Windows host in WSL's NAT mode. */
@@ -44,6 +47,8 @@ const worker = new Worker({
   journal: new Journal(workspace),
   browser,
   workspace,
+  computer: process.env.ORCH_COMPUTER ?? workspace,
+  shell: socketShell(process.env.ORCH_RUNNER_SOCKET ?? "/run/coucou-runner.sock"),
   log: (line) => console.log(`coucou-worker: ${line}`),
 });
 

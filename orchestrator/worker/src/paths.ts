@@ -17,7 +17,8 @@ export function taskDir(workspace: string, taskId: string): string {
 
 export async function ensureTaskDir(workspace: string, taskId: string): Promise<string> {
   const dir = taskDir(workspace, taskId);
-  await mkdir(dir, { recursive: true, mode: 0o750 });
+  // Group-writable: the runner (group `computer`) works in it too.
+  await mkdir(dir, { recursive: true, mode: 0o770 });
   return realpath(dir);
 }
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Coucou computer: the socket the worker sends the agents' commands to
+
+[Socket]
+ListenStream=/run/coucou-runner.sock
+# Only the worker's group may connect; the runner's own commands cannot.
+SocketUser=root
+SocketGroup=agent
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

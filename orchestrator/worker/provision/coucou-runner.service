@@ -1,0 +1,44 @@
+[Unit]
+Description=Coucou computer: runs the agents' shell commands
+Requires=coucou-runner.socket
+After=coucou-runner.socket
+
+[Service]
+# Not the worker's user: what the agents run never sees the worker, its
+# token or its journal. /computer is the computer's disk: task folders, each
+# agent's own folder, and a shared one.
+User=runner
+Group=computer
+WorkingDirectory=/opt/coucou-worker
+Environment=ORCH_COMPUTER=/computer
+ExecStart=/usr/local/bin/node worker/src/runner/main.ts
+Restart=always
+RestartSec=3
+UMask=0007
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/computer
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+# The worker's processes are invisible, and its files, token and settings unreachable.
+ProtectProc=invisible
+InaccessiblePaths=-/workspace -/etc/coucou-worker -/run/credentials -/run/coucou-runner.sock
+# Folders WSL shares between every distro on the PC: other agents, and the
+# sockets of Podman, Docker or WSLg.
+InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+# The internet yes; the user's PC (the WSL gateway runs the backend) and the
+# local network no. 10.255.255.254 is WSL's DNS tunnel.
+IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+IPAddressAllow=localhost 10.255.255.254
+# A runaway build or fork bomb slows the computer, not the PC.
+MemoryMax=75%
+TasksMax=512

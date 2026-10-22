@@ -39,6 +39,8 @@ export function describeTarget(op: Operation): string {
       return String(a.url);
     case "terminal.run":
       return (a.argv as string[]).join(" ");
+    case "terminal.shell":
+      return String(a.command);
     case "fs.write_artifact":
     case "fs.read":
     case "fs.fetch":
@@ -81,8 +83,12 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
       if (!SAFE_COMMANDS.has(bin)) return { verdict: "approve", reason: `${bin} is not on the read-only list` };
       return { verdict: "allow" };
     }
+    // The shell runs as the computer's `runner` user, which cannot reach the
+    // worker, its token, Windows or the local network: the computer is the
+    // boundary, as in rakazo, so code runs without a click. The same shell can
+    // rewrite any file, so an overwrite asks no more either.
+    case "terminal.shell":
     case "fs.write_artifact":
-      return a.overwrite === true ? { verdict: "approve", reason: "overwrites an existing file" } : { verdict: "allow" };
     case "browser.extract_text":
     case "browser.screenshot":
     case "fs.list":

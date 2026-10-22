@@ -39,7 +39,7 @@ export interface OrchTask {
   parentTaskId: string | null;
   goalId: string | null;
   question: { id: string; text: string; options: string[] } | null;
-  waitingReason: "agent_paused" | "daily_limit" | null;
+  waitingReason: "agent_paused" | "daily_limit" | "computer_offline" | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -51,7 +51,7 @@ if (-not $existing) {
 Invoke-Checked "Copying the worker into $Name" {
   # Through cmd.exe: Windows PowerShell would turn the tar stream into text.
   $unpack = "rm -rf /opt/coucou-worker.new && mkdir -p /opt/coucou-worker.new && tar -C /opt/coucou-worker.new -xf - && mkdir -p /opt/coucou-worker && cp -a /opt/coucou-worker.new/. /opt/coucou-worker/ && rm -rf /opt/coucou-worker.new"
-  cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=tests -cf - . | wsl.exe -d $Name -u root --exec sh -c `"$unpack`""
+  cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=.env --exclude=tests -cf - . | wsl.exe -d $Name -u root --exec sh -c `"$unpack`""
 }
 
 Invoke-Checked "Setting up $Name (this takes a few minutes the first time)" {
@@ -67,7 +67,7 @@ Invoke-Checked "Handing the worker its token" {
 }
 
 Invoke-Checked "Restarting $Name" { wsl.exe --terminate $Name }
-Invoke-Checked "Starting the worker" { wsl.exe -d $Name -u root --exec systemctl restart coucou-worker.service }
+Invoke-Checked "Starting the worker" { wsl.exe -d $Name -u root --exec systemctl restart coucou-runner.socket coucou-worker.service }
 
 Write-Host ""
 Write-Host "$Name is ready."
@@ -76,3 +76,4 @@ if ($Name -ne "agent-01") {
 }
 Write-Host "Start the backend with: npm start   (in $root)"
 Write-Host "Worker log: wsl -d $Name -u root --exec journalctl -u coucou-worker -n 50"
+Write-Host "Shell log:  wsl -d $Name -u root --exec journalctl -u coucou-runner -n 50"
