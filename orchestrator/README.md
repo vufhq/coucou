@@ -202,6 +202,12 @@ both limits per agent. Once either limit is reached, queued work remains visible
 with `waitingReason: "daily_limit"` and starts after local midnight; a running
 step is allowed to finish first.
 
+When the computer goes offline (VM stopped, PC asleep) while a task's operation
+waits for it, the task stays running with `waitingReason: "computer_offline"`
+and goes on when the worker is back. That wait does not use the timeout budget
+either. An operation that was already running and is not safe to repeat still
+fails the task as `worker_lost`.
+
 ## Memory
 
 Agents can keep up to 50 short notes, and the user can add or remove notes in

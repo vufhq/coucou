@@ -469,10 +469,14 @@ export class Runner {
         await this.waitForPoke(taskId, this.options.pollMs * 30);
         continue;
       }
+      // The computer went away (VM stopped, PC asleep) with an operation for
+      // it pending: the task waits for it, and that wait does not count
+      // against its time budget.
+      this.store.setWaitingForComputer(
+        task.id,
+        this.openJob(task.id) !== null && this.store.agent(task.agentId)?.status === "offline",
+      );
       if (this.activeMs(task) > task.budget.timeoutMs) {
-        if (this.store.agent(task.agentId)?.status === "offline") {
-          return this.fail(task, "worker_lost", "the task ran out of time while the agent's computer was offline");
-        }
         return this.fail(task, "timeout", "the task ran out of time");
       }
 

@@ -4725,6 +4725,17 @@
    "ru": "Достигнут дневной лимит",
    "id": "Batas harian tercapai"
   },
+  "Waiting for its computer": {
+   "zh-Hans": "等待其电脑",
+   "hi": "अपने कंप्यूटर की प्रतीक्षा",
+   "es": "Esperando a su ordenador",
+   "ar": "بانتظار حاسوبه",
+   "fr": "En attente de son ordinateur",
+   "bn": "নিজের কম্পিউটারের অপেক্ষায়",
+   "pt-BR": "Aguardando o computador",
+   "ru": "Ждёт свой компьютер",
+   "id": "Menunggu komputernya"
+  },
   "Waiting for answer": {
    "zh-Hans": "等待回答",
    "hi": "जवाब की प्रतीक्षा",

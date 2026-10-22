@@ -238,6 +238,29 @@ describe("reliability", () => {
     expect(events.at(-1)).toMatchObject({ type: "task.failed", payload: { reason: "timeout" } });
   }, 20_000);
 
+  it("waits for an offline computer without spending the task's time budget", async () => {
+    const { r, workspace } = await setup([act("fs.write_artifact", { path: "a.md", content: "x" }), done("saved")]);
+    await waitFor(() => r.backend.store.computer("agent-01")?.status === "ready", 5_000, "the worker to connect");
+    workers[0]!.stop();
+    workers = [];
+    await new Promise((resolve) => setTimeout(resolve, 500)); // its last claim poll ends
+    r.backend.store.setComputerStatus("agent-01", "offline");
+    const task = await submit(r, "write a file", { budget: { timeoutMs: 10_000, opTimeoutMs: 60_000 } });
+    await waitFor(
+      () => r.backend.store.task(task.id)?.waitingReason === "computer_offline",
+      5_000,
+      "the task to wait for its computer",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 11_000));
+    expect(r.backend.store.task(task.id)).toMatchObject({ status: "running", waitingReason: "computer_offline" });
+
+    const { worker } = startWorker(workspace, r.workerPort, new FakeBrowser());
+    workers.push(worker);
+    const events = await taskEnd(r, task.id);
+    expect(events.at(-1)?.type).toBe("task.completed");
+    expect(r.backend.store.task(task.id)?.waitingReason).toBeNull();
+  }, 30_000);
+
   it("never re-runs a write whose worker vanished: the task fails as worker_lost", async () => {
     const { r } = await setup([act("fs.write_artifact", { path: "a.md", content: "x" })]);
     workers[0]!.stop(); // No live worker; we play a dead one instead.

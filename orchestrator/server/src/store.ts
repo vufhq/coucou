@@ -877,11 +877,12 @@ export class Store {
 
   setTaskStatus(id: string, status: TaskStatus): void {
     const row = this.db
-      .prepare("SELECT status, inactive_since, inactive_ms FROM tasks WHERE id = ?")
+      .prepare("SELECT status, inactive_since, inactive_ms, waiting_reason FROM tasks WHERE id = ?")
       .get(id) as Row | undefined;
     if (!row) return;
     const t = now();
-    const wasInactive = row.status === "paused" || row.status === "waiting_for_answer" || row.status === "waiting_for_agents";
+    const wasInactive = row.status === "paused" || row.status === "waiting_for_answer" ||
+      row.status === "waiting_for_agents" || row.waiting_reason === "computer_offline";
     const isInactive = status === "paused" || status === "waiting_for_answer" || status === "waiting_for_agents";
     let inactiveMs = Number(row.inactive_ms ?? 0);
     if (wasInactive && !isInactive && row.inactive_since) {
@@ -893,10 +894,30 @@ export class Store {
       .prepare(
         `UPDATE tasks
          SET status = ?, updated_at = ?, started_at = COALESCE(started_at, ?),
-             inactive_ms = ?, inactive_since = ?
+             inactive_ms = ?, inactive_since = ?,
+             waiting_reason = CASE WHEN waiting_reason = 'computer_offline' THEN NULL ELSE waiting_reason END
          WHERE id = ?`,
       )
       .run(status, t, startedAt, inactiveMs, inactiveSince, id);
+  }
+
+  /**
+   * A running task whose pending operation waits for an offline computer.
+   * That time is not active time, like a pause. Idempotent.
+   */
+  setWaitingForComputer(id: string, waiting: boolean): void {
+    const row = this.db
+      .prepare("SELECT status, waiting_reason, inactive_ms, inactive_since FROM tasks WHERE id = ?")
+      .get(id) as Row | undefined;
+    if (!row || row.status !== "running") return;
+    const was = row.waiting_reason === "computer_offline";
+    if (was === waiting) return;
+    const t = now();
+    let inactiveMs = Number(row.inactive_ms ?? 0);
+    if (was && row.inactive_since) inactiveMs += Math.max(0, Date.parse(t) - Date.parse(String(row.inactive_since)));
+    this.db
+      .prepare("UPDATE tasks SET waiting_reason = ?, inactive_ms = ?, inactive_since = ?, updated_at = ? WHERE id = ?")
+      .run(waiting ? "computer_offline" : null, inactiveMs, waiting ? t : null, t, id);
   }
 
   setWaitingReason(id: string, reason: Task["waitingReason"]): void {
