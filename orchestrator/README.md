@@ -12,7 +12,8 @@ Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend
                                                                  policy · model router (Claude Code / Cursor CLIs)
                                                                      ▲ worker pulls jobs (WSL interface :47621)
                                                        computers agent-01, agent-02… (one WSL2 distro each, Ubuntu 24.04)
-                                                       coucou-worker · browser (Playwright/Chromium) · files · terminal
+                                                       coucou-worker · browser (Playwright/Chromium) · files
+                                                       coucou-runner · the agents' bash shell, as another user, in /computer
 ```
 
 ## Mochi and the team
@@ -39,6 +40,34 @@ wait 20 times.
 The model proposes one operation at a time. The backend's policy decides:
 run it, ask you, or refuse. The worker in the VM checks it again and runs it.
 The model never gets host access, credentials or control over the VM.
+
+## The computer
+
+Agents run code on their computer, as rakazo's bots do (structure only, no code
+taken): `terminal.shell` is a real `bash -lc` command line, with pipes,
+scripts, installs and servers, and it needs no click. The computer is the
+boundary, not each command.
+
+- Commands run as `runner`, a second user with no sudo, in the
+  `coucou-runner` service. The worker hands it each command over a socket only
+  the worker's group can open. `runner` can't see the worker's processes, its
+  token, its journal or `/workspace`.
+- `/computer` is the computer's disk, kept across tasks and updates:
+  `tasks/<id>` is each task's folder (what you see and download, where a
+  command starts), `agents/<agent>` is each agent's own folder and `~` in its
+  shell, and `shared/` is shared by the team. As in rakazo, these folders keep
+  work tidy but are not walls between agents: they all share one computer.
+- Installed: python3, uv, node, npm, git, curl, a C compiler. No apt. Python
+  packages go in a venv (`uv venv`, `uv pip install`), tools in
+  `~/.local/bin` (`uv tool install`).
+- The internet is open. Your PC (the WSL gateway, where the backend listens)
+  and the local network are closed (`IPAddressDeny`), except WSL's DNS tunnel.
+- A command stops after `timeoutSec` (120 s by default, 600 at most), with
+  everything it started. A server started with `&` doesn't hold the command
+  and keeps running. The runner may use at most 75 % of the VM's memory and
+  512 processes.
+- Output streams live to Coucou; the model gets the exit code and the last
+  64 KB.
 
 ## Layout
 
@@ -85,8 +114,9 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    `D:\coucou-vms\agent-01`. Pass `-Location` to put it somewhere else. It then
    installs Node, Chromium and the worker, and restarts the distro. To update
    the worker later, run the same command with `-Update`. The disk and
-   `/workspace` are kept. (After a backend update that changes the worker, as
-   0.2 did for downloads and health reports, run `-Update` once.)
+   `/workspace` and `/computer` are kept. (After a backend update that changes
+   the worker, as 0.2 did for downloads and health reports and 0.3 for the
+   shell, run `-Update` once.)
 
    **One shared computer.** Every agent shares `agent-01`, so `ORCH_AGENTS`
    should name only it:
@@ -228,16 +258,19 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 
 - **Operations** are an allowlist (`protocol/src/ops.ts`): navigate, extract
   text and take a screenshot in the browser; write, list and read files in the
-  task's folder; run one command with no shell.
+  task's folder; run bash command lines on the computer (`terminal.shell`, see
+  The computer). The older `terminal.run` (one command, no shell, as the
+  worker's user) keeps its rules, so an outdated worker never runs free code.
+- **Runs without a click:** shell commands and writing or overwriting files.
 - **Needs your click:** the first visit to a site (approving it remembers the
-  site), commands that aren't read-only, installing software, and overwriting a
-  file. Coucou never approves on its own.
+  site), and creating or retiring an agent. Coucou never approves on its own.
 - **Always refused:** the host machine, the LAN, cloud metadata, URLs with
   credentials, and paths or command arguments that leave the task folder.
   Symlinks are not followed.
 - **The VM:** no Windows drives, no Windows programs (`wsl.conf`). The worker
   runs as `agent`, a user with no sudo, under systemd with `NoNewPrivileges`
-  and `ProtectSystem=strict`. It may write to `/workspace` only.
+  and `ProtectSystem=strict`. It may write to `/workspace` and `/computer`
+  only. What the agents run is the `runner` user's (see The computer).
 - **Secrets:** tokens live in the Credential Manager and in a root-only file
   in the VM. Every event and job result is redacted before it is stored,
   streamed, or shown to the model. Both model CLIs run so that they can only
@@ -304,6 +337,10 @@ npm run typecheck
 - Each computer does one task at a time; at most `ORCH_MAX_PARALLEL` computers work at once.
 - At most 12 live character agents share the computer, so their tasks queue.
 - All agents share WSL's memory (half the PC's by default) and your plan's limits.
+- Shell commands need worker 0.3 and its runner: run `provision.ps1 -Update`
+  once. An older worker answers that it doesn't know the operation.
+- Packages installed outside `/computer` don't exist (no apt); ask for them in
+  `setup.sh`.
 - Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
   with `provision.ps1 -Update`.
 - After you approve a site, redirects to another site are followed without asking.

@@ -139,7 +139,11 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
       const job = store.claimJob(agentId, deps.leaseMs);
       if (job) {
         setStatus(agentId, "busy");
-        return { job: { id: job.id, taskId: job.taskId, op: job.op, args: job.args, deadlineMs: job.deadlineMs }, cancel };
+        const owner = store.task(job.taskId)?.agentId;
+        return {
+          job: { id: job.id, taskId: job.taskId, op: job.op, args: job.args, deadlineMs: job.deadlineMs, ...(owner ? { agentId: owner } : {}) },
+          cancel,
+        };
       }
       setStatus(agentId, "ready");
       if (cancel.length > 0 || closed || Date.now() >= until) return { job: null, cancel };

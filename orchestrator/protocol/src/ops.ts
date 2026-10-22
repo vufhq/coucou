@@ -16,7 +16,11 @@ export const RelPath = z
   .regex(/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/, "relative path of letters, digits, . _ -")
   .refine((p) => p.split("/").every((seg) => seg !== ".." && seg !== "." && !seg.startsWith(".")), "no . or .. segments");
 
-export const HttpUrl = z.url({ protocol: /^https?$/, error: "http or https URL" }).max(2_000);
+/** How long a shell command may run, unless the model asks for less or more. */
+export const SHELL_DEFAULT_TIMEOUT_SEC = 120;
+export const SHELL_MAX_TIMEOUT_SEC = 600;
+
+export const HttpUrl =z.url({ protocol: /^https?$/, error: "http or https URL" }).max(2_000);
 
 export const WORKER_OPS = {
   "browser.navigate": z.object({ url: HttpUrl }).strict(),
@@ -29,6 +33,21 @@ export const WORKER_OPS = {
   "fs.read": z.object({ path: RelPath }).strict(),
   "fs.fetch": z.object({ path: RelPath }).strict(),
   "terminal.run": z.object({ argv: z.array(z.string().min(1).max(1_000)).min(1).max(32) }).strict(),
+  // A bash command line on the shared computer, as its sandboxed `runner`
+  // user. `cwd` is a folder under the task folder, or `~/…` for the agent's
+  // own folder that outlives the task.
+  "terminal.shell": z
+    .object({
+      command: z.string().min(1).max(8_000),
+      cwd: z
+        .string()
+        .max(200)
+        .regex(/^(?:~|~\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*|[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*)$/, "a folder in the task folder, or ~/…")
+        .refine((p) => p.split("/").every((seg) => seg !== ".." && seg !== "."), "no . or .. segments")
+        .optional(),
+      timeoutSec: z.number().int().min(1).max(SHELL_MAX_TIMEOUT_SEC).optional(),
+    })
+    .strict(),
 } as const;
 
 const Member = z

@@ -1,7 +1,7 @@
 [Unit]
 Description=Coucou orchestrator worker
 After=network-online.target
-Wants=network-online.target
+Wants=network-online.target coucou-runner.socket
 
 [Service]
 User=agent
@@ -10,6 +10,9 @@ WorkingDirectory=/opt/coucou-worker
 # ORCH_AGENT_ID: which agent this VM is, written by setup.sh.
 EnvironmentFile=/etc/coucou-worker/agent.env
 Environment=ORCH_WORKSPACE=/workspace
+# Task folders live on the computer's disk, shared with coucou-runner, which
+# runs the agents' shell commands as another user.
+Environment=ORCH_COMPUTER=/computer
 Environment=HOME=/workspace/.coucou/home
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/coucou-worker/browsers
 # The token file is root-only; systemd hands this service a private copy.
@@ -18,10 +21,12 @@ ExecStart=/usr/local/bin/node worker/src/main.ts
 Restart=always
 RestartSec=3
 
-# The worker and everything it runs may write to /workspace and nowhere else.
+# The worker may write to /workspace (its own) and /computer, nowhere else.
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/workspace
+ReadWritePaths=/workspace /computer
+# Files it creates on the computer stay writable by the runner (group computer).
+UMask=0007
 # Folders WSL shares between every distro on the PC: other agents, and the
 # sockets of Podman, Docker or WSLg (whose user ids can equal ours). Never
 # reachable from here.

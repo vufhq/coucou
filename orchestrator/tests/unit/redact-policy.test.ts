@@ -59,9 +59,13 @@ describe("policy", () => {
     expect(decide({ op: "fs.fetch", args: { path: "a.png" } }, ctx).verdict).toBe("deny");
   });
 
-  it("asks before overwriting a file", () => {
+  it("runs shell commands on the computer without a click", () => {
+    expect(decide({ op: "terminal.shell", args: { command: "pip install x && python3 main.py" } }, ctx).verdict).toBe("allow");
+  });
+
+  it("writes and overwrites files without a click", () => {
     expect(decide({ op: "fs.write_artifact", args: { path: "a.md", content: "" } }, ctx).verdict).toBe("allow");
-    expect(decide({ op: "fs.write_artifact", args: { path: "a.md", content: "", overwrite: true } }, ctx).verdict).toBe("approve");
+    expect(decide({ op: "fs.write_artifact", args: { path: "a.md", content: "", overwrite: true } }, ctx).verdict).toBe("allow");
   });
 
   it("approves whole sites, not single hosts", () => {
