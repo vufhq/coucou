@@ -113,6 +113,52 @@ test("a coworker's delegated task is one exchange with Mochi: his message and th
   ]);
 });
 
+test("teammates asking teammates: Mochi sees the whole chain, each coworker its own part", () => {
+  const GRACE = "grace";
+  const parent = task({ prompt: "Review PR #4", result: { summary: "Reviewed.", artifacts: [] },
+    createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:30:00Z" });
+  const toAda = task({ agentId: ADA, source: "delegated", parentTaskId: parent.id, prompt: "Review it",
+    result: { summary: "Fine, Linus checked the host.", artifacts: [] },
+    createdAt: "2026-10-20T10:01:00Z", updatedAt: "2026-10-20T10:20:00Z" });
+  const toLinus = task({ agentId: LINUS, source: "delegated", parentTaskId: toAda.id, prompt: "Is the host safe?",
+    result: { summary: "Grace confirmed it.", artifacts: [] },
+    createdAt: "2026-10-20T10:02:00Z", updatedAt: "2026-10-20T10:10:00Z" });
+  const toGrace = task({ agentId: GRACE, source: "delegated", parentTaskId: toLinus.id, prompt: "Confirm the host",
+    result: { summary: "Confirmed.", artifacts: [] },
+    createdAt: "2026-10-20T10:03:00Z", updatedAt: "2026-10-20T10:05:00Z" });
+  const children = groupChildren([toAda, toLinus, toGrace]);
+  const said = (item) => item.messages.map((m) => [m.fromAgentId, m.toAgentId, m.text]);
+
+  const mochi = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [parent], children }).find((i) => i.kind === "exchange");
+  assert.deepEqual(mochi.withAgentIds, [ADA, LINUS, GRACE]);
+  assert.deepEqual(said(mochi), [
+    [CHIEF, ADA, "Review it"],
+    [ADA, LINUS, "Is the host safe?"],
+    [LINUS, GRACE, "Confirm the host"],
+    [GRACE, LINUS, "Confirmed."],
+    [LINUS, ADA, "Grace confirmed it."],
+    [ADA, CHIEF, "Fine, Linus checked the host."],
+  ]);
+
+  // Linus was asked by Ada, not Mochi, and asked Grace himself.
+  const linus = buildThread({ agentId: LINUS, chiefId: CHIEF, tasks: [toLinus], children }).find((i) => i.kind === "exchange");
+  assert.deepEqual(linus.withAgentIds, [ADA, GRACE]);
+  assert.deepEqual(said(linus), [
+    [ADA, LINUS, "Is the host safe?"],
+    [LINUS, GRACE, "Confirm the host"],
+    [GRACE, LINUS, "Confirmed."],
+    [LINUS, ADA, "Grace confirmed it."],
+  ]);
+
+  // A coworker the user wrote to directly is the one asking its teammate.
+  const direct = task({ agentId: LINUS, prompt: "Check the host", createdAt: "2026-10-20T11:00:00Z", updatedAt: "2026-10-20T11:10:00Z" });
+  const toGrace2 = task({ agentId: GRACE, source: "delegated", parentTaskId: direct.id, prompt: "Confirm it",
+    createdAt: "2026-10-20T11:01:00Z", updatedAt: "2026-10-20T11:05:00Z", result: { summary: "Yes.", artifacts: [] } });
+  const own = buildThread({ agentId: LINUS, chiefId: CHIEF, tasks: [direct], children: groupChildren([toGrace2]) });
+  assert.deepEqual(kinds(own), ["time", "user", "exchange", "agent"]);
+  assert.deepEqual(said(own[2]), [[LINUS, GRACE, "Confirm it"], [GRACE, LINUS, "Yes."]]);
+});
+
 test("a delegated task's question is the chief's, not the user's", () => {
   const job = task({ agentId: ADA, source: "delegated", parentTaskId: "t-parent", status: "waiting_for_answer",
     result: null, question: { id: "q1", text: "Which colour?", options: ["Red", "Blue"] } });

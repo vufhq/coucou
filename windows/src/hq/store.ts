@@ -162,15 +162,14 @@ export function createHqStore(): HqStore {
     return request;
   }
 
-  /** Every delegated task, for Mochi's exchanges. */
+  /** Every delegated task, for the exchanges: Mochi's, and coworkers' with their teammates. */
   async function loadDelegated(): Promise<void> {
     const data = await OrchestratorBridge.listTasks({ source: "delegated", limit: DELEGATED_LIMIT }).catch(() => null);
     if (!data) return;
     children = groupChildren(data.tasks ?? []);
     parentOf.clear();
     for (const [parent, kids] of children) for (const kid of kids) parentOf.set(kid.id, parent);
-    const id = chief()?.id;
-    if (id) invalidate(id);
+    invalidate();
     notify();
   }
 

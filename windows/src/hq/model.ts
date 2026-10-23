@@ -4,10 +4,11 @@
 // A conversation reads oldest to newest, one block per task:
 // - a chat task: what the user wrote, then the agent's reply (or why it failed);
 // - a goal run: the agent's message, titled with the goal;
-// - a task Mochi handed out (in the coworker's conversation): one exchange
-//   with Mochi, his message and the coworker's reply;
-// - a task of Mochi's that handed work out: the exchange (his messages and the
-//   reports) goes before his reply;
+// - a task handed to a coworker (in its conversation): one exchange with
+//   whoever asked (Mochi or a teammate), their message, what the coworker asked
+//   its own teammates, and its reply;
+// - a task that handed work out: the exchange (the messages, the teammates'
+//   own exchanges below them, and the reports) goes before the reply;
 // - then whatever is happening now: the live line, approvals, the question.
 
 import { ACTIVE, type OrchAgent, type OrchApproval, type OrchTask } from "../core/orchestrator";
@@ -56,18 +57,44 @@ function reportText(task: OrchTask): string | null {
   return null;
 }
 
-/** The chief's messages to each coworker he asked, and their reports, in time order. */
-function exchangeOf(chiefId: string, kids: readonly OrchTask[]): { withAgentIds: string[]; messages: ExchangeMessage[] } {
+/**
+ * What `fromAgentId` said to each agent it asked (`kids`) and their reports,
+ * with what those agents asked their own teammates in between, in time order.
+ * `withAgentIds` is everyone asked, at any depth.
+ */
+function exchangeOf(
+  fromAgentId: string,
+  kids: readonly OrchTask[],
+  children: ReadonlyMap<string, readonly OrchTask[]> | undefined,
+  seen = new Set<string>(),
+): { withAgentIds: string[]; messages: ExchangeMessage[] } {
   const withAgentIds: string[] = [];
   const messages: ExchangeMessage[] = [];
+  const add = (id: string) => {
+    if (!withAgentIds.includes(id)) withAgentIds.push(id);
+  };
   for (const kid of [...kids].sort(byCreated)) {
-    if (!withAgentIds.includes(kid.agentId)) withAgentIds.push(kid.agentId);
-    messages.push({ fromAgentId: chiefId, toAgentId: kid.agentId, text: kid.prompt, at: kid.createdAt, taskId: kid.id });
+    if (seen.has(kid.id)) continue;
+    seen.add(kid.id);
+    add(kid.agentId);
+    messages.push({ fromAgentId, toAgentId: kid.agentId, text: kid.prompt, at: kid.createdAt, taskId: kid.id });
+    const below = exchangeOf(kid.agentId, children?.get(kid.id) ?? [], children, seen);
+    below.withAgentIds.forEach(add);
+    messages.push(...below.messages);
     const report = reportText(kid);
-    if (report) messages.push({ fromAgentId: kid.agentId, toAgentId: chiefId, text: report, at: kid.updatedAt, taskId: kid.id });
+    if (report) messages.push({ fromAgentId: kid.agentId, toAgentId: fromAgentId, text: report, at: kid.updatedAt, taskId: kid.id });
   }
   messages.sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1));
   return { withAgentIds, messages };
+}
+
+/** Who handed `task` out: the owner of its parent when that is a delegated task too, else Mochi. */
+function askerOf(task: OrchTask, input: ThreadInput): string {
+  for (const kids of input.children?.values() ?? []) {
+    const parent = kids.find((other) => other.id === task.parentTaskId);
+    if (parent) return parent.agentId;
+  }
+  return input.chiefId ?? "";
 }
 
 /** The agent's reply to a task, or null while it has none. */
@@ -114,20 +141,24 @@ export function buildThread(input: ThreadInput): ThreadItem[] {
     const delegated = task.source === "delegated";
 
     if (delegated && !isChief) {
-      // Mochi's message and the coworker's reply, folded into one line.
-      const chief = input.chiefId ?? "";
+      // The asker's message, what this coworker asked its teammates, and its reply, folded into one line.
+      const asker = askerOf(task, input);
+      const below = exchangeOf(task.agentId, kids, input.children);
       const messages: ExchangeMessage[] = [
-        { fromAgentId: chief, toAgentId: task.agentId, text: task.prompt, at: task.createdAt, taskId: task.id },
+        { fromAgentId: asker, toAgentId: task.agentId, text: task.prompt, at: task.createdAt, taskId: task.id },
+        ...below.messages,
       ];
       const report = reportText(task);
-      if (report) messages.push({ fromAgentId: task.agentId, toAgentId: chief, text: report, at: task.updatedAt, taskId: task.id });
-      items.push({ kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds: chief ? [chief] : [], messages });
+      if (report) messages.push({ fromAgentId: task.agentId, toAgentId: asker, text: report, at: task.updatedAt, taskId: task.id });
+      const withAgentIds = [...new Set([asker, ...below.withAgentIds].filter(Boolean))];
+      items.push({ kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds, messages });
     } else {
       if (task.source !== "goal") {
         items.push({ kind: "user", key: `u:${task.id}`, taskId: task.id, text: task.prompt, at: task.createdAt });
       }
-      if (kids.length && input.chiefId) {
-        const { withAgentIds, messages } = exchangeOf(input.chiefId, kids);
+      if (kids.length) {
+        // Whoever owns the task asked: Mochi, or a coworker the user wrote to.
+        const { withAgentIds, messages } = exchangeOf(task.agentId, kids, input.children);
         items.push({ kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds, messages });
       }
       const goalTitle = task.source === "goal"

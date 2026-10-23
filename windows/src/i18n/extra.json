@@ -6337,6 +6337,17 @@
    "pt-BR": "O que faz (opcional)",
    "ru": "Чем занимается (необязательно)",
    "id": "Apa tugasnya (opsional)"
+  },
+  "From {name}": {
+   "zh-Hans": "来自 {name}",
+   "hi": "{name} से",
+   "es": "De {name}",
+   "ar": "من {name}",
+   "fr": "De {name}",
+   "bn": "{name} থেকে",
+   "pt-BR": "De {name}",
+   "ru": "От {name}",
+   "id": "Dari {name}"
   }
  }
 }
