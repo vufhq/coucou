@@ -30,6 +30,7 @@ const GLYPHS = {
   activity: "M3 12h4l3-7 4 14 3-7h4",
   chevron: "M7 9.5l5 5 5-5",
 };
+const CROSS = "M6 6l12 12M18 6 6 18";
 
 function glyph(path: string, size = 16): SVGSVGElement {
   return svg(path, size, { stroke: 1.8 });
@@ -59,7 +60,6 @@ function saveIds(key: string, ids: string[]) {
 export function mountSidebar(root: HTMLElement, store: HqStore): void {
   let pins = loadIds(PINNED_KEY);
   let collapsed = new Set(loadIds(COLLAPSED_KEY));
-  let query = "";
 
   // Avatars are live canvases: kept between renders while their look holds.
   const avatars = new Map<string, { sig: string; el: HTMLElement }>();
@@ -77,16 +77,7 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
     return el;
   }
 
-  // ── Top: search and + ──
-
-  const searchInput = h("input", {
-    class: "hq-search-input",
-    type: "search",
-    placeholder: tl("Search agents"),
-    "aria-label": tl("Search agents"),
-    spellcheck: "false",
-  }) as HTMLInputElement;
-  const searchBar = h("div", { class: "hq-search", hidden: true }, glyph(GLYPHS.search, 14), searchInput);
+  // ── Top: search (the palette) and + ──
 
   const searchButton = h("button", { class: "hq-icon-btn", title: tl("Search agents"), "aria-label": tl("Search agents") });
   searchButton.append(glyph(GLYPHS.search));
@@ -100,25 +91,7 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
 
   const top = h("div", { class: "hq-side-top" }, searchButton, plusButton);
 
-  function closeSearch() {
-    query = "";
-    searchInput.value = "";
-    searchBar.hidden = true;
-    render();
-  }
-
-  searchButton.addEventListener("click", () => {
-    if (!searchBar.hidden) return closeSearch();
-    searchBar.hidden = false;
-    searchInput.focus();
-  });
-  searchInput.addEventListener("input", () => {
-    query = searchInput.value.trim().toLowerCase();
-    render();
-  });
-  searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeSearch();
-  });
+  searchButton.addEventListener("click", () => document.dispatchEvent(new CustomEvent("hq-palette-open")));
 
   // ── The + menu ──
 
@@ -174,23 +147,53 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
     const { teams, agents } = store.snapshot();
     let color = PILL_PALETTE[agents.length % PILL_PALETTE.length];
 
-    const name = h("input", { class: "hq-field-input", maxlength: "60", placeholder: t("Name") }) as HTMLInputElement;
-    const role = h("input", { class: "hq-field-input", maxlength: "60", placeholder: t("Role") }) as HTMLInputElement;
+    /** null: no outfit, the first look. */
+    let outfit: OrchOutfit | null = null;
+    /** What the agent will look like, for the drawings. */
+    const look = (o: OrchOutfit | null) => ({ id: "hq-new", name: "", color, outfit: o }) as OrchAgent;
 
-    const team = h("select", { class: "hq-field-input" }) as HTMLSelectElement;
+    const name = h("input", {
+      class: "hq-create-name",
+      maxlength: "60",
+      placeholder: t("Name your agent"),
+      "aria-label": t("Name"),
+    }) as HTMLInputElement;
+    const role = h("input", {
+      class: "hq-create-role",
+      maxlength: "60",
+      placeholder: t("What they do (optional)"),
+      "aria-label": t("Role"),
+    }) as HTMLInputElement;
+
+    const team = h("select", { class: "hq-field-input", "aria-label": t("Team"), hidden: !teams.length }) as HTMLSelectElement;
     team.append(h("option", { value: "", text: t("No team") }));
     for (const tm of [...teams].sort((a, b) => a.order - b.order)) {
       team.append(h("option", { value: tm.id, text: tm.name }));
     }
 
-    const outfit = h("select", { class: "hq-field-input" }) as HTMLSelectElement;
-    outfit.append(h("option", { value: "", text: t("Default look") }));
-    for (const o of OUTFIT_SELECTIONS) {
-      if (o !== "auto") outfit.append(h("option", { value: o, text: OUTFIT_LABELS[o] }));
-    }
-
+    // The big face on top, every outfit drawn on a mini in the colour, then the colours.
+    const preview = h("div", { class: "hq-create-preview" });
+    const looks = h("div", { class: "hq-create-looks", role: "group", "aria-label": t("Outfit") });
     const swatches = h("div", { class: "hq-swatches", role: "group", "aria-label": t("Colour") });
-    const drawSwatches = () => {
+    const draw = () => {
+      preview.replaceChildren(agentAvatar(look(outfit), 96));
+      clear(looks);
+      for (const o of OUTFIT_SELECTIONS) {
+        if (o === "auto") continue;
+        const value = o === "none" ? null : o;
+        const b = h("button", {
+          type: "button",
+          class: value === outfit ? "hq-create-look on" : "hq-create-look",
+          title: OUTFIT_LABELS[o],
+          "aria-label": OUTFIT_LABELS[o],
+          "aria-pressed": value === outfit,
+        }, agentAvatar(look(value), 40));
+        b.addEventListener("click", () => {
+          outfit = value;
+          draw();
+        });
+        looks.append(b);
+      }
       clear(swatches);
       for (const hex of PILL_PALETTE) {
         const s = h("button", {
@@ -203,30 +206,23 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
         });
         s.addEventListener("click", () => {
           color = hex;
-          drawSwatches();
+          draw();
         });
         swatches.append(s);
       }
     };
-    drawSwatches();
+    draw();
 
     const error = h("div", { class: "hq-form-error", hidden: true });
     const create = h("button", { type: "submit", class: "hq-btn primary", text: t("Create"), disabled: true }) as HTMLButtonElement;
     const cancel = h("button", { type: "button", class: "hq-btn", text: t("Cancel") });
+    const shut = h("button", { type: "button", class: "hq-icon-btn", title: t("Cancel"), "aria-label": t("Cancel") }, glyph(CROSS));
     name.addEventListener("input", () => (create.disabled = !name.value.trim()));
 
-    const field = (label: string, control: HTMLElement) =>
-      h("label", { class: "hq-field" }, h("span", { class: "hq-field-label", text: label }), control);
-
-    const form = h("form", { class: "hq-sheet-card", role: "dialog", "aria-label": t("Create agent…") },
-      h("div", { class: "hq-sheet-title", text: t("Create agent…") }),
-      field(t("Name"), name),
-      field(t("Role"), role),
-      field(t("Team"), team),
-      field(t("Colour"), swatches),
-      field(t("Outfit"), outfit),
-      error,
-      h("div", { class: "hq-sheet-actions" }, cancel, create),
+    const form = h("form", { class: "hq-sheet-card hq-create", role: "dialog", "aria-label": t("New agent") },
+      h("div", { class: "hq-create-head" }, h("div", { class: "hq-sheet-title", text: t("New agent") }), shut),
+      h("div", { class: "hq-create-body" }, preview, name, role, looks, swatches, error),
+      h("div", { class: "hq-create-foot" }, team, h("div", { class: "hq-sheet-actions" }, cancel, create)),
     );
     const sheet = h("div", { class: "hq-sheet" }, form);
 
@@ -238,6 +234,7 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
       if (e.key === "Escape") close();
     };
     cancel.addEventListener("click", close);
+    shut.addEventListener("click", close);
     sheet.addEventListener("mousedown", (e) => {
       if (e.target === sheet) close();
     });
@@ -251,7 +248,7 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
         name: agentName,
         role: role.value.trim() || null,
         color,
-        outfit: (outfit.value || null) as OrchOutfit | null,
+        outfit,
         teamId: team.value || null,
       }).then(async ({ agent }) => {
         close();
@@ -387,12 +384,6 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
 
     if (!snap.agents.length && snap.error) {
       list.append(h("div", { class: "hq-side-empty", text: snap.error }));
-    } else if (query) {
-      // Searching: one flat list of who matches, the chief included.
-      const hits = [chief, ...coworkers].filter((a): a is OrchAgent =>
-        !!a && (a.name.toLowerCase().includes(query) || (a.role ?? "").toLowerCase().includes(query)));
-      if (hits.length) list.append(section(null, hits, selectedId));
-      else list.append(h("div", { class: "hq-side-empty", text: t("No agents match.") }));
     } else {
       const faces = [chief, ...pins.map((id) => coworkers.find((a) => a.id === id))]
         .filter((a): a is OrchAgent => !!a);
@@ -427,7 +418,7 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
   connect.addEventListener("click", () => void Bridge.openHubPage("integrations"));
   const bottom = h("div", { class: "hq-side-bottom" }, me, connect);
 
-  root.append(top, searchBar, activityEntry, pinned, list, bottom);
+  root.append(top, activityEntry, pinned, list, bottom);
   store.subscribe(render);
   render();
 }

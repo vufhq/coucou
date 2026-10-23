@@ -5550,17 +5550,6 @@
    "ru": "Нужны вы",
    "id": "Butuh Anda"
   },
-  "No agents match.": {
-   "zh-Hans": "没有匹配的代理。",
-   "hi": "कोई एजेंट मेल नहीं खाता।",
-   "es": "Ningún agente coincide.",
-   "ar": "لا يوجد وكلاء مطابقون.",
-   "fr": "Aucun agent ne correspond.",
-   "bn": "কোনো এজেন্ট মেলেনি।",
-   "pt-BR": "Nenhum agente corresponde.",
-   "ru": "Нет подходящих агентов.",
-   "id": "Tidak ada agen yang cocok."
-  },
   "Connect apps": {
    "zh-Hans": "连接应用",
    "hi": "ऐप्स जोड़ें",
@@ -6131,17 +6120,6 @@
    "ru": "Поиск агентов и действий",
    "id": "Cari agen dan tindakan"
   },
-  "Go to {name}": {
-   "zh-Hans": "前往 {name}",
-   "hi": "{name} पर जाएँ",
-   "es": "Ir a {name}",
-   "ar": "الانتقال إلى {name}",
-   "fr": "Aller à {name}",
-   "bn": "{name}-এ যান",
-   "pt-BR": "Ir para {name}",
-   "ru": "Перейти к {name}",
-   "id": "Buka {name}"
-  },
   "Pause {name}": {
    "zh-Hans": "暂停 {name}",
    "hi": "{name} को रोकें",
@@ -6284,6 +6262,81 @@
    "pt-BR": "Restaurar",
    "ru": "Восстановить",
    "id": "Pulihkan"
+  },
+  "{count} agents": {
+   "zh-Hans": {
+    "other": "{count} 个代理"
+   },
+   "hi": {
+    "one": "{count} एजेंट",
+    "other": "{count} एजेंट"
+   },
+   "es": {
+    "one": "{count} agente",
+    "other": "{count} agentes"
+   },
+   "ar": {
+    "zero": "{count} وكيل",
+    "one": "وكيل واحد",
+    "two": "وكيلان",
+    "few": "{count} وكلاء",
+    "many": "{count} وكيلًا",
+    "other": "{count} وكيل"
+   },
+   "fr": {
+    "one": "{count} agent",
+    "other": "{count} agents"
+   },
+   "bn": {
+    "one": "{count}টি এজেন্ট",
+    "other": "{count}টি এজেন্ট"
+   },
+   "pt-BR": {
+    "one": "{count} agente",
+    "other": "{count} agentes"
+   },
+   "ru": {
+    "one": "{count} агент",
+    "few": "{count} агента",
+    "many": "{count} агентов",
+    "other": "{count} агента"
+   },
+   "id": {
+    "other": "{count} agen"
+   }
+  },
+  "Close chat": {
+   "zh-Hans": "关闭聊天",
+   "hi": "चैट बंद करें",
+   "es": "Cerrar chat",
+   "ar": "إغلاق الدردشة",
+   "fr": "Fermer le chat",
+   "bn": "চ্যাট বন্ধ করুন",
+   "pt-BR": "Fechar chat",
+   "ru": "Закрыть чат",
+   "id": "Tutup obrolan"
+  },
+  "Name your agent": {
+   "zh-Hans": "给代理起个名字",
+   "hi": "अपने एजेंट को नाम दें",
+   "es": "Ponle nombre a tu agente",
+   "ar": "سمِّ وكيلك",
+   "fr": "Nommez votre agent",
+   "bn": "আপনার এজেন্টের নাম দিন",
+   "pt-BR": "Dê um nome ao seu agente",
+   "ru": "Назовите агента",
+   "id": "Beri nama agen Anda"
+  },
+  "What they do (optional)": {
+   "zh-Hans": "负责什么（可选）",
+   "hi": "यह क्या करता है (वैकल्पिक)",
+   "es": "Qué hace (opcional)",
+   "ar": "ماذا يفعل (اختياري)",
+   "fr": "Ce qu’il fait (facultatif)",
+   "bn": "কী করে (ঐচ্ছিক)",
+   "pt-BR": "O que faz (opcional)",
+   "ru": "Чем занимается (необязательно)",
+   "id": "Apa tugasnya (opsional)"
   }
  }
 }

@@ -9,6 +9,7 @@ import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { agentAvatar, avatarSignature } from "./avatar";
 import { createComposer } from "./composer";
+import { createSideChat } from "./sidechat";
 import { createThread } from "./thread";
 import type { HqPanel, HqStore, ThreadItem } from "./types";
 
@@ -42,7 +43,15 @@ export function mountConversation(root: HTMLElement, store: HqStore): void {
   const head = h("header", { class: "hq-head", hidden: true });
   const empty = h("div", { class: "hq-start" });
   const earlier = h("button", { class: "hq-earlier", text: tl("Load earlier messages"), hidden: true });
-  const thread = createThread(store);
+  /** The exchange opened on its own over the conversation, by its key. */
+  let sideKey: string | null = null;
+  const openSide = (key: string | null) => {
+    sideKey = key;
+    draw();
+  };
+  const thread = createThread(store, openSide);
+  const side = createSideChat(store, () => openSide(null));
+  side.el.hidden = true;
   const column = h("div", { class: "hq-column" }, empty, earlier, thread.el);
   const scroller = h("div", { class: "hq-scroll hq-main" }, column);
   const jump = h(
@@ -53,7 +62,12 @@ export function mountConversation(root: HTMLElement, store: HqStore): void {
   const composer = createComposer(store, () => (follow = true));
   // It floats just above the composer, whatever the composer's height.
   composer.el.append(jump);
-  root.append(head, scroller, composer.el);
+  root.append(head, scroller, composer.el, side.el);
+  document.addEventListener("keydown", (e) => {
+    // The palette and the sheets close themselves on Esc.
+    const inDialog = e.target instanceof Element && !!e.target.closest(".hq-palette, .hq-sheet");
+    if (e.key === "Escape" && sideKey && !inDialog) openSide(null);
+  });
 
   let shownId: string | null = null;
   let headSig = "";
@@ -174,12 +188,21 @@ export function mountConversation(root: HTMLElement, store: HqStore): void {
       startKey = null;
       shownCount = PAGE;
       anchored = false;
+      sideKey = null;
     }
     const stick = follow || nearBottom();
 
     drawHead(agent, snap.panel);
     composer.setAgent(agent);
     const items = id ? store.thread(id) : [];
+    const opened = sideKey ? items.find((item) => item.key === sideKey) : undefined;
+    if (opened?.kind === "exchange") {
+      side.el.hidden = false;
+      side.render(opened);
+    } else {
+      sideKey = null;
+      side.el.hidden = true;
+    }
     const isEmpty = items.length === 0;
     empty.hidden = !isEmpty;
     thread.el.hidden = isEmpty;

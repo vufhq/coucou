@@ -55,40 +55,6 @@
   padding: 14px 14px 6px;
 }
 
-.hq-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 12px 6px;
-  padding: 0 12px;
-  height: 36px;
-  border-radius: 18px;
-  background: var(--hq-raised);
-  color: var(--hq-secondary);
-}
-
-.hq-search[hidden] {
-  display: none;
-}
-
-.hq-search-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--hq-text);
-  font: 400 13.5px var(--font);
-}
-
-.hq-search-input::placeholder {
-  color: var(--hq-muted);
-}
-
-.hq-search-input::-webkit-search-cancel-button {
-  display: none;
-}
-
 /* ── Pinned faces ────────────────────────────────────────────────────────── */
 
 .hq-pinned {
@@ -401,6 +367,124 @@
 
 .hq-swatch.on {
   box-shadow: 0 0 0 2px var(--hq-raised), 0 0 0 4px var(--hq-text);
+}
+
+/* The new agent: its face, its name, its look and its colour. */
+.hq-create {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  gap: 0;
+}
+
+.hq-create-head,
+.hq-create-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.hq-create-head {
+  border-bottom: 1px solid var(--hq-line);
+}
+
+.hq-create-foot {
+  border-top: 1px solid var(--hq-line);
+}
+
+.hq-create-foot .hq-field-input {
+  max-width: 50%;
+}
+
+.hq-create-foot .hq-sheet-actions {
+  margin-inline-start: auto;
+}
+
+.hq-create-body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+
+.hq-create-preview {
+  height: 104px;
+  display: grid;
+  place-items: center;
+}
+
+.hq-create-name,
+.hq-create-role {
+  width: 100%;
+  border: 1px solid var(--hq-line);
+  border-radius: 10px;
+  background: var(--hq-bg);
+  color: var(--hq-text);
+  text-align: center;
+  outline: none;
+}
+
+.hq-create-name {
+  height: 40px;
+  font: 500 14.5px var(--font);
+}
+
+.hq-create-role {
+  height: 34px;
+  font: 400 13px var(--font);
+}
+
+.hq-create-name:focus,
+.hq-create-role:focus {
+  border-color: var(--hq-secondary);
+}
+
+.hq-create-name::placeholder,
+.hq-create-role::placeholder {
+  color: var(--hq-muted);
+}
+
+.hq-create-looks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.hq-create-look {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.hq-create-look:hover {
+  background: var(--hq-hover);
+}
+
+.hq-create-look.on {
+  background: var(--hq-selected);
+  box-shadow: inset 0 0 0 1.5px var(--hq-secondary);
+}
+
+.hq-create .hq-swatches {
+  justify-content: center;
+  gap: 10px;
+}
+
+.hq-create .hq-swatch {
+  width: 26px;
+  height: 26px;
 }
 
 .hq-form-error {

@@ -76,7 +76,7 @@ export function mountPalette(root: HTMLElement, store: HqStore): void {
     const snap = store.snapshot();
     const out: Command[] = [];
     for (const agent of snap.agents) {
-      out.push({ label: t("Go to {name}", { name: agent.name }), also: agent.role ?? "", agent, run: () => store.select(agent.id) });
+      out.push({ label: agent.name, also: agent.role ?? agent.persona ?? "", agent, run: () => store.select(agent.id) });
     }
     out.push({ label: t("Activity"), run: () => store.setView("activity") });
     const chief = store.chief();
@@ -128,11 +128,21 @@ export function mountPalette(root: HTMLElement, store: HqStore): void {
         id: `hq-palette-${index}`,
         "aria-selected": String(index === active),
       },
-      command.agent
-        ? agentAvatar(command.agent, 22, { working: store.working(command.agent.id) })
-        : h("span", { class: "hq-palette-icon" }, svg(ICONS.chevronRight, 14, { stroke: 2 })),
-      h("span", { class: "hq-palette-label", text: command.label }),
-      command.also ? h("span", { class: "hq-palette-also", text: command.also }) : null,
+      ...(command.agent
+        ? [
+          // An agent: its face, its name and what it does under it.
+          agentAvatar(command.agent, 28, { working: store.working(command.agent.id) }),
+          h(
+            "span",
+            { class: "hq-palette-agent" },
+            h("span", { class: "hq-palette-label", text: command.label }),
+            command.also ? h("span", { class: "hq-palette-also", text: command.also }) : null,
+          ),
+        ]
+        : [
+          h("span", { class: "hq-palette-icon" }, svg(ICONS.chevronRight, 14, { stroke: 2 })),
+          h("span", { class: "hq-palette-label", text: command.label }),
+        ]),
     );
     el.addEventListener("mousemove", () => {
       if (active !== index) mark(index);
@@ -240,6 +250,8 @@ export function mountPalette(root: HTMLElement, store: HqStore): void {
   backdrop.addEventListener("mousedown", (e) => {
     if (e.target === backdrop) close();
   });
+  // The sidebar's search button.
+  document.addEventListener("hq-palette-open", open);
   document.addEventListener("keydown", (e) => {
     if (isPaletteKey(e)) {
       e.preventDefault();

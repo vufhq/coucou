@@ -472,3 +472,13 @@ test("palette: matches every word, any case and accents; Ctrl+K and Cmd+K only",
   assert.ok(!isPaletteKey(key({})));
   assert.ok(!isPaletteKey(key({ ctrlKey: true, shiftKey: true })));
 });
+
+test("side chat: everyone in order of appearance, and runs of the same author", async () => {
+  const { participants, runs } = await import("../src/hq/sidechat.ts");
+  const msg = (fromAgentId, toAgentId, text) => ({ fromAgentId, toAgentId, text, at: "", taskId: "t" });
+  const messages = [msg(CHIEF, ADA, "a"), msg(CHIEF, LINUS, "b"), msg(LINUS, CHIEF, "c"), msg(ADA, CHIEF, "d"), msg(ADA, CHIEF, "e")];
+  assert.deepEqual(participants({ withAgentIds: [ADA, LINUS], messages }), [CHIEF, ADA, LINUS]);
+  // Someone asked but not yet in a message still counts.
+  assert.deepEqual(participants({ withAgentIds: [CHIEF], messages: [] }), [CHIEF]);
+  assert.deepEqual(runs(messages).map((r) => r.map((m) => m.text).join("")), ["ab", "c", "de"]);
+});
