@@ -11,6 +11,7 @@ import type { ProviderId } from "./providers";
 import type { FileDiff } from "./diff";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
+import { DEFAULT_CHARACTER, DEFAULT_TOFU_COLOR } from "../mochi/character";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicPlaying } from "./spotify";
 
@@ -191,6 +192,12 @@ export interface Settings {
    */
   mochiOutfit: string;
   /**
+   * Who Coucou draws: "mochi" (the default) or "tofu", and Tofu's colour, a
+   * name from its palette. Read them through mochi/character.ts.
+   */
+  character: string;
+  tofuColor: string;
+  /**
    * A colour of the user's own for a pill's Mochi, by pill ID ("#RRGGBB").
    * Empty means the catalog's colours; read it through core/pill-colors.ts.
    * Same key and values as the Mac's "pillColors".
@@ -244,6 +251,8 @@ export const DEFAULT_SETTINGS: Settings = {
   customUrl: "",
   shortcuts: {},
   mochiOutfit: DEFAULT_OUTFIT,
+  character: DEFAULT_CHARACTER,
+  tofuColor: DEFAULT_TOFU_COLOR,
   pillColors: {},
   language: "",
 };

@@ -15,6 +15,7 @@ import { SPOTIFY_ID } from "./core/spotify";
 import { Recap } from "./recap/recap";
 import { OrchestratorBridge } from "./core/orchestrator";
 import { GREETING_END } from "./mochi/greeting";
+import { applyCharacter } from "./mochi/character";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
 /** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
@@ -62,6 +63,7 @@ async function main() {
   if (boot) {
     State.settings = { ...State.settings, ...boot.settings };
   }
+  applyCharacter(State.settings);
   // A language change redraws the island in place: the texts given as tl(…)
   // relabel themselves (views/dom.ts) and the views redraw the rest on this
   // sync. Nothing is rebuilt, so tasks, steps and the chat stay as they are.
@@ -145,6 +147,7 @@ async function main() {
   await onEvent<Settings>("settings-changed", (s) => {
     const previousMain = State.mainPillId;
     State.settings = { ...State.settings, ...s };
+    applyCharacter(State.settings);
     applyLanguage();
     island.applySettings();
     State.loadIntegrationTasks();

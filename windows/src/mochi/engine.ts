@@ -8,6 +8,8 @@ import { Ease, lerp, type EaseFn } from "../core/anim";
 import { Sound } from "../core/sound";
 import type { BotEmoteName, BotStateName } from "../core/layout";
 import { PUMPKIN_BODY, drawOutfitBehind, drawOutfitFront, makeHead } from "./outfits";
+import { character, tofuInk } from "./character";
+import { drawTofu, type TofuHooks } from "./tofu";
 import type { Outfit } from "./wardrobe";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -785,7 +787,18 @@ export class BotEngine {
       x.rotate(this.roll);
       x.translate(-cx, -cy);
     }
+    if (character() === "tofu") this.drawTofu(x, R, cx, cy);
+    else this.drawMochi(x, R, rx, ry, cx, cy);
+    x.restore();
 
+    if (this.badge && this.badgeS > 0.01 && this.morph < 0.25) {
+      this.drawBadge(x, this.badge, R, cx, cy);
+    }
+    this.drawParticles(x, R, cx, cy);
+  }
+
+  /** Hands, body, cheeks, eyes, mouth and outfit — Mochi himself. */
+  private drawMochi(x: CanvasRenderingContext2D, R: number, rx: number, ry: number, cx: number, cy: number) {
     this.drawHandsBehind(x, R, rx, ry, cx, cy);
 
     x.save();
@@ -821,12 +834,24 @@ export class BotEngine {
     if (head) drawOutfitFront(x, this.outfit, head, outfitState);
 
     x.restore();
-    x.restore();
+  }
 
-    if (this.badge && this.badgeS > 0.01 && this.morph < 0.25) {
-      this.drawBadge(x, this.badge, R, cx, cy);
-    }
-    this.drawParticles(x, R, cx, cy);
+  /** Tofu (./tofu.ts) in Mochi's place, from the same animated state. */
+  private drawTofu(x: CanvasRenderingContext2D, R: number, cx: number, cy: number) {
+    const pose = {
+      yaw: this.yaw, pitch: this.pitch, roll: this.roll, rigidRoll: this.rigidRoll,
+      tilt: this.tilt, sx: this.sx, sy: this.sy, es: this.es,
+      blush: this.blush, tint: this.tint, hands: this.hands, morph: this.morph,
+      col: this.col, state: this.state, eye: this.eyeShapeNow(),
+      outfit: this.outfit, presence: this.outfitPresence, physDx: this.physDx, physDy: this.physDy,
+      waveStart: this.waveStart, waveUntil: this.waveUntil, isMini: this.isMini,
+      fill: this.bodyColor ? rgba(this.bodyColor) : tofuInk(),
+    };
+    const hooks: TofuHooks = {
+      eye: (c, shape, w, h, sd, ink) => this.drawEyeShape(c, shape, w, h, sd, ink),
+      mouth: (c, body) => this.drawMouth(c, body, R),
+    };
+    drawTofu(x, pose, R, cx, cy, hooks);
   }
 
   private bodyPath(rx: number, ry: number, R: number): Path2D {
@@ -913,7 +938,8 @@ export class BotEngine {
     x.restore();
   }
 
-  private drawEyes(x: CanvasRenderingContext2D, body: Path2D, R: number, rx: number, ry: number) {
+  /** The eyes' shape this frame: the state's, an emote's, or the dance's and the mailbox's. */
+  private eyeShapeNow(): EyeShape {
     let shape: EyeShape = this.eyeOverride ?? this.cfg.eye;
     // Dancing: happy eyes in the calm states.
     if (this.isDancing && this.dancingLevel > 0.15 && !this.isMini && (this.state === "idle" || this.state === "finished")) {
@@ -923,6 +949,11 @@ export class BotEngine {
       if (this.isChewing) shape = "happy";
       else if (this.slotHTarget > 0.05 || this.slotH > 0.1) shape = "cup";
     }
+    return shape;
+  }
+
+  private drawEyes(x: CanvasRenderingContext2D, body: Path2D, R: number, rx: number, ry: number) {
+    const shape = this.eyeShapeNow();
 
     x.save();
     x.clip(body);

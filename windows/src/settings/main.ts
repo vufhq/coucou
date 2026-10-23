@@ -23,6 +23,8 @@ import { FLOW_PAGE_RENDERERS } from "../hub/pages";
 import { agentsSection } from "./agents";
 import { phoneSection } from "./phone";
 import { colorDot } from "./colors";
+import { TOFU_COLORS, applyCharacter, parseCharacter, parseTofuColor } from "../mochi/character";
+import { TOFU_PALETTE } from "../mochi/tofu-shape";
 import { renderDiff, statusDot } from "./parts";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t, tn,
@@ -977,9 +979,64 @@ function generalSection(): HTMLElement {
       h("label", { text: t("Launch at startup") }),
       toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
     ),
+    ...characterRows(),
     ...recapRows(),
     languageRow(),
   );
+}
+
+/**
+ * Settings → General → Character: Mochi, or Tofu — a flat pebble with Mochi's
+ * moves and outfits — and Tofu's colour. Every window redraws at once.
+ */
+function characterRows(): HTMLElement[] {
+  const select = h("select", {}) as HTMLSelectElement;
+  select.append(
+    h("option", { value: "mochi", text: "Mochi" }),
+    h("option", { value: "tofu", text: "Tofu" }),
+  );
+  select.value = parseCharacter(settings.character);
+
+  const swatches = h("div", { class: "character-colors", role: "group", "aria-label": t("Color") });
+  const paint = () => {
+    const current = parseTofuColor(settings.tofuColor);
+    for (const b of swatches.children) {
+      const on = (b as HTMLElement).dataset.color === current;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    }
+  };
+  for (const name of TOFU_COLORS) {
+    const swatch = h("button", {
+      class: "swatch",
+      style: `background:${TOFU_PALETTE[name].dark}`,
+      title: name,
+      "aria-label": name,
+    });
+    swatch.dataset.color = name;
+    swatch.addEventListener("click", () => {
+      settings.tofuColor = name;
+      applyCharacter(settings);
+      paint();
+      void save();
+    });
+    swatches.append(swatch);
+  }
+  paint();
+
+  const colorRow = h("div", { class: "row" }, h("label", { text: t("Color") }), swatches);
+  colorRow.style.display = select.value === "tofu" ? "" : "none";
+  select.addEventListener("change", () => {
+    settings.character = select.value;
+    applyCharacter(settings);
+    colorRow.style.display = select.value === "tofu" ? "" : "none";
+    void save();
+  });
+  return [
+    h("div", { class: "row" }, h("label", { text: t("Character") }), select),
+    colorRow,
+    h("div", { class: "hint", text: t("Tofu is a flat pebble with Mochi's moves and outfits. It shows in the island, on the desktop and in Coucou HQ.") }),
+  ];
 }
 
 /**
@@ -1287,6 +1344,7 @@ async function main() {
     version = boot.version;
   }
   setLanguage(resolveLanguage(settings.language, systemLanguages()));
+  applyCharacter(settings);
   applyDirection();
   // The window is borderless (lib.rs): its title bar is drawn here.
   mountTitleBar({ title: "Coucou" });
@@ -1308,6 +1366,7 @@ async function main() {
   void onEvent<Settings>("settings-changed", (s) => {
     const before = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
     settings = { ...settings, ...s };
+    applyCharacter(settings);
     shortcutsListener?.settingsChanged();
     for (const redraw of declaredViews) redraw();
     const after = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;

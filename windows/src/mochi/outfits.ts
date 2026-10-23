@@ -14,6 +14,9 @@
 import { Ease } from "../core/anim";
 import type { Outfit, OutfitSelection } from "./wardrobe";
 import { SCRIPT_FONTS } from "../core/fonts";
+import { withLayer } from "./layer";
+import { character } from "./character";
+import { drawTofuStill } from "./tofu";
 
 const EXP = 2.7;
 const VIEW_TILT = -0.3;
@@ -940,41 +943,6 @@ function bunnyEars(ctx: Ctx, H: Head) {
 
 // ── Layers and transitions ────────────────────────────────────────────────────
 
-let scratch: HTMLCanvasElement | null = null;
-
-/**
- * Draws `fn` at `alpha` as one layer, so overlapping parts don't show through
- * each other while an outfit fades (SwiftUI's drawLayer on macOS).
- */
-function withLayer(ctx: Ctx, alpha: number, fn: (c: Ctx) => void) {
-  if (alpha >= 0.999) {
-    ctx.save();
-    fn(ctx);
-    ctx.restore();
-    return;
-  }
-  const W = ctx.canvas.width;
-  const Hh = ctx.canvas.height;
-  scratch ??= document.createElement("canvas");
-  if (scratch.width < W || scratch.height < Hh) {
-    scratch.width = Math.max(scratch.width, W);
-    scratch.height = Math.max(scratch.height, Hh);
-  }
-  const s = scratch.getContext("2d");
-  if (!s) return;
-  s.setTransform(1, 0, 0, 1, 0, 0);
-  s.clearRect(0, 0, W, Hh);
-  s.setTransform(ctx.getTransform());
-  s.save();
-  fn(s);
-  s.restore();
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha *= alpha;
-  ctx.drawImage(scratch, 0, 0, W, Hh, 0, 0, W, Hh);
-  ctx.restore();
-}
-
 /** Glasses, bow, scarf and pumpkin are on the face: behind the head once it has turned away. */
 const ON_FACE: ReadonlySet<Outfit> = new Set(["sunglasses", "roundGlasses", "bow", "scarf", "pumpkin"]);
 const HATS: ReadonlySet<Outfit> = new Set(["beanie", "santaHat", "partyHat", "crown", "witchHat"]);
@@ -1077,6 +1045,10 @@ const INK = "rgb(26,20,18)";
 
 /** A little Mochi wearing `outfit`, centred in a `size`×`size` icon. */
 function iconMochi(ctx: Ctx, size: number, outfit: Outfit) {
+  if (character() === "tofu") {
+    drawTofuStill(ctx, size, outfit);
+    return;
+  }
   const R = 10;
   const H = makeHead(R);
   const cx = size / 2;
