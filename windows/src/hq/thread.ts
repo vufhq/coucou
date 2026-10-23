@@ -1,7 +1,8 @@
 // Coucou HQ: the conversation itself, one element per ThreadItem. Elements are
 // kept by `item.key` and only redrawn when what they show changed, so a live
 // line ticking or a new message never rebuilds the whole thread (and the
-// minis in the exchanges keep their animation).
+// minis in the exchanges keep their animation). An exchange is one line; a
+// click opens it on its own (sidechat.ts), through `openExchange`.
 
 import type { OrchApproval } from "../core/orchestrator";
 import { approvalLabel } from "../core/orchestrator";
@@ -10,7 +11,7 @@ import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { renderMarkdown } from "../views/markdown";
 import { agentAvatar } from "./avatar";
-import type { ExchangeMessage, HqStore, ThreadItem } from "./types";
+import type { HqStore, ThreadItem } from "./types";
 
 export interface ThreadView {
   el: HTMLElement;
@@ -49,7 +50,7 @@ export function separatorLabel(at: string, now = new Date()): string {
 }
 
 /** "Ada and Linus", "Ada, Linus and Grace", in the language's own words. */
-function nameList(names: string[]): string {
+export function nameList(names: string[]): string {
   try {
     return new Intl.ListFormat(language(), { type: "conjunction" }).format(names);
   } catch {
@@ -59,11 +60,12 @@ function nameList(names: string[]): string {
 
 // ── The view ──────────────────────────────────────────────────────────────────
 
-export function createThread(store: HqStore): ThreadView {
+/** More agents than this in an exchange: the line says how many, and a hover lists them. */
+export const NAMED_AGENTS = 2;
+
+export function createThread(store: HqStore, openExchange: (key: string) => void): ThreadView {
   const el = h("div", { class: "hq-thread", role: "log", "aria-live": "polite" });
   let entries = new Map<string, Entry>();
-  /** The exchanges the user opened, kept across redraws. */
-  const open = new Set<string>();
 
   const name = (id: string) => store.agent(id)?.name ?? id;
 
@@ -158,56 +160,37 @@ export function createThread(store: HqStore): ThreadView {
     return row;
   }
 
-  function exchange(item: Extract<ThreadItem, { kind: "exchange" }>): HTMLElement {
-    const names = item.withAgentIds.map(name);
-    const line = h(
-      "button",
-      { class: "hq-exchange-line", "aria-expanded": "false" },
-      h("span", { text: tn("{count} message with", "{count} messages with", item.messages.length) }),
-      faces(item.withAgentIds, 16),
-      h("span", { class: "hq-exchange-names", text: nameList(names) }),
-      h("span", { class: "hq-chevron" }, svg(ICONS.chevronRight, 12, { stroke: 2 })),
-    );
-    const wrap = h("div", { class: "hq-exchange" }, line);
-    let body: HTMLElement | null = null;
-
-    const show = (on: boolean) => {
-      wrap.classList.toggle("open", on);
-      line.setAttribute("aria-expanded", String(on));
-      if (on && !body) {
-        body = h("div", { class: "hq-exchange-body" });
-        for (const message of item.messages) body.append(exchangeMessage(message));
-        wrap.append(body);
-      } else if (!on && body) {
-        body.remove();
-        body = null;
-      }
-    };
-    line.addEventListener("click", () => {
-      const on = !open.has(item.key);
-      if (on) open.add(item.key);
-      else open.delete(item.key);
-      show(on);
-    });
-    if (open.has(item.key)) show(true);
-    return wrap;
+  /** Every agent of a crowded exchange, shown on hover: a click goes to its conversation. */
+  function roster(ids: string[]): HTMLElement {
+    const list = h("div", { class: "hq-roster" });
+    for (const id of ids) {
+      const agent = store.agent(id);
+      if (!agent) continue;
+      const row = h("button", { class: "hq-roster-row" }, agentAvatar(agent, 18), h("span", { text: agent.name }));
+      row.addEventListener("click", () => store.select(id));
+      list.append(row);
+    }
+    return list;
   }
 
-  function exchangeMessage(message: ExchangeMessage): HTMLElement {
-    const from = store.agent(message.fromAgentId);
-    const text = h("div", { class: "hq-md" });
-    renderMarkdown(text, message.text);
-    return h(
-      "div",
-      { class: "hq-exchange-message" },
-      h(
-        "div",
-        { class: "hq-exchange-who" },
-        from ? agentAvatar(from, 16) : null,
-        h("span", { text: t("{from} to {to}", { from: name(message.fromAgentId), to: name(message.toAgentId) }) }),
-      ),
-      text,
+  function exchange(item: Extract<ThreadItem, { kind: "exchange" }>): HTMLElement {
+    const ids = item.withAgentIds;
+    const crowded = ids.length > NAMED_AGENTS;
+    const line = h(
+      "button",
+      { class: "hq-exchange-line", "aria-haspopup": "dialog" },
+      h("span", { text: tn("{count} message with", "{count} messages with", item.messages.length) }),
+      faces(ids, 16),
+      h("span", {
+        class: "hq-exchange-names",
+        text: crowded ? tn("{count} agent", "{count} agents", ids.length) : nameList(ids.map(name)),
+      }),
+      h("span", { class: "hq-chevron" }, svg(ICONS.chevronRight, 12, { stroke: 2 })),
     );
+    line.addEventListener("click", () => openExchange(item.key));
+    const wrap = h("div", { class: crowded ? "hq-exchange crowded" : "hq-exchange" }, line);
+    if (crowded) wrap.append(roster(ids));
+    return wrap;
   }
 
   // ── Waiting for the user ────────────────────────────────────────────────────
@@ -302,7 +285,6 @@ export function createThread(store: HqStore): ThreadView {
 
   function reset() {
     entries = new Map();
-    open.clear();
     el.replaceChildren();
   }
 
