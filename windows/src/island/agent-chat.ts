@@ -196,7 +196,8 @@ export function onAgentEvent(e: OrchEvent) {
     if (!coworkerId || !childTaskId || !message) return;
     delegated.set(childTaskId, { chiefId: e.agentId, coworkerId, message });
     append(e.agentId, "assistant", t("Asked {name}: {message}", { name: agentName(coworkerId), message }));
-    append(coworkerId, "user", `${t("From Mochi")}\n\n${message}`);
+    // Mochi, or a teammate asking for help.
+    append(coworkerId, "user", `${t("From {name}", { name: agentName(e.agentId) })}\n\n${message}`);
     State.notify();
     return;
   }
