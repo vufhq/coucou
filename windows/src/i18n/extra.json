@@ -353,6 +353,17 @@
    "ru": "Не удаётся прочитать {path}: {error}",
    "id": "Tidak dapat membaca {path}: {error}"
   },
+  "Character": {
+   "zh-Hans": "角色",
+   "hi": "किरदार",
+   "es": "Personaje",
+   "ar": "الشخصية",
+   "fr": "Personnage",
+   "bn": "চরিত্র",
+   "pt-BR": "Personagem",
+   "ru": "Персонаж",
+   "id": "Karakter"
+  },
   "Chat providers": {
    "zh-Hans": "聊天服务商",
    "hi": "चैट प्रदाता",
@@ -2343,6 +2354,17 @@
    "pt-BR": "Quinta-feira",
    "ru": "Четверг",
    "id": "Kamis"
+  },
+  "Tofu is a flat pebble with Mochi's moves and outfits. It shows in the island, on the desktop and in Coucou HQ.": {
+   "zh-Hans": "Tofu 是一颗扁平的小卵石，拥有 Mochi 的动作和服装。它会出现在灵动岛、桌面和 Coucou HQ 中。",
+   "hi": "Tofu एक सपाट कंकड़ है, जिसकी हरकतें और कपड़े Mochi जैसे हैं। यह आइलैंड में, डेस्कटॉप पर और Coucou HQ में दिखता है।",
+   "es": "Tofu es un guijarro plano con los movimientos y los disfraces de Mochi. Aparece en la isla, en el escritorio y en Coucou HQ.",
+   "ar": "Tofu حصاة مسطّحة بحركات Mochi وأزيائه. يظهر في الجزيرة وعلى سطح المكتب وفي Coucou HQ.",
+   "fr": "Tofu est un galet tout plat, avec les mouvements et les tenues de Mochi. Il apparaît dans l'île, sur le bureau et dans Coucou HQ.",
+   "bn": "Tofu একটি চ্যাপ্টা নুড়ি, Mochi-র মতো নড়াচড়া আর পোশাক নিয়ে। এটি আইল্যান্ডে, ডেস্কটপে আর Coucou HQ-তে দেখা যায়।",
+   "pt-BR": "Tofu é um seixo achatado com os movimentos e as roupas do Mochi. Ele aparece na ilha, na área de trabalho e no Coucou HQ.",
+   "ru": "Tofu — плоский камешек с движениями и нарядами Mochi. Он появляется на острове, на рабочем столе и в Coucou HQ.",
+   "id": "Tofu adalah kerikil pipih dengan gerakan dan kostum Mochi. Ia muncul di pulau, di desktop, dan di Coucou HQ."
   },
   "Token": {
    "zh-Hans": "令牌",

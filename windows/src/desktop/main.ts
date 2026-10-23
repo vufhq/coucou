@@ -11,6 +11,7 @@ import { Bridge, emitToWindow, onEvent, type DesktopMode } from "../core/bridge"
 import type { BotEmoteName } from "../core/layout";
 import { Sound } from "../core/sound";
 import { BotEngine } from "../mochi/engine";
+import { applyCharacter } from "../mochi/character";
 import {
   DESKTOP_EVENTS, DOUBLE_CLICK_MS, DRAG_THRESHOLD, PANEL_SIZE, agentActive, gaze, isOverBody,
   layerDragTopLeft, lookOrigin, pointerDistance, shouldSleep, windowDragTopLeft,
@@ -37,6 +38,7 @@ class DesktopMochi {
 
   private snap: DesktopSnapshot = {
     state: "idle", outfit: "none", soundEnabled: true, soundVolume: 0.12, paused: false, dancing: false,
+    character: "mochi", tofuColor: "",
   };
 
   private visible = false;
@@ -104,6 +106,7 @@ class DesktopMochi {
   private onSnapshot(s: DesktopSnapshot) {
     this.snap = s;
     this.informed = true;
+    applyCharacter(s);
     Sound.setEnabled(s.soundEnabled);
     Sound.setVolume(s.soundVolume);
     if (agentActive(s.state)) this.lastAgentActive = performance.now();

@@ -497,6 +497,11 @@ own window.
   MultiEdit and Write, on whichever pill its session is on (VS Code, Cursor,
   Claude Desktop); other agents' edits show as plain steps.
 - There is no iPhone to keep fetching the GitHub lists while the pill is off.
+- Settings → General → Character can swap Mochi for Tofu, a flat pebble with
+  Mochi's moves and his twelve outfits, in one of ten colours. Tofu shows
+  everywhere this build draws Mochi (island, desktop, pills, Coucou HQ, the
+  wardrobe); the Mac and the phones keep Mochi. The pebble and its palette come
+  from grok-bot-avatar-engine (MIT, `src/mochi/tofu-shape.ts`).
 - Keyboard shortcuts use `Ctrl+Alt` where the Mac uses `⌃⌥`, with different
   keys (see [Keyboard shortcuts](#keyboard-shortcuts)), and `Ctrl` where the
   Mac uses `⌘` inside the island. "Bring the terminal forward" is "Open

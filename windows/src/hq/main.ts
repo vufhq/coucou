@@ -16,6 +16,7 @@ import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { mountTitleBar } from "../views/titlebar";
 import { miniBotCount, pruneMiniBots, tickMiniBots } from "../mochi/minibots";
+import { applyCharacter } from "../mochi/character";
 import { createHqStore } from "./store";
 import { mountSidebar } from "./sidebar";
 import { mountConversation } from "./conversation";
@@ -57,6 +58,7 @@ function setShown(on: boolean) {
 async function main() {
   const boot = await Bridge.boot();
   setLanguage(resolveLanguage(boot?.settings.language, systemLanguages()));
+  applyCharacter(boot?.settings);
 
   // The window is borderless (lib.rs): its title bar, with Coucou's settings in reach.
   const settingsBtn = h("button", { class: "cc-tb-action", title: tl("Settings") }, svg(ICONS.gear, 14), h("span", { text: tl("Settings") }));
@@ -93,7 +95,11 @@ async function main() {
   void onEvent<{ agentId: string | null }>("hq-open", ({ agentId }) => {
     if (agentId) store.select(agentId);
   });
-  void onEvent<Settings>("settings-changed", (s) => setLanguage(resolveLanguage(s.language, systemLanguages())));
+  void onEvent<Settings>("settings-changed", (s) => {
+    setLanguage(resolveLanguage(s.language, systemLanguages()));
+    applyCharacter(s);
+    wakeMinis();
+  });
   onLanguageChange(() => void store.reload());
   document.addEventListener("visibilitychange", wakeMinis);
   setShown(await Bridge.hqShown());

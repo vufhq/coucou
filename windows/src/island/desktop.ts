@@ -172,6 +172,8 @@ export class DesktopLink {
       soundVolume: State.settings.soundVolume,
       paused: State.paused,
       dancing: desktopDances(State.spotifyPlaying, State.effectiveState),
+      character: State.settings.character,
+      tofuColor: State.settings.tofuColor,
     };
     const key = JSON.stringify(snapshot);
     if (key === this.pushed) return;

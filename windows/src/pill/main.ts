@@ -10,6 +10,7 @@ import { Bridge, onEvent } from "../core/bridge";
 import { FlowBridge, clock, type PillState } from "../core/flow";
 import type { Settings } from "../core/state";
 import { BotEngine, hexToRGB } from "../mochi/engine";
+import { applyCharacter } from "../mochi/character";
 import { resolveLanguage, setLanguage, systemLanguages, t } from "../i18n/i18n";
 import { HUB_ICONS, keyLabel } from "../hub/ui";
 
@@ -490,6 +491,7 @@ async function say(s: Say) {
 async function main() {
   const boot = await Bridge.boot();
   setLanguage(resolveLanguage(boot?.settings.language, systemLanguages()));
+  applyCharacter(boot?.settings);
   const status = await FlowBridge.status();
   if (status) platform = status.platform;
   state = (await FlowBridge.pillState()) ?? state;
@@ -519,6 +521,7 @@ async function main() {
   void onEvent<Say>("voice-say", (s) => void say(s));
   void onEvent<Settings>("settings-changed", (s) => {
     setLanguage(resolveLanguage(s.language, systemLanguages()));
+    applyCharacter(s);
     render();
   });
 }

@@ -21,6 +21,9 @@ export interface DesktopSnapshot {
   paused: boolean;
   /** Music plays: he dances (the compact island's rules, core/spotify.ts). */
   dancing: boolean;
+  /** The character and Tofu's colour, as in the preferences (mochi/character.ts). */
+  character: string;
+  tofuColor: string;
 }
 
 /** Events between the two windows. Rust adds `desktop-mochi-dropped`. */
