@@ -16,6 +16,7 @@ import {
   CreateTeamRequest,
   CreateTaskRequest,
   GoalRunRequest,
+  MAX_ATTACHMENT_BYTES,
   RelPath,
   TaskAnswer,
   UpdateTeamRequest,
@@ -23,6 +24,7 @@ import {
   type Agent,
   type AgentProblem,
 } from "@coucou-orchestrator/protocol";
+import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
 import type { ModelRouter } from "./model/router.ts";
 import { runBackendJob, type Downloads, type JobSignals } from "./jobs.ts";
@@ -40,6 +42,8 @@ export interface ApiDeps {
   runner: Runner;
   signals: JobSignals;
   downloads: Downloads;
+  /** Files attached to messages; without it, POST /api/attachments is not there. */
+  uploads?: Uploads;
   models: ModelRouter;
   token: string;
   vmProbe: VmProbe;
@@ -121,6 +125,10 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     return running;
   };
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
+  // Attached files, on their one route; everything else is JSON.
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: MAX_ATTACHMENT_BYTES }, (_req, body, done) =>
+    done(null, body),
+  );
   const chiefId = () => store.agents().find((agent) => agent.kind === "chief")!.id;
 
   app.addHook("onRequest", async (req, reply) => {
@@ -138,9 +146,26 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     if (body.data.modelProfileId && !deps.models.has(body.data.modelProfileId)) {
       return bad(reply, `unknown model profile ${body.data.modelProfileId}`);
     }
-    const { task, created } = runner.submit(body.data);
+    const submitted = runner.submit(body.data);
+    if ("error" in submitted) return bad(reply, submitted.error);
+    const { task, created } = submitted;
     return reply.code(created ? 201 : 200).send({ task, created });
   });
+
+  // A file for the next message, bytes as they are; its id goes in the task's
+  // `attachments`. It waits here until the task copies it to the computer.
+  app.post<{ Querystring: { name?: string } }>(
+    "/api/attachments",
+    { bodyLimit: MAX_ATTACHMENT_BYTES },
+    async (req, reply) => {
+      if (!deps.uploads) return reply.code(404).send({ error: "not_found" });
+      if (!Buffer.isBuffer(req.body)) return reply.code(415).send({ error: "invalid", message: "expected application/octet-stream" });
+      const name = z.string().min(1).max(255).safeParse(req.query.name);
+      if (!name.success) return bad(reply, "name is required");
+      const upload = deps.uploads.save(name.data, req.body);
+      return reply.code(201).send({ attachment: { id: upload.id, name: upload.name, bytes: upload.bytes } });
+    },
+  );
 
   app.get("/api/tasks", async (req, reply) => {
     const q = TaskQuery.safeParse(req.query);

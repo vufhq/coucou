@@ -4,6 +4,7 @@
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { buildApi } from "./api.ts";
+import { Uploads } from "./attachments.ts";
 import type { Config } from "./config.ts";
 import { EventLog } from "./events.ts";
 import { buildGateway } from "./gateway.ts";
@@ -60,6 +61,7 @@ export function createBackend(
   const events = new EventLog(store);
   const signals = new JobSignals();
   const downloads = new Downloads();
+  const uploads = new Uploads(store, join(config.dataDir, "uploads"));
   const runner = new Runner(store, events, models, {
     leaseMs: config.leaseMs,
     defaultModelProfile: config.defaultModelProfile,
@@ -67,15 +69,17 @@ export function createBackend(
     pollMs: opts.pollMs,
     modelRetries: opts.modelRetries,
     transientRetryDelaysMs: opts.transientRetryDelaysMs,
+    uploads,
   });
   const scheduler = new GoalScheduler(store, events, runner, opts.schedulerPollMs);
-  const api = buildApi({ store, events, runner, signals, downloads, models, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
+  const api = buildApi({ store, events, runner, signals, downloads, uploads, models, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
   const gateway = buildGateway({
     store,
     events,
     runner,
     signals,
     downloads,
+    uploads,
     tokens: tokens.workers,
     leaseMs: config.leaseMs,
     claimWaitMs: config.claimWaitMs,
@@ -97,7 +101,11 @@ export function createBackend(
       runner.start();
       scheduler.start();
       prune(store, config.retentionDays);
-      pruner = setInterval(() => prune(store, config.retentionDays), PRUNE_EVERY_MS);
+      uploads.prune();
+      pruner = setInterval(() => {
+        prune(store, config.retentionDays);
+        uploads.prune();
+      }, PRUNE_EVERY_MS);
       pruner.unref();
       const port = (s: FastifyInstance) => {
         const addr = s.server.address();

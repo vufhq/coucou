@@ -7,11 +7,13 @@ import { calls, emit, internals, sent } from "./tauri.mjs";
 import {
   buildThread,
   conversationContext,
+  githubLinks,
   groupChildren,
   isWorking,
   needsUser,
   oneLine,
   pendingQuestion,
+  sizeLabel,
   threadPreview,
   withTimes,
 } from "../src/hq/model.ts";
@@ -307,6 +309,32 @@ test("an agent is working while its computer is busy or a task of its runs", () 
   assert.equal(isWorking({ status: "ready" }, [task({ status: "waiting_for_answer" }), task()]), false);
 });
 
+test("the user's message carries what was attached to it", () => {
+  const attachments = [{ kind: "file", name: "a.pdf", path: "attachments/a.pdf", bytes: 10, url: null }];
+  const user = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [task({ attachments })] }).find((i) => i.kind === "user");
+  assert.deepEqual(user.attachments, attachments);
+  const plain = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [task()] }).find((i) => i.kind === "user");
+  assert.equal("attachments" in plain, false);
+});
+
+test("githubLinks finds each repository once, and leaves other GitHub pages", () => {
+  assert.deepEqual(
+    githubLinks(
+      "See https://github.com/octo/app, https://github.com/octo/app/blob/main/x.py and https://github.com/Other/lib.git. " +
+        "Not https://github.com/features/copilot nor https://example.com/a/b nor http://github.com/a/b",
+    ),
+    ["https://github.com/octo/app", "https://github.com/Other/lib"],
+  );
+  const many = Array.from({ length: 6 }, (_, i) => `https://github.com/o/r${i}`).join(" ");
+  assert.equal(githubLinks(many).length, 4);
+});
+
+test("sizeLabel speaks the user's units", () => {
+  assert.equal(sizeLabel(820, "en"), "0.8 kB");
+  assert.equal(sizeLabel(14_200, "en"), "14.2 kB");
+  assert.equal(sizeLabel(2_400_000, "en"), "2.4 MB");
+});
+
 // ── store.ts ────────────────────────────────────────────────────────────────
 
 const AGENTS = [
@@ -391,6 +419,44 @@ test("a message that could not go stays in the conversation, with why", async ()
   assert.equal(last.kind, "agent");
   assert.equal(last.failed, true);
   assert.match(last.markdown, /Couldn't send it: backend down/);
+});
+
+test("send takes the attached files and the GitHub links in the text, and shows them at once", async () => {
+  const store = createHqStore();
+  await store.start();
+  let release;
+  const answered = new Promise((resolve) => (release = resolve));
+  backend.orchestrator_submit = async (args) => {
+    await answered;
+    return { task: task({ id: "t-files", prompt: args.prompt, status: "queued", result: null, attachments: [] }), created: true };
+  };
+  const files = [{ id: "u-1", name: "report.pdf", bytes: 2048 }];
+  const sending = store.send(ADA, "Read this and https://github.com/octo/app/tree/main please", files);
+  // Before the backend answers, the draft already carries its chips.
+  await new Promise((resolve) => setImmediate(resolve));
+  const draft = store.thread(ADA).find((i) => i.kind === "user");
+  assert.deepEqual(draft.attachments, [
+    { kind: "file", name: "report.pdf", path: "", bytes: 2048, url: null },
+    { kind: "repo", name: "octo/app", path: "", bytes: null, url: "https://github.com/octo/app" },
+  ]);
+  release();
+  await sending;
+  const [args] = sent("orchestrator_submit");
+  assert.deepEqual(args.attachments, ["u-1"]);
+  assert.deepEqual(args.links, ["https://github.com/octo/app"]);
+});
+
+test("files never go with an answer: the question comes first", async () => {
+  backend.orchestrator_chat_history = ({ agentId }) => ({
+    tasks: agentId === CHIEF
+      ? [task({ id: "t-ask", status: "waiting_for_answer", result: null, question: { id: "q1", text: "Which?", options: [] } })]
+      : [],
+  });
+  const store = createHqStore();
+  await store.start();
+  await assert.rejects(store.send(CHIEF, "Blue", [{ id: "u-1", name: "a.txt", bytes: 1 }]), /question first/);
+  assert.deepEqual(sent("orchestrator_answer"), []);
+  assert.deepEqual(sent("orchestrator_submit"), []);
 });
 
 test("send answers the pending question instead of starting a task", async () => {

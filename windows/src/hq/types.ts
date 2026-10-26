@@ -4,7 +4,14 @@
 // thread.ts, composer.ts, palette.ts) and the side panel (panel.ts). Each part
 // only talks to the others through these.
 
-import type { OrchAgent, OrchApproval, OrchComputer, OrchTask, OrchTeam } from "../core/orchestrator";
+import type { OrchAgent, OrchApproval, OrchAttachment, OrchComputer, OrchTask, OrchTeam } from "../core/orchestrator";
+
+/** A file already handed to the backend for the next message. */
+export interface SentFile {
+  id: string;
+  name: string;
+  bytes: number;
+}
 
 /** One message between two agents, inside an exchange ("2 messages with Ada and Linus"). */
 export interface ExchangeMessage {
@@ -20,7 +27,7 @@ export type ThreadItem =
   /** A time separator ("Yesterday 12:27 AM"), before a message more than an hour after the last. */
   | { kind: "time"; key: string; at: string }
   /** What the user wrote. */
-  | { kind: "user"; key: string; taskId: string; text: string; at: string }
+  | { kind: "user"; key: string; taskId: string; text: string; at: string; attachments?: OrchAttachment[] }
   /** What the agent answered (Markdown), with the files its task made. */
   | { kind: "agent"; key: string; taskId: string; agentId: string; markdown: string; at: string; artifacts: string[]; failed: boolean }
   /**
@@ -87,8 +94,12 @@ export interface HqStore {
   activity(): Promise<OrchTask[]>;
   /** Cancels a task. Rejects when the backend refused. Called only from an explicit click. */
   stop(taskId: string): Promise<void>;
-  /** Sends what the user typed: answers the pending question, or starts a chat task. */
-  send(agentId: string, text: string): Promise<void>;
+  /**
+   * Sends what the user typed: answers the pending question, or starts a chat
+   * task with `files` (from OrchestratorBridge.attach) and the GitHub links in
+   * the text. Rejects files with an answer: they need a new message.
+   */
+  send(agentId: string, text: string, files?: readonly SentFile[]): Promise<void>;
   answer(taskId: string, questionId: string, text: string): Promise<void>;
   decide(approval: OrchApproval, approve: boolean): Promise<void>;
   /** Saves one of a task's files where the user chooses; resolves to the saved path. */

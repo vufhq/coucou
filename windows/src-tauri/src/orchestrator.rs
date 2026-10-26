@@ -140,13 +140,29 @@ fn token() -> Result<String, String> {
 }
 
 async fn request(app: &AppHandle, method: Method, path: &str, body: Option<Value>) -> Result<Vec<u8>, String> {
+    send(app, method, path, &[], |req| match body {
+        Some(body) => req.json(&body),
+        None => req,
+    })
+    .await
+}
+
+/// `path` on the backend with `query` (encoded here), the body set by `with`.
+async fn send(
+    app: &AppHandle,
+    method: Method,
+    path: &str,
+    query: &[(&str, &str)],
+    with: impl FnOnce(reqwest::RequestBuilder) -> reqwest::RequestBuilder,
+) -> Result<Vec<u8>, String> {
     let url = state(app).prefs.lock().unwrap().url.clone();
     let base = base_url(&url)?;
     let client = net::client(&base, REQUEST_TIMEOUT)?;
-    let mut req = client.request(method, net::join(&base, path)).bearer_auth(token()?);
-    if let Some(body) = body {
-        req = req.json(&body);
+    let mut target = Url::parse(&net::join(&base, path)).map_err(|e| e.to_string())?;
+    if !query.is_empty() {
+        target.query_pairs_mut().extend_pairs(query);
     }
+    let req = with(client.request(method, target).bearer_auth(token()?));
     let response = req
         .send()
         .await
@@ -679,8 +695,17 @@ pub async fn orchestrator_submit(
     agent_id: Option<String>,
     context: Option<String>,
     source: Option<String>,
+    attachments: Option<Vec<String>>,
+    links: Option<Vec<String>>,
 ) -> Result<Value, String> {
     let mut body = json!({ "prompt": prompt, "idempotencyKey": segment(&idempotency_key)? });
+    // Ids from orchestrator_attach, and GitHub links: the backend checks both.
+    if let Some(ids) = attachments.filter(|ids| !ids.is_empty()) {
+        body["attachments"] = json!(ids.iter().map(|id| segment(id)).collect::<Result<Vec<_>, _>>()?);
+    }
+    if let Some(links) = links.filter(|links| !links.is_empty()) {
+        body["links"] = json!(links);
+    }
     if let Some(profile) = model_profile_id {
         body["modelProfileId"] = json!(segment(&profile)?);
     }
@@ -699,6 +724,37 @@ pub async fn orchestrator_submit(
         body["source"] = json!(source);
     }
     api(&app, Method::POST, "/api/tasks", Some(body)).await
+}
+
+/// The largest file a message can carry: the backend's own limit.
+const MAX_ATTACHMENT: u64 = 20 * 1024 * 1024;
+
+/// Hands the backend a file the user dropped on (or picked in) Coucou HQ's
+/// composer; it keeps it for the next message, whose task copies it to the
+/// agent's computer. Only a path a real drop or pick just delivered is read
+/// (files.rs), so the page cannot send a file of its own choosing.
+#[tauri::command]
+pub async fn orchestrator_attach(app: AppHandle, path: String) -> Result<Value, String> {
+    if !crate::files::take_dropped(&path) {
+        return Err(t("Only files dropped on or chosen in Coucou HQ can be attached."));
+    }
+    let source = Path::new(&path);
+    let meta = std::fs::metadata(source)
+        .map_err(|e| tf("Cannot read {path}: {error}", &[("path", &path), ("error", &e.to_string())]))?;
+    let name = source.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
+    if meta.is_dir() {
+        return Err(t("Folders can't be attached yet."));
+    }
+    if meta.len() > MAX_ATTACHMENT {
+        return Err(tf("{name} is larger than 20 MB.", &[("name", &name)]));
+    }
+    let bytes = std::fs::read(source)
+        .map_err(|e| tf("Cannot read {path}: {error}", &[("path", &path), ("error", &e.to_string())]))?;
+    let answer = send(&app, Method::POST, "/api/attachments", &[("name", &name)], |req| {
+        req.header(reqwest::header::CONTENT_TYPE, "application/octet-stream").body(bytes)
+    })
+    .await?;
+    serde_json::from_slice(&answer).map_err(|e| e.to_string())
 }
 
 /// The models the backend can run tasks on (Claude, Cursor…), and its default.

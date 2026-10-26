@@ -41,7 +41,11 @@ export type WorkerHealth = z.infer<typeof WorkerHealth>;
 export const Hello = z.object({
   agentId: AgentId,
   version: z.string().max(32),
-  capabilities: z.array(WorkerOpName),
+  /** The operations it can run. Names this side does not know (a newer worker) are dropped. */
+  capabilities: z
+    .array(z.string().max(64))
+    .max(64)
+    .transform((names) => names.filter((name): name is WorkerOpName => WorkerOpName.safeParse(name).success)),
   journal: z.array(JournalEntry).max(500),
   health: WorkerHealth.optional(),
 });

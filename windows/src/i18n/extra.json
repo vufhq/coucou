@@ -6392,6 +6392,94 @@
    "pt-BR": "Essa pasta não tem o backend do orchestrator.",
    "ru": "В этой папке нет бэкенда orchestrator.",
    "id": "Folder itu tidak berisi backend orchestrator."
+  },
+  "Attach files…": {
+   "zh-Hans": "附加文件…",
+   "hi": "फ़ाइलें जोड़ें…",
+   "es": "Adjuntar archivos…",
+   "ar": "إرفاق ملفات…",
+   "fr": "Joindre des fichiers…",
+   "bn": "ফাইল সংযুক্ত করুন…",
+   "pt-BR": "Anexar arquivos…",
+   "ru": "Прикрепить файлы…",
+   "id": "Lampirkan file…"
+  },
+  "GitHub repository": {
+   "zh-Hans": "GitHub 仓库",
+   "hi": "GitHub रिपॉज़िटरी",
+   "es": "Repositorio de GitHub",
+   "ar": "مستودع GitHub",
+   "fr": "Dépôt GitHub",
+   "bn": "GitHub রিপোজিটরি",
+   "pt-BR": "Repositório do GitHub",
+   "ru": "Репозиторий GitHub",
+   "id": "Repositori GitHub"
+  },
+  "Here are some files.": {
+   "zh-Hans": "这里有一些文件。",
+   "hi": "ये कुछ फ़ाइलें हैं।",
+   "es": "Aquí tienes unos archivos.",
+   "ar": "إليك بعض الملفات.",
+   "fr": "Voici quelques fichiers.",
+   "bn": "এখানে কয়েকটি ফাইল আছে।",
+   "pt-BR": "Aqui estão alguns arquivos.",
+   "ru": "Вот несколько файлов.",
+   "id": "Ini beberapa file."
+  },
+  "At most {count} files per message.": {
+   "zh-Hans": "每条消息最多 {count} 个文件。",
+   "hi": "एक संदेश में अधिकतम {count} फ़ाइलें।",
+   "es": "Como máximo {count} archivos por mensaje.",
+   "ar": "{count} ملفات كحد أقصى لكل رسالة.",
+   "fr": "{count} fichiers au plus par message.",
+   "bn": "প্রতি বার্তায় সর্বোচ্চ {count}টি ফাইল।",
+   "pt-BR": "No máximo {count} arquivos por mensagem.",
+   "ru": "Не больше {count} файлов в одном сообщении.",
+   "id": "Paling banyak {count} file per pesan."
+  },
+  "Answer {name}'s question first, then send the files.": {
+   "zh-Hans": "请先回答 {name} 的问题，再发送文件。",
+   "hi": "पहले {name} के सवाल का जवाब दें, फिर फ़ाइलें भेजें।",
+   "es": "Responde primero a la pregunta de {name} y luego envía los archivos.",
+   "ar": "أجب عن سؤال {name} أولًا، ثم أرسل الملفات.",
+   "fr": "Répondez d'abord à la question de {name}, puis envoyez les fichiers.",
+   "bn": "আগে {name}-এর প্রশ্নের উত্তর দিন, তারপর ফাইল পাঠান।",
+   "pt-BR": "Responda primeiro à pergunta de {name} e depois envie os arquivos.",
+   "ru": "Сначала ответьте на вопрос {name}, потом отправьте файлы.",
+   "id": "Jawab dulu pertanyaan {name}, lalu kirim filenya."
+  },
+  "Only files dropped on or chosen in Coucou HQ can be attached.": {
+   "zh-Hans": "只能附加拖到 Coucou HQ 或在其中选择的文件。",
+   "hi": "केवल वही फ़ाइलें जोड़ी जा सकती हैं जो Coucou HQ पर छोड़ी गई हों या उसमें चुनी गई हों।",
+   "es": "Solo se pueden adjuntar archivos soltados o elegidos en Coucou HQ.",
+   "ar": "لا يمكن إرفاق إلا الملفات التي تُسحب إلى Coucou HQ أو تُختار فيه.",
+   "fr": "Seuls les fichiers déposés ou choisis dans Coucou HQ peuvent être joints.",
+   "bn": "শুধু Coucou HQ-তে ছাড়া বা বেছে নেওয়া ফাইলই সংযুক্ত করা যায়।",
+   "pt-BR": "Só é possível anexar arquivos soltados ou escolhidos no Coucou HQ.",
+   "ru": "Прикрепить можно только файлы, перетащенные в Coucou HQ или выбранные в нём.",
+   "id": "Hanya file yang dijatuhkan ke atau dipilih di Coucou HQ yang bisa dilampirkan."
+  },
+  "Folders can't be attached yet.": {
+   "zh-Hans": "暂时还不能附加文件夹。",
+   "hi": "फ़ोल्डर अभी नहीं जोड़े जा सकते।",
+   "es": "Todavía no se pueden adjuntar carpetas.",
+   "ar": "لا يمكن إرفاق المجلدات بعد.",
+   "fr": "Les dossiers ne peuvent pas encore être joints.",
+   "bn": "ফোল্ডার এখনো সংযুক্ত করা যায় না।",
+   "pt-BR": "Ainda não é possível anexar pastas.",
+   "ru": "Папки пока нельзя прикрепить.",
+   "id": "Folder belum bisa dilampirkan."
+  },
+  "{name} is larger than 20 MB.": {
+   "zh-Hans": "{name} 超过 20 MB。",
+   "hi": "{name} 20 MB से बड़ी है।",
+   "es": "{name} supera los 20 MB.",
+   "ar": "حجم {name} أكبر من 20 ميغابايت.",
+   "fr": "{name} dépasse 20 Mo.",
+   "bn": "{name} 20 MB-এর চেয়ে বড়।",
+   "pt-BR": "{name} tem mais de 20 MB.",
+   "ru": "{name} больше 20 МБ.",
+   "id": "{name} lebih besar dari 20 MB."
   }
  }
 }

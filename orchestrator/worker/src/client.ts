@@ -61,6 +61,16 @@ export class BackendClient {
     await this.post(`/worker/v1/jobs/${encodeURIComponent(jobId)}/file?agentId=${this.agentId}`, bytes, 60_000);
   }
 
+  /** The bytes of a file the user attached, for an fs.receive job. */
+  async download(jobId: string): Promise<Buffer> {
+    const res = await fetch(`${this.base}/worker/v1/jobs/${encodeURIComponent(jobId)}/file?agentId=${this.agentId}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) throw new BackendError(res.status, `file: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   async heartbeat(running: string[]): Promise<string[]> {
     const out = HeartbeatResponse.parse(await this.post("/worker/v1/heartbeat", { agentId: this.agentId, running }, 10_000));
     return out.cancel;
