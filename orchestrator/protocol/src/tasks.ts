@@ -86,6 +86,15 @@ export const Task = z.object({
   parentTaskId: z.string().nullable(),
   goalId: z.string().nullable(),
   question: TaskQuestion.nullable(),
+  /** Questions the task asked and the answers it got, oldest first. */
+  answers: z.array(
+    z.object({
+      question: TaskQuestion,
+      answer: z.string(),
+      askedAt: z.string().optional(),
+      answeredAt: z.string().optional(),
+    }),
+  ),
   waitingReason: z.enum(["agent_paused", "daily_limit", "computer_offline"]).nullable(),
   modelProfileId: z.string(),
   workspace: z.string(),

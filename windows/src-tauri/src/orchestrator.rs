@@ -9,14 +9,19 @@
 // Heartbeats and tool output stay out of the island: a hidden island still
 // costs nothing. The Tasks page gets every event as `orchestrator-event`.
 //
+// When nothing answers, Coucou starts the backend itself (node, from the
+// orchestrator folder: the one picked on the Tasks page, else the repository a
+// dev build sits in) and leaves it running when it quits.
+//
 // The access token is the backend's own: it writes it to the Credential
 // Manager on its first start, under Coucou's service name, and only Rust reads
 // it. The backend's address must be this machine, so the token cannot be sent
 // anywhere else.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
@@ -44,11 +49,15 @@ const MAX_EVENT: usize = 1 << 20;
 pub struct Prefs {
     pub enabled: bool,
     pub url: String,
+    /// Start the backend when nothing answers at `url`.
+    pub start_backend: bool,
+    /// The orchestrator folder to start it from; empty: the repository this build came from.
+    pub backend_dir: String,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { enabled: false, url: DEFAULT_URL.into() }
+        Self { enabled: false, url: DEFAULT_URL.into(), start_backend: true, backend_dir: String::new() }
     }
 }
 
@@ -65,6 +74,8 @@ pub struct Orchestrator {
     prefs: Mutex<Prefs>,
     status: Mutex<Status>,
     wake: Notify,
+    /// When Coucou last started the backend.
+    started: Mutex<Option<Instant>>,
 }
 
 fn state(app: &AppHandle) -> tauri::State<'_, Orchestrator> {
@@ -407,6 +418,7 @@ pub fn setup(app: &AppHandle) {
         prefs: Mutex::new(load_prefs()),
         status: Mutex::new(Status { state: "off", error: None }),
         wake: Notify::new(),
+        started: Mutex::new(None),
     });
     let app = app.clone();
     tauri::async_runtime::spawn(async move { run(app).await });
@@ -424,6 +436,8 @@ async fn run(app: AppHandle) {
             sleep_or_wake(&app, Duration::from_secs(5)).await;
             continue;
         }
+        // Before the key check: the backend's first start is what creates the key.
+        ensure_backend(&app, &prefs).await;
         if secrets::get_internal(TOKEN_KEY).is_none() {
             set_status(&app, "noToken", None);
             sleep_or_wake(&app, Duration::from_secs(10)).await;
@@ -440,6 +454,71 @@ async fn run(app: AppHandle) {
             }
         }
     }
+}
+
+// ── Starting the backend ──────────────────────────────────────────────────────
+
+/// A folder holding the backend: its package.json and server/src/main.ts.
+fn is_backend_dir(dir: &Path) -> bool {
+    dir.join("package.json").is_file() && dir.join("server").join("src").join("main.ts").is_file()
+}
+
+/// Where Coucou starts the backend from: the folder the user picked, else the
+/// `orchestrator` folder of the repository this build sits in (a dev build).
+/// None for an installed build with no folder picked.
+fn backend_dir(prefs: &Prefs) -> Option<PathBuf> {
+    let picked = prefs.backend_dir.trim();
+    if !picked.is_empty() {
+        let dir = PathBuf::from(picked);
+        return is_backend_dir(&dir).then_some(dir);
+    }
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors().map(|dir| dir.join("orchestrator")).find(|dir| is_backend_dir(dir))
+}
+
+/// Starts the backend when nothing answers at its address, at most once a
+/// minute. It keeps running when Coucou quits, so goals and tasks go on.
+async fn ensure_backend(app: &AppHandle, prefs: &Prefs) {
+    if !prefs.start_backend {
+        return;
+    }
+    let Ok(base) = base_url(&prefs.url) else { return };
+    let (Some(host), Some(port)) = (base.host_str().map(str::to_string), base.port_or_known_default()) else { return };
+    let address = format!("{host}:{port}");
+    let answers = tokio::time::timeout(Duration::from_secs(1), tokio::net::TcpStream::connect(address)).await;
+    if matches!(answers, Ok(Ok(_))) {
+        return;
+    }
+    let Some(dir) = backend_dir(prefs) else { return };
+    {
+        let orchestrator = state(app);
+        let mut started = orchestrator.started.lock().unwrap();
+        if started.is_some_and(|at| at.elapsed() < Duration::from_secs(60)) {
+            return;
+        }
+        *started = Some(Instant::now());
+    }
+    match spawn_backend(&dir) {
+        Ok(()) => log::line(format!("orchestrator: started the backend in {}", dir.display())),
+        Err(e) => log::line(format!("orchestrator: could not start the backend: {e}")),
+    }
+}
+
+/// `npm start` without npm: node runs the backend with the folder's .env, its
+/// output in Coucou's local folder.
+fn spawn_backend(dir: &Path) -> Result<(), String> {
+    let node = platform::find_on_path("node").ok_or("node is not on PATH")?;
+    let logs = platform::local_dir();
+    std::fs::create_dir_all(&logs).map_err(|e| e.to_string())?;
+    let out = std::fs::File::create(logs.join("orchestrator-backend.log")).map_err(|e| e.to_string())?;
+    let err = out.try_clone().map_err(|e| e.to_string())?;
+    let mut cmd = Command::new(node);
+    cmd.args(["--env-file-if-exists=.env", "server/src/main.ts"])
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(out)
+        .stderr(err);
+    platform::no_console(&mut cmd).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 async fn sleep_or_wake(app: &AppHandle, d: Duration) {
@@ -542,13 +621,31 @@ pub fn orchestrator_status(app: AppHandle) -> Value {
     let o = state(&app);
     let prefs = o.prefs.lock().unwrap().clone();
     let status = o.status.lock().unwrap().clone();
-    json!({ "prefs": prefs, "status": status, "hasToken": secrets::get_internal(TOKEN_KEY).is_some() })
+    let backend_dir = backend_dir(&prefs).map(|dir| dir.display().to_string());
+    json!({
+        "prefs": prefs,
+        "status": status,
+        "hasToken": secrets::get_internal(TOKEN_KEY).is_some(),
+        "backendDir": backend_dir,
+    })
 }
 
+/// `start_backend` and `backend_dir` left out keep what they were.
 #[tauri::command]
-pub fn orchestrator_set_prefs(app: AppHandle, enabled: bool, url: String) -> Result<(), String> {
+pub fn orchestrator_set_prefs(
+    app: AppHandle,
+    enabled: bool,
+    url: String,
+    start_backend: Option<bool>,
+    backend_dir: Option<String>,
+) -> Result<(), String> {
     let url = if url.trim().is_empty() { DEFAULT_URL.to_string() } else { base_url(&url)?.as_str().trim_end_matches('/').to_string() };
-    let prefs = Prefs { enabled, url };
+    let before = state(&app).prefs.lock().unwrap().clone();
+    let backend_dir = backend_dir.map(|dir| dir.trim().to_string()).unwrap_or(before.backend_dir);
+    if !backend_dir.is_empty() && !is_backend_dir(Path::new(&backend_dir)) {
+        return Err(t("That folder has no orchestrator backend."));
+    }
+    let prefs = Prefs { enabled, url, start_backend: start_backend.unwrap_or(before.start_backend), backend_dir };
     save_prefs(&prefs)?;
     *state(&app).prefs.lock().unwrap() = prefs;
     state(&app).wake.notify_waiters();
@@ -894,6 +991,22 @@ mod tests {
 
     fn event(kind: &str, payload: Value) -> Value {
         json!({ "v": 1, "seq": 7, "type": kind, "taskId": "t-1", "agentId": "agent-01", "payload": payload })
+    }
+
+    #[test]
+    fn older_prefs_start_the_backend_and_a_picked_folder_must_hold_it() {
+        let prefs: Prefs = serde_json::from_str(r#"{"enabled":true,"url":"http://127.0.0.1:47620"}"#).unwrap();
+        assert!(prefs.start_backend);
+        assert_eq!(prefs.backend_dir, "");
+
+        let dir = std::env::temp_dir().join(format!("coucou-orch-dir-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("server").join("src")).unwrap();
+        let picked = Prefs { backend_dir: dir.display().to_string(), ..Prefs::default() };
+        assert_eq!(backend_dir(&picked), None);
+        std::fs::write(dir.join("package.json"), "{}").unwrap();
+        std::fs::write(dir.join("server").join("src").join("main.ts"), "").unwrap();
+        assert_eq!(backend_dir(&picked), Some(dir.clone()));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

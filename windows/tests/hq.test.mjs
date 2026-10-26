@@ -181,6 +181,41 @@ test("a question in a task the user started waits for the user, with its options
   assert.equal(pendingQuestion(items).questionId, "q1");
 });
 
+test("a finished task keeps the questions it asked and the answers, in time order", () => {
+  const answer = (id, text, reply, askedAt, answeredAt) => ({
+    question: { id, text, options: [] }, answer: reply, askedAt, answeredAt,
+  });
+  // The user's own task: it asked, handed work out, then asked again.
+  const parent = task({ prompt: "Ship it", createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:30:00Z",
+    result: { summary: "Shipped.", artifacts: [] },
+    answers: [
+      answer("q1", "Which branch?", "main", "2026-10-20T10:01:00Z", "2026-10-20T10:02:00Z"),
+      answer("q2", "Tag it?", "Yes", "2026-10-20T10:20:00Z", "2026-10-20T10:21:00Z"),
+    ] });
+  const toAda = task({ agentId: ADA, source: "delegated", parentTaskId: parent.id, prompt: "Run the tests",
+    createdAt: "2026-10-20T10:05:00Z", updatedAt: "2026-10-20T10:15:00Z", result: { summary: "Green.", artifacts: [] },
+    answers: [answer("q3", "All of them?", "Only unit", "2026-10-20T10:06:00Z", "2026-10-20T10:07:00Z")] });
+  const children = groupChildren([toAda]);
+  const items = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [parent], children });
+  assert.deepEqual(kinds(items), ["time", "user", "agent", "user", "exchange", "agent", "user", "agent"]);
+  assert.deepEqual(
+    items.filter((i) => i.kind === "user" || i.kind === "agent").map((i) => i.text ?? i.markdown),
+    ["Ship it", "Which branch?", "main", "Tag it?", "Yes", "Shipped."],
+  );
+  assert.equal(new Set(keys(items)).size, items.length, "keys stay unique");
+
+  // Ada's question went to the chief who asked her, inside the exchange.
+  const said = (item) => item.messages.map((m) => [m.fromAgentId, m.toAgentId, m.text]);
+  assert.deepEqual(said(items[4]), [
+    [CHIEF, ADA, "Run the tests"],
+    [ADA, CHIEF, "All of them?"],
+    [CHIEF, ADA, "Only unit"],
+    [ADA, CHIEF, "Green."],
+  ]);
+  const ada = buildThread({ agentId: ADA, chiefId: CHIEF, tasks: [toAda], children });
+  assert.deepEqual(said(ada[1]), said(items[4]));
+});
+
 test("a goal run is an agent message titled with the goal", () => {
   const run = task({ source: "goal", goalId: "g1", prompt: "Check the inbox", result: { summary: "3 new mails.", artifacts: [] } });
   const items = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [run], goalTitles: new Map([["g1", "Inbox zero"]]) });

@@ -5418,27 +5418,16 @@
    "ru": "Нет доступных компьютеров.",
    "id": "Tidak ada komputer yang tersedia."
   },
-  "Waiting for Mochi to answer.": {
-   "zh-Hans": "等待 Mochi 回答。",
-   "hi": "Mochi के जवाब की प्रतीक्षा है।",
-   "es": "Esperando la respuesta de Mochi.",
-   "ar": "بانتظار إجابة Mochi.",
-   "fr": "En attente de la réponse de Mochi.",
-   "bn": "Mochi-এর উত্তরের অপেক্ষায়।",
-   "pt-BR": "Aguardando a resposta de Mochi.",
-   "ru": "Ожидание ответа Mochi.",
-   "id": "Menunggu jawaban Mochi."
-  },
-  "From Mochi": {
-   "zh-Hans": "来自 Mochi",
-   "hi": "Mochi से",
-   "es": "De Mochi",
-   "ar": "من Mochi",
-   "fr": "De Mochi",
-   "bn": "Mochi থেকে",
-   "pt-BR": "De Mochi",
-   "ru": "От Mochi",
-   "id": "Dari Mochi"
+  "Waiting for {name} to answer.": {
+   "zh-Hans": "等待 {name} 回答。",
+   "hi": "{name} के जवाब की प्रतीक्षा है।",
+   "es": "Esperando la respuesta de {name}.",
+   "ar": "بانتظار إجابة {name}.",
+   "fr": "En attente de la réponse de {name}.",
+   "bn": "{name}-এর উত্তরের অপেক্ষায়।",
+   "pt-BR": "Aguardando a resposta de {name}.",
+   "ru": "Ожидание ответа {name}.",
+   "id": "Menunggu jawaban {name}."
   },
   "{name} asks: {message}": {
    "zh-Hans": "{name} 问：{message}",
@@ -5484,16 +5473,16 @@
    "ru": "Создать",
    "id": "Baru"
   },
-  "Ask Mochi to hire…": {
-   "zh-Hans": "让 Mochi 招人…",
-   "hi": "Mochi से भर्ती करने को कहें…",
-   "es": "Pedir a Mochi que contrate…",
-   "ar": "اطلب من Mochi التوظيف…",
-   "fr": "Demander à Mochi d’embaucher…",
-   "bn": "Mochi-কে নিয়োগ দিতে বলুন…",
-   "pt-BR": "Pedir ao Mochi para contratar…",
-   "ru": "Попросить Mochi нанять…",
-   "id": "Minta Mochi merekrut…"
+  "Ask {name} to hire…": {
+   "zh-Hans": "让 {name} 招人…",
+   "hi": "{name} से भर्ती करने को कहें…",
+   "es": "Pedir a {name} que contrate…",
+   "ar": "اطلب من {name} التوظيف…",
+   "fr": "Demander à {name} d’embaucher…",
+   "bn": "{name}-কে নিয়োগ দিতে বলুন…",
+   "pt-BR": "Pedir a {name} para contratar…",
+   "ru": "Попросить {name} нанять…",
+   "id": "Minta {name} merekrut…"
   },
   "Create agent…": {
    "zh-Hans": "创建代理…",
@@ -6348,6 +6337,61 @@
    "pt-BR": "De {name}",
    "ru": "От {name}",
    "id": "Dari {name}"
+  },
+  "Start the backend with Coucou": {
+   "zh-Hans": "随 Coucou 启动后端",
+   "hi": "Coucou के साथ बैकएंड शुरू करें",
+   "es": "Iniciar el backend con Coucou",
+   "ar": "تشغيل الخادم الخلفي مع Coucou",
+   "fr": "Démarrer le backend avec Coucou",
+   "bn": "Coucou-এর সাথে ব্যাকএন্ড চালু করুন",
+   "pt-BR": "Iniciar o backend com o Coucou",
+   "ru": "Запускать бэкенд вместе с Coucou",
+   "id": "Mulai backend bersama Coucou"
+  },
+  "Starts it from {folder} when it is not running.": {
+   "zh-Hans": "后端未运行时，从 {folder} 启动。",
+   "hi": "चालू न होने पर इसे {folder} से शुरू करता है।",
+   "es": "Lo inicia desde {folder} cuando no está en marcha.",
+   "ar": "يشغّله من {folder} عندما لا يكون قيد التشغيل.",
+   "fr": "Le démarre depuis {folder} quand il ne tourne pas.",
+   "bn": "চালু না থাকলে {folder} থেকে এটি চালু করে।",
+   "pt-BR": "Inicia a partir de {folder} quando não está em execução.",
+   "ru": "Запускает его из {folder}, когда он не работает.",
+   "id": "Memulainya dari {folder} saat tidak berjalan."
+  },
+  "Pick the orchestrator folder to start the backend from.": {
+   "zh-Hans": "选择用于启动后端的 orchestrator 文件夹。",
+   "hi": "वह orchestrator फ़ोल्डर चुनें जिससे बैकएंड शुरू हो।",
+   "es": "Elige la carpeta orchestrator desde la que iniciar el backend.",
+   "ar": "اختر مجلد orchestrator الذي يُشغَّل منه الخادم الخلفي.",
+   "fr": "Choisissez le dossier orchestrator depuis lequel démarrer le backend.",
+   "bn": "যে orchestrator ফোল্ডার থেকে ব্যাকএন্ড চালু হবে সেটি বেছে নিন।",
+   "pt-BR": "Escolha a pasta orchestrator de onde iniciar o backend.",
+   "ru": "Выберите папку orchestrator, из которой запускать бэкенд.",
+   "id": "Pilih folder orchestrator untuk memulai backend."
+  },
+  "Orchestrator folder": {
+   "zh-Hans": "orchestrator 文件夹",
+   "hi": "orchestrator फ़ोल्डर",
+   "es": "Carpeta orchestrator",
+   "ar": "مجلد orchestrator",
+   "fr": "Dossier orchestrator",
+   "bn": "orchestrator ফোল্ডার",
+   "pt-BR": "Pasta orchestrator",
+   "ru": "Папка orchestrator",
+   "id": "Folder orchestrator"
+  },
+  "That folder has no orchestrator backend.": {
+   "zh-Hans": "该文件夹中没有 orchestrator 后端。",
+   "hi": "उस फ़ोल्डर में orchestrator बैकएंड नहीं है।",
+   "es": "Esa carpeta no contiene el backend de orchestrator.",
+   "ar": "لا يحتوي هذا المجلد على الخادم الخلفي لـ orchestrator.",
+   "fr": "Ce dossier ne contient pas le backend orchestrator.",
+   "bn": "ওই ফোল্ডারে orchestrator ব্যাকএন্ড নেই।",
+   "pt-BR": "Essa pasta não tem o backend do orchestrator.",
+   "ru": "В этой папке нет бэкенда orchestrator.",
+   "id": "Folder itu tidak berisi backend orchestrator."
   }
  }
 }

@@ -57,6 +57,16 @@ function reportText(task: OrchTask): string | null {
   return null;
 }
 
+const byAt = (a: { at: string }, b: { at: string }) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1);
+
+/** The questions `task` asked `askerId` on the way and the answers it got. */
+function answeredMessages(task: OrchTask, askerId: string): ExchangeMessage[] {
+  return (task.answers ?? []).flatMap((item) => [
+    { fromAgentId: task.agentId, toAgentId: askerId, text: item.question.text, at: item.askedAt ?? task.createdAt, taskId: task.id },
+    { fromAgentId: askerId, toAgentId: task.agentId, text: item.answer, at: item.answeredAt ?? task.createdAt, taskId: task.id },
+  ]);
+}
+
 /**
  * What `fromAgentId` said to each agent it asked (`kids`) and their reports,
  * with what those agents asked their own teammates in between, in time order.
@@ -78,13 +88,14 @@ function exchangeOf(
     seen.add(kid.id);
     add(kid.agentId);
     messages.push({ fromAgentId, toAgentId: kid.agentId, text: kid.prompt, at: kid.createdAt, taskId: kid.id });
+    messages.push(...answeredMessages(kid, fromAgentId));
     const below = exchangeOf(kid.agentId, children?.get(kid.id) ?? [], children, seen);
     below.withAgentIds.forEach(add);
     messages.push(...below.messages);
     const report = reportText(kid);
     if (report) messages.push({ fromAgentId: kid.agentId, toAgentId: fromAgentId, text: report, at: kid.updatedAt, taskId: kid.id });
   }
-  messages.sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1));
+  messages.sort(byAt);
   return { withAgentIds, messages };
 }
 
@@ -146,8 +157,9 @@ export function buildThread(input: ThreadInput): ThreadItem[] {
       const below = exchangeOf(task.agentId, kids, input.children);
       const messages: ExchangeMessage[] = [
         { fromAgentId: asker, toAgentId: task.agentId, text: task.prompt, at: task.createdAt, taskId: task.id },
+        ...answeredMessages(task, asker),
         ...below.messages,
-      ];
+      ].sort(byAt);
       const report = reportText(task);
       if (report) messages.push({ fromAgentId: task.agentId, toAgentId: asker, text: report, at: task.updatedAt, taskId: task.id });
       const withAgentIds = [...new Set([asker, ...below.withAgentIds].filter(Boolean))];
@@ -156,11 +168,30 @@ export function buildThread(input: ThreadInput): ThreadItem[] {
       if (task.source !== "goal") {
         items.push({ kind: "user", key: `u:${task.id}`, taskId: task.id, text: task.prompt, at: task.createdAt });
       }
+      // In time order: the questions the agent asked the user and their answers,
+      // and the exchange with the agents it asked (the chief's, or a coworker's the user wrote to).
+      const middle: { at: string; item: ThreadItem }[] = (task.answers ?? []).flatMap((answered, i) => {
+        const askedAt = answered.askedAt ?? task.createdAt;
+        const answeredAt = answered.answeredAt ?? askedAt;
+        return [
+          {
+            at: askedAt,
+            item: {
+              kind: "agent", key: `aq:${task.id}:${i}`, taskId: task.id, agentId: task.agentId, at: askedAt,
+              markdown: answered.question.text, artifacts: [], failed: false,
+            } satisfies ThreadItem,
+          },
+          { at: answeredAt, item: { kind: "user", key: `ua:${task.id}:${i}`, taskId: task.id, text: answered.answer, at: answeredAt } satisfies ThreadItem },
+        ];
+      });
       if (kids.length) {
-        // Whoever owns the task asked: Mochi, or a coworker the user wrote to.
         const { withAgentIds, messages } = exchangeOf(task.agentId, kids, input.children);
-        items.push({ kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds, messages });
+        middle.push({
+          at: messages[0]?.at ?? task.createdAt,
+          item: { kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds, messages },
+        });
       }
+      items.push(...middle.sort(byAt).map((entry) => entry.item));
       const goalTitle = task.source === "goal"
         ? (task.goalId && input.goalTitles?.get(task.goalId)) || firstLine(task.prompt)
         : null;

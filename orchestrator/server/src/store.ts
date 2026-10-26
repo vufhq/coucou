@@ -274,6 +274,9 @@ export interface EventRow {
 export interface AnswerRow {
   question: TaskQuestion;
   answer: string;
+  /** Absent on answers stored before these were kept. */
+  askedAt?: string;
+  answeredAt?: string;
 }
 
 export interface ComputerRow {
@@ -1069,14 +1072,15 @@ export class Store {
 
   answerQuestion(id: string, answer: string): TaskQuestion | null {
     return this.tx(() => {
-      const row = this.db.prepare("SELECT question, answers FROM tasks WHERE id = ?").get(id) as Row | undefined;
+      const row = this.db.prepare("SELECT question, question_asked_at, answers FROM tasks WHERE id = ?").get(id) as Row | undefined;
       if (!row?.question) return null;
       const question = parse<TaskQuestion>(row.question);
       const answers = parse<AnswerRow[]>(row.answers ?? "[]");
-      answers.push({ question, answer });
+      const at = now();
+      answers.push({ question, answer, askedAt: (row.question_asked_at as string | null) ?? at, answeredAt: at });
       this.db
         .prepare("UPDATE tasks SET question = NULL, question_asked_at = NULL, answers = ?, updated_at = ? WHERE id = ?")
-        .run(json(answers), now(), id);
+        .run(json(answers), at, id);
       return question;
     });
   }
@@ -1564,6 +1568,7 @@ function toTask(r: Row): Task {
     parentTaskId: (r.parent_task_id as string | null) ?? null,
     goalId: (r.goal_id as string | null) ?? null,
     question: parseOrNull(r.question),
+    answers: parse<AnswerRow[]>(r.answers ?? "[]"),
     waitingReason: (r.waiting_reason as Task["waitingReason"]) ?? null,
     modelProfileId: String(r.model_profile_id),
     workspace: String(r.workspace),

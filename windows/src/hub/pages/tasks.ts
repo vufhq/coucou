@@ -94,6 +94,12 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let agentChoice: string | null = null;
   /** An agent's name, for the task list once there is more than one. */
   const agentLabel = (id: string) => (agents.length > 1 ? ` · ${agents.find((a) => a.id === id)?.name ?? id}` : "");
+  /** Who handed a delegated task out: the owner of its parent task, else the chief. */
+  const askerName = (task: OrchTask) => {
+    const id = tasks.find((other) => other.id === task.parentTaskId)?.agentId
+      ?? agents.find((agent) => agent.kind === "chief")?.id;
+    return agents.find((agent) => agent.id === id)?.name ?? id ?? "";
+  };
 
   page.append(ctx.hero("tasks", t("Tasks"), t("Give your agents a task. Each one works in its own Linux computer and asks you before anything risky."), [], true));
 
@@ -165,6 +171,35 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       });
     });
     connection.append(card(row(t("Orchestrator backend"), line, sw)));
+    if (enabled && s) drawStartBackend(s);
+  }
+
+  /** Whether Coucou starts the backend when it is not running, and from which folder. */
+  function drawStartBackend(s: OrchStatus) {
+    const save = (backend: { startBackend?: boolean; backendDir?: string }) => {
+      void OrchestratorBridge.setPrefs(s.prefs.enabled, s.prefs.url, backend).then(() => {
+        note = "";
+        return reload();
+      }, (err) => {
+        note = String(err);
+        draw();
+      });
+    };
+    const sw = toggle(s.prefs.startBackend, (on) => save({ startBackend: on }));
+    const folder = h("input", {
+      class: "hub-input",
+      placeholder: s.backendDir ?? t("Orchestrator folder"),
+      value: s.prefs.backendDir,
+      spellcheck: "false",
+    }) as HTMLInputElement;
+    folder.addEventListener("change", () => save({ backendDir: folder.value }));
+    const where = s.backendDir
+      ? t("Starts it from {folder} when it is not running.", { folder: s.backendDir })
+      : t("Pick the orchestrator folder to start the backend from.");
+    connection.append(card(
+      row(t("Start the backend with Coucou"), where, sw),
+      s.prefs.startBackend ? folder : null,
+    ));
   }
 
   function drawComposer() {
@@ -813,7 +848,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       if (task.source === "delegated") {
         detailEl.append(card(
           h("div", { class: "title", text: task.question.text }),
-          h("div", { class: "hub-note", text: t("Waiting for Mochi to answer.") }),
+          h("div", { class: "hub-note", text: t("Waiting for {name} to answer.", { name: askerName(task) }) }),
         ));
       } else {
       const answerInput = h("input", {
