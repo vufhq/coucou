@@ -79,6 +79,16 @@ describe("questions and memory", () => {
 
     const listed = await r.api<{ tasks: Task[] }>("/api/tasks?agentId=agent-01&source=chat&limit=50");
     expect(listed.body.tasks.map((item) => item.id)).toEqual([task.id]);
+    // The finished task keeps its question and answer, for the chat history.
+    expect(listed.body.tasks[0]!.question).toBeNull();
+    expect(listed.body.tasks[0]!.answers).toEqual([
+      {
+        question: expect.objectContaining({ text: "Which format? token=[redacted]" }),
+        answer: "Markdown please",
+        askedAt: expect.any(String),
+        answeredAt: expect.any(String),
+      },
+    ]);
     const memory = await r.api<{ notes: { id: string; text: string }[] }>("/api/agents/agent-01/memory");
     expect(memory.body.notes).toHaveLength(1);
     expect(memory.body.notes[0]).toMatchObject({ text: "token=[redacted]" });

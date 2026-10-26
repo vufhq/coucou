@@ -18,7 +18,8 @@ const TURN_CHARS = 1_200;
 let nextId = 1;
 const revisions = new Map<string, number>();
 const loading = new Map<string, Promise<void>>();
-const delegated = new Map<string, { chiefId: string; coworkerId: string; message: string }>();
+/** Delegated tasks by id: who asked (the chief or a teammate), who was asked, and the message. */
+const delegated = new Map<string, { askerId: string; coworkerId: string; message: string }>();
 
 function changed(agentId: string) {
   revisions.set(agentId, (revisions.get(agentId) ?? 0) + 1);
@@ -64,27 +65,56 @@ function agentName(agentId: string): string {
   return State.tasks.find((task) => task.orchestrator?.agentId === agentId)?.name ?? agentId;
 }
 
-function rebuilt(agentId: string, tasks: OrchTask[]): { messages: ChatMessage[]; question: AgentQuestion | null } {
+function chiefId(): string {
+  return State.tasks.find((task) => task.orchestrator?.kind === "chief")?.orchestrator?.agentId ?? "";
+}
+
+/** "From Ada" over a message the user did not write: the agent who asked, else the chief. */
+function fromLine(askerId: string): string {
+  return t("From {name}", { name: agentName(askerId || chiefId()) });
+}
+
+/**
+ * Who handed each delegated task out: the owner of its parent task.
+ * A parent that cannot be read is left out (the chief is assumed).
+ */
+async function askersOf(tasks: readonly OrchTask[]): Promise<Map<string, string>> {
+  const parents = [...new Set(tasks.filter((task) => task.source === "delegated" && task.parentTaskId).map((task) => task.parentTaskId!))];
+  const owners = new Map<string, string>();
+  await Promise.all(parents.map((id) =>
+    OrchestratorBridge.task(id).then(({ task }) => owners.set(id, task.agentId), () => {}),
+  ));
+  return owners;
+}
+
+function rebuilt(
+  agentId: string,
+  tasks: OrchTask[],
+  askers: ReadonlyMap<string, string>,
+): { messages: ChatMessage[]; question: AgentQuestion | null } {
   const messages: ChatMessage[] = [];
   let question: AgentQuestion | null = null;
   // GET /api/tasks is newest first; chat reads oldest to newest.
   for (const task of [...tasks].reverse()) {
-    const fromMochi = task.source === "delegated";
-    if (fromMochi) {
-      delegated.set(task.id, { chiefId: "", coworkerId: agentId, message: task.prompt });
+    const asked = task.source === "delegated";
+    const askerId = asked ? askers.get(task.parentTaskId ?? "") ?? "" : "";
+    if (asked) {
+      delegated.set(task.id, { askerId, coworkerId: agentId, message: task.prompt });
     }
-    messages.push({
-      id: nextId++,
-      role: "user",
-      content: fromMochi ? `${t("From Mochi")}\n\n${task.prompt}` : task.prompt,
-    });
+    const from = asked ? `${fromLine(askerId)}\n\n` : "";
+    messages.push({ id: nextId++, role: "user", content: `${from}${task.prompt}` });
+    // The questions it asked on the way, and the answers it got.
+    for (const answered of task.answers ?? []) {
+      messages.push({ id: nextId++, role: "assistant", content: answered.question.text });
+      messages.push({ id: nextId++, role: "user", content: `${from}${answered.answer}` });
+    }
     if (task.result?.summary) {
       messages.push({ id: nextId++, role: "assistant", content: task.result.summary });
     } else if (task.error?.message) {
       messages.push({ id: nextId++, role: "assistant", content: task.error.message });
     } else if (task.question) {
       messages.push({ id: nextId++, role: "assistant", content: task.question.text });
-      if (!fromMochi) {
+      if (!asked) {
         question = {
           taskId: task.id,
           questionId: task.question.id,
@@ -103,10 +133,11 @@ export function loadAgentHistory(agentId: string, force = false): Promise<void> 
   const revision = revisions.get(agentId) ?? 0;
   let request: Promise<void>;
   request = OrchestratorBridge.chatHistory(agentId)
-    .then(({ tasks }) => {
+    .then(async ({ tasks }) => ({ tasks: tasks ?? [], askers: await askersOf(tasks ?? []) }))
+    .then(({ tasks, askers }) => {
       // Do not erase a turn that arrived while this request was in flight.
       if ((revisions.get(agentId) ?? 0) !== revision) return;
-      const history = rebuilt(agentId, tasks ?? []);
+      const history = rebuilt(agentId, tasks, askers);
       State.agentChats.set(agentId, history.messages);
       if (history.question) State.agentQuestions.set(agentId, history.question);
       else State.agentQuestions.delete(agentId);
@@ -194,10 +225,10 @@ export function onAgentEvent(e: OrchEvent) {
     const childTaskId = str(p.childTaskId);
     const message = str(p.message);
     if (!coworkerId || !childTaskId || !message) return;
-    delegated.set(childTaskId, { chiefId: e.agentId, coworkerId, message });
+    delegated.set(childTaskId, { askerId: e.agentId, coworkerId, message });
     append(e.agentId, "assistant", t("Asked {name}: {message}", { name: agentName(coworkerId), message }));
-    // Mochi, or a teammate asking for help.
-    append(coworkerId, "user", `${t("From {name}", { name: agentName(e.agentId) })}\n\n${message}`);
+    // The chief, or a teammate asking for help.
+    append(coworkerId, "user", `${fromLine(e.agentId)}\n\n${message}`);
     State.notify();
     return;
   }
@@ -215,7 +246,7 @@ export function onAgentEvent(e: OrchEvent) {
     );
     if (!asks) append(coworkerId, "assistant", summary);
     if (childTaskId && !delegated.has(childTaskId)) {
-      delegated.set(childTaskId, { chiefId: e.agentId, coworkerId, message: "" });
+      delegated.set(childTaskId, { askerId: e.agentId, coworkerId, message: "" });
     }
     State.notify();
     return;
@@ -262,7 +293,7 @@ export function onAgentEvent(e: OrchEvent) {
   if (e.type === "task.answered") {
     if (delegated.has(e.taskId) || p.source === "delegated") {
       const answer = str(p.answer);
-      if (answer) append(e.agentId, "user", `${t("From Mochi")}\n\n${answer}`);
+      if (answer) append(e.agentId, "user", `${fromLine(delegated.get(e.taskId)?.askerId ?? "")}\n\n${answer}`);
       pillState(e.agentId, "working");
       State.notify();
       return;

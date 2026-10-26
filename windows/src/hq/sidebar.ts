@@ -107,8 +107,9 @@ export function mountSidebar(root: HTMLElement, store: HqStore): void {
       });
       return b;
     };
+    const chief = store.chief();
     const menu = h("div", { class: "hq-menu", role: "menu" },
-      item(t("Ask Mochi to hire…"), askToHire),
+      chief ? item(t("Ask {name} to hire…", { name: chief.name }), askToHire) : null,
       item(t("Create agent…"), openCreateForm),
     );
     const close = () => {

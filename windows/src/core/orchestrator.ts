@@ -39,9 +39,19 @@ export interface OrchTask {
   parentTaskId: string | null;
   goalId: string | null;
   question: { id: string; text: string; options: string[] } | null;
+  /** Questions already answered, oldest first. Absent from an older backend. */
+  answers?: OrchAnswer[];
   waitingReason: "agent_paused" | "daily_limit" | "computer_offline" | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrchAnswer {
+  question: { id: string; text: string; options: string[] };
+  answer: string;
+  /** Absent on answers given before the backend kept them. */
+  askedAt?: string;
+  answeredAt?: string;
 }
 
 export interface OrchApproval {
@@ -149,14 +159,20 @@ export interface OrchEvent {
 }
 
 export interface OrchStatus {
-  prefs: { enabled: boolean; url: string };
+  prefs: { enabled: boolean; url: string; startBackend: boolean; backendDir: string };
   status: { state: "off" | "connecting" | "connected" | "noToken" | "unreachable"; error: string | null };
   hasToken: boolean;
+  /** The orchestrator folder Coucou starts the backend from, or null when there is none. */
+  backendDir: string | null;
 }
 
 export const OrchestratorBridge = {
   status: () => callOrThrow<OrchStatus>("orchestrator_status"),
-  setPrefs: (enabled: boolean, url: string) => callOrThrow<void>("orchestrator_set_prefs", { enabled, url }),
+  /** `backend` left out keeps whether and where Coucou starts the backend. */
+  setPrefs: (enabled: boolean, url: string, backend: { startBackend?: boolean; backendDir?: string } = {}) =>
+    callOrThrow<void>("orchestrator_set_prefs", {
+      enabled, url, startBackend: backend.startBackend ?? null, backendDir: backend.backendDir ?? null,
+    }),
   tasks: () => callOrThrow<{
     tasks: OrchTask[] | null;
     agents: OrchAgent[] | null;

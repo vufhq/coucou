@@ -82,7 +82,7 @@ export function mountPalette(root: HTMLElement, store: HqStore): void {
     const chief = store.chief();
     if (chief) {
       out.push({
-        label: t("Ask Mochi to hire…"),
+        label: t("Ask {name} to hire…", { name: chief.name }),
         run: () => {
           store.select(chief.id);
           document.dispatchEvent(new CustomEvent("hq-compose", { detail: { text: "Hire " } }));

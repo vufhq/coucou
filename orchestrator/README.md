@@ -167,8 +167,13 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    needs you lights its dot. Rename an agent or change its colour on the Tasks
    page.
 
-Keep `npm start` running. Closing Coucou does not stop a task. Stopping the
-backend pauses tasks, and they carry on when it starts again.
+Once the backend is on, Coucou starts it for you whenever it is not running:
+from this folder when Coucou was built from this repository, else from the
+folder picked under **Start the backend with Coucou** on the Tasks page (its
+output goes to `%LOCALAPPDATA%\Coucou\orchestrator-backend.log`). Turn that off
+to run `npm start` yourself. Closing Coucou leaves the backend running and
+does not stop a task. Stopping the backend pauses tasks, and they carry on when
+it starts again.
 
 ## Goals and schedules
 
