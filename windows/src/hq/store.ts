@@ -24,13 +24,14 @@ import { t } from "../i18n/i18n";
 import {
   buildThread,
   conversationContext,
+  githubLinks,
   groupChildren,
   isWorking,
   needsUser,
   pendingQuestion,
   threadPreview,
 } from "./model";
-import type { HqPanel, HqSnapshot, HqStore, HqView, ThreadItem } from "./types";
+import type { HqPanel, HqSnapshot, HqStore, HqView, SentFile, ThreadItem } from "./types";
 
 /** Events are gathered this long before anything is fetched again. */
 const DEBOUNCE_MS = 250;
@@ -333,20 +334,31 @@ export function createHqStore(): HqStore {
     invalidate(task.agentId);
   }
 
-  async function send(agentId: string, text: string): Promise<void> {
+  async function send(agentId: string, text: string, files: readonly SentFile[] = []): Promise<void> {
     const message = text.trim();
     if (!message) return;
     const items = thread(agentId);
     const question = pendingQuestion(items);
     if (question) {
+      if (files.length) throw new Error(t("Answer {name}'s question first, then send the files.", { name: nameOf(agentId) }));
       await answer(question.taskId, question.questionId, message);
       return;
     }
     const context = conversationContext(items);
-    const draft = draftTask(agentId, message);
+    const links = githubLinks(message);
+    const draft: OrchTask = {
+      ...draftTask(agentId, message),
+      // Shown at once; the backend's copy says where each one went.
+      attachments: [
+        ...files.map((file) => ({ kind: "file" as const, name: file.name, path: "", bytes: file.bytes, url: null })),
+        ...links.map((url) => ({ kind: "repo" as const, name: url.slice("https://github.com/".length), path: "", bytes: null, url })),
+      ],
+    };
     replaceLocal(agentId, "", draft);
     try {
-      const created = await OrchestratorBridge.submit(message, newTaskKey(), null, agentId, context || null, "chat");
+      const created = await OrchestratorBridge.submit(
+        message, newTaskKey(), null, agentId, context || null, "chat", files.map((file) => file.id), links,
+      );
       if (created?.task) {
         upsert(created.task);
         replaceLocal(agentId, draft.id, null);

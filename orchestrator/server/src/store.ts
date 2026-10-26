@@ -21,6 +21,7 @@ import {
   type OpName,
   type Schedule,
   type Task,
+  type TaskAttachment,
   type TaskQuestion,
   type TaskStatus,
   type Team,
@@ -96,7 +97,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   paused_by_agent INTEGER NOT NULL DEFAULT 0,
   paused_from_status TEXT,
   inactive_ms INTEGER NOT NULL DEFAULT 0,
-  inactive_since TEXT
+  inactive_since TEXT,
+  attachments TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS tasks_by_status ON tasks(agent_id, status, created_at);
 CREATE INDEX IF NOT EXISTS tasks_by_parent ON tasks(parent_task_id, created_at);
@@ -182,6 +184,15 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS notes_by_agent ON notes(agent_id, created_at);
+CREATE TABLE IF NOT EXISTS uploads (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  task_id TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS uploads_by_task ON uploads(task_id);
 `;
 
 /** Columns added after a database was first created: added in place, data kept. */
@@ -216,7 +227,24 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "tasks", column: "inactive_ms", ddl: "ALTER TABLE tasks ADD COLUMN inactive_ms INTEGER NOT NULL DEFAULT 0" },
   { table: "tasks", column: "inactive_since", ddl: "ALTER TABLE tasks ADD COLUMN inactive_since TEXT" },
   { table: "steps", column: "management_state", ddl: "ALTER TABLE steps ADD COLUMN management_state TEXT" },
+  { table: "tasks", column: "attachments", ddl: "ALTER TABLE tasks ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'" },
 ];
+
+/** A file the user attached, waiting in the backend until its task copies it to the computer. */
+export interface UploadRow {
+  id: string;
+  name: string;
+  bytes: number;
+  sha256: string;
+  taskId: string | null;
+  createdAt: string;
+}
+
+/** A task's attachment as the backend keeps it: what Coucou sees, plus the upload it comes from. */
+export interface StoredAttachment extends TaskAttachment {
+  upload?: string;
+  sha256?: string;
+}
 
 export type JobStatus = "queued" | "claimed" | "succeeded" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
@@ -739,11 +767,13 @@ export class Store {
    * `created` tells the caller which, so it only announces new tasks.
    */
   createTask(
-    req: Omit<CreateTaskRequest, "agentId" | "source"> & {
+    req: Omit<CreateTaskRequest, "agentId" | "source" | "attachments" | "links"> & {
       agentId: string;
       source?: Task["source"];
       parentTaskId?: string | null;
       goalId?: string | null;
+      /** Copied into the task folder before the first step; their uploads become the task's. */
+      attachments?: StoredAttachment[];
     },
     modelProfileId: string,
   ): { task: Task; created: boolean } {
@@ -753,20 +783,26 @@ export class Store {
         | undefined;
       if (existing) return { task: toTask(existing), created: false };
       const id = randomUUID();
+      const attachments = req.attachments ?? [];
       const budget: Budget = { ...DEFAULT_BUDGET, ...req.budget };
+      // Copying them takes steps the model did not choose.
+      budget.maxSteps = Math.min(100, budget.maxSteps + attachments.length);
       const t = now();
       this.db
         .prepare(
           `INSERT INTO tasks (
              id, agent_id, prompt, status, source, parent_task_id, goal_id, model_profile_id, workspace,
-             budget, idempotency_key, context, created_at, updated_at
-           ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             budget, idempotency_key, context, attachments, created_at, updated_at
+           ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           id, req.agentId, req.prompt, req.source ?? "user", req.parentTaskId ?? null, req.goalId ?? null, modelProfileId,
           `/workspace/tasks/${id}`, json(budget), req.idempotencyKey,
-          req.context?.trim() || null, t, t,
+          req.context?.trim() || null, json(attachments), t, t,
         );
+      for (const item of attachments) {
+        if (item.upload) this.db.prepare("UPDATE uploads SET task_id = ? WHERE id = ?").run(id, item.upload);
+      }
       return { task: this.task(id)!, created: true };
     });
   }
@@ -774,6 +810,61 @@ export class Store {
   task(id: string): Task | null {
     const row = this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as Row | undefined;
     return row ? toTask(row) : null;
+  }
+
+  taskByIdempotencyKey(key: string): Task | null {
+    const row = this.db.prepare("SELECT * FROM tasks WHERE idempotency_key = ?").get(key) as Row | undefined;
+    return row ? toTask(row) : null;
+  }
+
+  /** The task's attachments with the uploads they come from (`Task.attachments` leaves those out). */
+  taskAttachments(id: string): StoredAttachment[] {
+    const row = this.db.prepare("SELECT attachments FROM tasks WHERE id = ?").get(id) as Row | undefined;
+    return parse<StoredAttachment[]>(row?.attachments ?? "[]");
+  }
+
+  // ── Uploads ───────────────────────────────────────────────────────────────
+
+  addUpload(u: { id: string; name: string; bytes: number; sha256: string }): UploadRow {
+    this.db
+      .prepare("INSERT INTO uploads (id, name, bytes, sha256, task_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)")
+      .run(u.id, u.name, u.bytes, u.sha256, now());
+    return this.upload(u.id)!;
+  }
+
+  upload(id: string): UploadRow | null {
+    const row = this.db.prepare("SELECT * FROM uploads WHERE id = ?").get(id) as Row | undefined;
+    return row
+      ? {
+          id: String(row.id),
+          name: String(row.name),
+          bytes: Number(row.bytes),
+          sha256: String(row.sha256),
+          taskId: (row.task_id as string | null) ?? null,
+          createdAt: String(row.created_at),
+        }
+      : null;
+  }
+
+  /** Uploads no task took before `before`, and every upload of a task that has ended. */
+  disposableUploads(before: Date): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT u.id FROM uploads u LEFT JOIN tasks t ON t.id = u.task_id
+         WHERE (u.task_id IS NULL AND u.created_at < ?)
+            OR (u.task_id IS NOT NULL AND t.id IS NULL)
+            OR t.status IN ('succeeded','failed','cancelled')`,
+      )
+      .all(before.toISOString()) as Row[];
+    return rows.map((r) => String(r.id));
+  }
+
+  uploadsOfTask(taskId: string): string[] {
+    return (this.db.prepare("SELECT id FROM uploads WHERE task_id = ?").all(taskId) as Row[]).map((r) => String(r.id));
+  }
+
+  deleteUpload(id: string): void {
+    this.db.prepare("DELETE FROM uploads WHERE id = ?").run(id);
   }
 
   /** The chat this task came from, if any. */
@@ -1570,6 +1661,13 @@ function toTask(r: Row): Task {
     question: parseOrNull(r.question),
     answers: parse<AnswerRow[]>(r.answers ?? "[]"),
     waitingReason: (r.waiting_reason as Task["waitingReason"]) ?? null,
+    attachments: parse<StoredAttachment[]>(r.attachments ?? "[]").map(({ kind, name, path, bytes, url }) => ({
+      kind,
+      name,
+      path,
+      bytes,
+      url,
+    })),
     modelProfileId: String(r.model_profile_id),
     workspace: String(r.workspace),
     budget: parse<Budget>(r.budget),

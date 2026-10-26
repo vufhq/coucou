@@ -740,7 +740,12 @@ pub const HQ_LABEL: &str = "hq";
 /// Created hidden at launch like the Coucou window, for the same reason (see
 /// create_settings_window).
 fn create_hq_window(app: &AppHandle) {
-    match WebviewWindowBuilder::new(app, HQ_LABEL, page_url(app, "hq.html"))
+    let builder = WebviewWindowBuilder::new(app, HQ_LABEL, page_url(app, "hq.html"));
+    // On Windows WebView2 takes files dropped on the composer itself, as on
+    // the island (webview_drop.rs).
+    #[cfg(windows)]
+    let builder = builder.disable_drag_drop_handler();
+    match builder
         .additional_browser_args(BROWSER_ARGS)
         .title("Coucou HQ")
         .inner_size(1100.0, 760.0)
@@ -765,8 +770,14 @@ fn create_hq_window(app: &AppHandle) {
                     let on = this.is_visible().unwrap_or(false) && !this.is_minimized().unwrap_or(false);
                     set_hq_shown(&this, on);
                 }
+                // Where Tauri takes the drop (Linux), those paths may be attached (files.rs).
+                tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    files::allow_dropped(paths.iter().map(|p| p.to_string_lossy().to_string()));
+                }
                 _ => {}
             });
+            #[cfg(windows)]
+            webview_drop::install(app, HQ_LABEL);
         }
         Err(err) => log::line(format!("Coucou HQ window failed: {err}")),
     }
@@ -905,6 +916,7 @@ pub fn run() {
             orchestrator::orchestrator_list_tasks,
             orchestrator::orchestrator_task,
             orchestrator::orchestrator_submit,
+            orchestrator::orchestrator_attach,
             orchestrator::orchestrator_models,
             orchestrator::orchestrator_cancel,
             orchestrator::orchestrator_answer,
@@ -1044,7 +1056,7 @@ pub fn run() {
                 });
                 platform::make_non_activating(&win);
                 #[cfg(windows)]
-                webview_drop::install(&handle);
+                webview_drop::install(&handle, island::WINDOW_LABEL);
                 island::apply_geometry(&handle, &loaded.screen, false);
                 let _ = win.show();
             }

@@ -20,12 +20,12 @@ import { BackendError, type BackendClient } from "./client.ts";
 import type { Journal } from "./journal.ts";
 import { PathError, ensureTaskDir } from "./paths.ts";
 import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } from "./ops/browser.ts";
-import { fetchFile, listFiles, readText, writeArtifact } from "./ops/fs.ts";
+import { fetchFile, listFiles, readText, receiveFile, writeArtifact } from "./ops/fs.ts";
 import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.3.0";
+export const WORKER_VERSION = "0.4.0";
 
 const HEALTH_EVERY_MS = 60_000;
 const PRUNE_EVERY_MS = 6 * 60 * 60_000;
@@ -42,6 +42,8 @@ export interface OpContext {
   report(type: WorkerEvent["type"], payload: Record<string, unknown>): void;
   /** Sends a download's bytes to the backend (fs.fetch only). */
   upload(bytes: Uint8Array): Promise<void>;
+  /** The bytes of a file the user attached (fs.receive only). */
+  download(): Promise<Buffer>;
 }
 
 export interface OpResult {
@@ -207,7 +209,18 @@ export class Worker {
       const dir = await ensureTaskDir(this.o.computer, job.taskId);
       const home = agentHome(this.o.computer, job.agentId ?? this.o.client.agentId);
       const upload = (bytes: Uint8Array) => this.o.client.upload(job.id, bytes);
-      const ctx: OpContext = { taskId: job.taskId, jobId: job.id, dir, home, deadlineMs: job.deadlineMs, signal: controller.signal, report, upload };
+      const download = () => this.o.client.download(job.id);
+      const ctx: OpContext = {
+        taskId: job.taskId,
+        jobId: job.id,
+        dir,
+        home,
+        deadlineMs: job.deadlineMs,
+        signal: controller.signal,
+        report,
+        upload,
+        download,
+      };
       const run = this.dispatch(ctx, parsed.op.op, parsed.op.args);
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
@@ -250,6 +263,8 @@ export class Worker {
         return readText(ctx, args as OpArgs<"fs.read">);
       case "fs.fetch":
         return fetchFile(ctx, args as OpArgs<"fs.fetch">);
+      case "fs.receive":
+        return receiveFile(ctx, args as OpArgs<"fs.receive">);
       case "terminal.run":
         return runCommand(ctx, args as OpArgs<"terminal.run">);
       case "terminal.shell":

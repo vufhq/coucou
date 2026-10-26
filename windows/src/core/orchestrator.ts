@@ -42,8 +42,19 @@ export interface OrchTask {
   /** Questions already answered, oldest first. Absent from an older backend. */
   answers?: OrchAnswer[];
   waitingReason: "agent_paused" | "daily_limit" | "computer_offline" | null;
+  /** Files and repositories the user sent with the message. Absent from an older backend. */
+  attachments?: OrchAttachment[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** A file the user attached, or a GitHub repository cloned for the task; `path` is in the task folder. */
+export interface OrchAttachment {
+  kind: "file" | "repo";
+  name: string;
+  path: string;
+  bytes: number | null;
+  url: string | null;
 }
 
 export interface OrchAnswer {
@@ -190,10 +201,17 @@ export const OrchestratorBridge = {
     agentId: string | null = null,
     context: string | null = null,
     source: "user" | "chat" = "user",
+    /** Ids from `attach`. */
+    attachments: string[] = [],
+    /** GitHub repository links, cloned for the task. */
+    links: string[] = [],
   ) =>
     callOrThrow<{ task: OrchTask; created: boolean }>("orchestrator_submit", {
-      prompt, idempotencyKey, modelProfileId, agentId, context, source,
+      prompt, idempotencyKey, modelProfileId, agentId, context, source, attachments, links,
     }),
+  /** Sends a file just dropped or picked in HQ to the backend, for the next message. */
+  attach: (path: string) =>
+    callOrThrow<{ attachment: { id: string; name: string; bytes: number } }>("orchestrator_attach", { path }),
   models: () => callOrThrow<{ profiles: { id: string }[]; default: string | null }>("orchestrator_models"),
   cancel: (taskId: string) => callOrThrow<{ task: OrchTask }>("orchestrator_cancel", { taskId }),
   answer: (taskId: string, questionId: string, answer: string) =>

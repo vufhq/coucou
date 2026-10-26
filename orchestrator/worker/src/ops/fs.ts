@@ -54,3 +54,17 @@ export async function fetchFile(ctx: OpContext, args: OpArgs<"fs.fetch">): Promi
   await ctx.upload(bytes);
   return { result: JSON.stringify({ bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }) };
 }
+
+/** A file the user attached, pulled from the backend; written only if it arrived whole. */
+export async function receiveFile(ctx: OpContext, args: OpArgs<"fs.receive">): Promise<OpResult> {
+  const path = await inside(ctx.dir, args.path);
+  const bytes = await ctx.download();
+  if (bytes.length !== args.bytes || createHash("sha256").update(bytes).digest("hex") !== args.sha256) {
+    throw new PathError(`${args.path} did not arrive whole`);
+  }
+  await mkdir(dirname(path), { recursive: true, mode: 0o770 });
+  // Group-readable and writable: the runner works on it like on the agent's own files.
+  // Not reported as an artifact: it is the user's file, not the agent's work.
+  await writeFile(path, bytes, { mode: 0o660 });
+  return { result: `Copied the user's file to ${args.path} (${bytes.length} bytes).` };
+}

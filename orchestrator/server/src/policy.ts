@@ -44,6 +44,7 @@ export function describeTarget(op: Operation): string {
     case "fs.write_artifact":
     case "fs.read":
     case "fs.fetch":
+    case "fs.receive":
       return String(a.path);
     case "browser.screenshot":
       return String(a.name);
@@ -95,7 +96,9 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
     case "fs.read":
       return { verdict: "allow" };
     case "fs.fetch":
-      // A download for the user, asked by the backend; never a model's step.
+    case "fs.receive":
+      // A download for the user, or a file the user attached, asked by the
+      // backend; never a model's step.
       return { verdict: "deny", reason: "not an operation the model can use" };
     case "team.propose":
       return { verdict: "approve", reason: "creating agents always needs the user's approval" };

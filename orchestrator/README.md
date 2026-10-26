@@ -69,6 +69,31 @@ boundary, not each command.
 - Output streams live to Coucou; the model gets the exit code and the last
   64 KB.
 
+## Files and links in messages
+
+Drop files on Coucou HQ (or pick them from the composer's + menu) and paste
+GitHub links in the message: the agent finds them in its task folder before it
+starts, with nothing to copy into WSL by hand.
+
+- Coucou sends each file to the backend as soon as it is dropped
+  (`POST /api/attachments?name=…`, the bytes as the body, 20 MB at most, 8 per
+  message), and only a path a real drop or the file chooser just delivered.
+  The backend keeps it in `uploads/` in its data folder until the task ends; a
+  file no message took goes after a day.
+- The task's first steps are the backend's, not the model's: one
+  `fs.receive` per file, which writes it to `attachments/<name>` (the name
+  made safe: `Rapport été.pdf` → `attachments/Rapport_ete.pdf`) after checking
+  its size and SHA-256, and one shell step per repository,
+  `git clone --depth 1` into `repos/<repo>`. A clone that fails (a private
+  repository) is reported to the model, which carries on. These steps come on
+  top of the task's step budget.
+- The model is told what came with the message and where it is. A coworker
+  Mochi hands the work to is told where the files are in Mochi's task folder.
+- `fs.receive` is a backend-only operation like `fs.fetch`: a model naming it
+  is refused. It needs worker 0.4; an older worker gets a clear failure
+  ("update it with provision.ps1 -Update") instead of a job it can't read.
+- Coucou shows the files and repositories as chips under the user's message.
+
 ## Layout
 
 | Folder | What |
@@ -115,8 +140,8 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    installs Node, Chromium and the worker, and restarts the distro. To update
    the worker later, run the same command with `-Update`. The disk and
    `/workspace` and `/computer` are kept. (After a backend update that changes
-   the worker, as 0.2 did for downloads and health reports and 0.3 for the
-   shell, run `-Update` once.)
+   the worker, as 0.2 did for downloads and health reports, 0.3 for the
+   shell and 0.4 for attached files, run `-Update` once.)
 
    **One shared computer.** Every agent shares `agent-01`, so `ORCH_AGENTS`
    should name only it:
@@ -354,6 +379,10 @@ npm run typecheck
   `setup.sh`.
 - Downloads stop at 8 MB. A worker older than 0.2 only downloads text; update it
   with `provision.ps1 -Update`.
+- Attached files stop at 20 MB each, 8 per message, and need worker 0.4.
+  Folders can't be attached yet, only GitHub repositories are cloned from
+  links (public ones: the computer has no GitHub sign-in), and choosing files
+  from the + menu works on Windows only (drop them on Linux).
 - After you approve a site, redirects to another site are followed without asking.
   The host and the LAN stay blocked.
 - Models: Claude Code, Cursor, and an optional OpenAI-compatible server on this

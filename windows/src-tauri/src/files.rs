@@ -49,7 +49,7 @@ pub fn allow_dropped<I: IntoIterator<Item = String>>(paths: I) {
 }
 
 /// True (once) when `path` was delivered by a drop in the last couple of minutes.
-fn take_dropped(path: &str) -> bool {
+pub fn take_dropped(path: &str) -> bool {
     let mut list = DROPPED.lock().unwrap_or_else(|e| e.into_inner());
     let now = std::time::Instant::now();
     list.retain(|(_, at)| now.duration_since(*at) < DROP_VALID_FOR);

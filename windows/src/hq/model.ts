@@ -12,7 +12,7 @@
 // - then whatever is happening now: the live line, approvals, the question.
 
 import { ACTIVE, type OrchAgent, type OrchApproval, type OrchTask } from "../core/orchestrator";
-import { t } from "../i18n/i18n";
+import { language, t } from "../i18n/i18n";
 import type { ExchangeMessage, ThreadItem } from "./types";
 
 /** How much of the conversation goes with a new task: the newest turns, up to this. */
@@ -137,6 +137,39 @@ function liveLine(task: OrchTask, input: ThreadInput, kids: readonly OrchTask[])
   return task.status === "queued" || task.status === "starting" ? t("Starting…") : t("Working…");
 }
 
+/** A file's size in the user's language: "0.8 kB", "14 kB", "2.4 MB". */
+export function sizeLabel(bytes: number, locale = language()): string {
+  const [value, unit] = bytes >= 1_000_000 ? [bytes / 1_000_000, "megabyte"] : [bytes / 1_000, "kilobyte"];
+  return new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: 1 }).format(value);
+}
+
+/** At most this many repositories go with one message (the backend's limit). */
+export const MAX_LINKS = 4;
+
+/** github.com pages that are not someone's repository. */
+const NOT_OWNERS = new Set([
+  "about", "apps", "collections", "enterprise", "explore", "features", "login", "marketplace", "new", "notifications",
+  "orgs", "pricing", "search", "security", "settings", "site", "sponsors", "team", "topics", "trending", "users",
+]);
+
+/**
+ * The GitHub repositories linked in `text`, as `https://github.com/owner/repo`,
+ * once each and in order: the agent clones them before it starts.
+ */
+export function githubLinks(text: string): string[] {
+  const found = new Map<string, string>();
+  for (const m of text.matchAll(/https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_.-]+)/g)) {
+    const owner = m[1];
+    // A sentence's full stop, then `.git`.
+    const repo = m[2].replace(/[.]+$/, "").replace(/\.git$/, "");
+    if (!repo || repo === "." || repo === ".." || NOT_OWNERS.has(owner.toLowerCase())) continue;
+    const key = `${owner}/${repo}`.toLowerCase();
+    if (!found.has(key)) found.set(key, `https://github.com/${owner}/${repo}`);
+    if (found.size >= MAX_LINKS) break;
+  }
+  return [...found.values()];
+}
+
 /** The agent's conversation, oldest first. */
 export function buildThread(input: ThreadInput): ThreadItem[] {
   const items: ThreadItem[] = [];
@@ -166,7 +199,10 @@ export function buildThread(input: ThreadInput): ThreadItem[] {
       items.push({ kind: "exchange", key: `x:${task.id}`, taskId: task.id, withAgentIds, messages });
     } else {
       if (task.source !== "goal") {
-        items.push({ kind: "user", key: `u:${task.id}`, taskId: task.id, text: task.prompt, at: task.createdAt });
+        items.push({
+          kind: "user", key: `u:${task.id}`, taskId: task.id, text: task.prompt, at: task.createdAt,
+          ...(task.attachments?.length ? { attachments: task.attachments } : {}),
+        });
       }
       // In time order: the questions the agent asked the user and their answers,
       // and the exchange with the agents it asked (the chief's, or a coworker's the user wrote to).

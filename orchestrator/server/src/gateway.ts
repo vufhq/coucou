@@ -17,6 +17,7 @@ import {
   WorkerEvents,
   type ClaimResponse,
 } from "@coucou-orchestrator/protocol";
+import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
 import type { Downloads, JobSignals } from "./jobs.ts";
 import { redact } from "./redact.ts";
@@ -30,6 +31,8 @@ export interface GatewayDeps {
   runner: Runner;
   signals: JobSignals;
   downloads: Downloads;
+  /** Files attached to messages, which fs.receive jobs copy to the computer. */
+  uploads?: Uploads;
   /** Agent id → its worker token. */
   tokens: ReadonlyMap<string, string>;
   leaseMs: number;
@@ -49,6 +52,8 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     done(null, body),
   );
 
+  /** What each computer's worker said it can run, from its last hello. */
+  const capabilities = new Map<string, ReadonlySet<string>>();
   const callers = new WeakMap<object, string>();
   app.addHook("onRequest", async (req, reply) => {
     const agentId = agentForBearer(req.headers.authorization, deps.tokens);
@@ -89,6 +94,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     if (!store.computer(agentId)) return reply.code(404).send({ error: "unknown_agent" });
     store.touchComputer(agentId);
     if (health) store.setComputerHealth(agentId, health);
+    capabilities.set(agentId, new Set(hello.data.capabilities));
 
     // Reconcile what the worker remembers with what we remember.
     const known = new Map(journal.map((j) => [j.jobId, j]));
@@ -137,6 +143,15 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
       const cancel = store.cancelRequestedJobs(agentId);
       if (closed) return { job: null, cancel };
       const job = store.claimJob(agentId, deps.leaseMs);
+      const can = capabilities.get(agentId);
+      if (job && can && !can.has(job.op)) {
+        // An older worker would not even read the claim; say why instead.
+        finish(job, {
+          status: "failed",
+          error: { code: "invalid", message: `this computer's worker is too old for ${job.op}: update it with provision.ps1 -Update` },
+        });
+        continue;
+      }
       if (job) {
         setStatus(agentId, "busy");
         const owner = store.task(job.taskId)?.agentId;
@@ -187,6 +202,17 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     store.renewLeases(job.agentId, [job.id], deps.leaseMs);
     deps.downloads.put(job.id, req.body);
     return { ok: true };
+  });
+
+  // A file the user attached, for the fs.receive job that copies it in. Only
+  // the job the backend made for that upload gets it.
+  app.get<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/file", async (req, reply) => {
+    const job = heldJob(caller(req), req.params.id);
+    if (!job || job.op !== "fs.receive") return reply.code(409).send({ error: "not_held" });
+    const bytes = deps.uploads?.read(String(job.args.upload)) ?? null;
+    if (!bytes) return reply.code(410).send({ error: "gone", message: "the attached file is no longer on the backend" });
+    store.renewLeases(job.agentId, [job.id], deps.leaseMs);
+    return reply.header("Content-Type", "application/octet-stream").send(bytes);
   });
 
   app.post<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/complete", async (req, reply) => {

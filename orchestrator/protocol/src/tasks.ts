@@ -33,6 +33,24 @@ export type Budget = z.infer<typeof Budget>;
 
 export const DEFAULT_BUDGET: Budget = { maxSteps: 20, timeoutMs: 10 * 60_000, opTimeoutMs: 60_000 };
 
+export const MAX_TASK_ATTACHMENTS = 8;
+export const MAX_TASK_LINKS = 4;
+
+/** `https://github.com/owner/repo`, maybe with `.git` or a page inside the repository after it. */
+const GITHUB_REPO = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]{1,100}?)(?:\.git)?(?:[/?#].*)?$/;
+
+/** The repository a GitHub link points into, or null. */
+export function githubRepo(url: string): { owner: string; repo: string } | null {
+  const m = GITHUB_REPO.exec(url);
+  if (!m || m[2] === "." || m[2] === "..") return null;
+  return { owner: m[1]!, repo: m[2]! };
+}
+
+export const GithubLink = z
+  .string()
+  .max(2_000)
+  .refine((url) => githubRepo(url) !== null, "a link to a GitHub repository");
+
 export const CreateTaskRequest = z.object({
   prompt: z.string().trim().min(1).max(8_000),
   source: z.enum(["user", "chat"]).optional().default("user"),
@@ -51,8 +69,25 @@ export const CreateTaskRequest = z.object({
    * model, never instructions.
    */
   context: z.string().max(8_000).optional(),
+  /** Files the user attached (ids from POST /api/attachments), copied into the task folder first. */
+  attachments: z.array(z.uuid()).max(MAX_TASK_ATTACHMENTS).optional(),
+  /** GitHub repositories the user linked, cloned into the task folder first. */
+  links: z.array(GithubLink).max(MAX_TASK_LINKS).optional(),
 });
 export type CreateTaskRequest = z.infer<typeof CreateTaskRequest>;
+
+/** What a task got before it started: a file the user attached, or a repository cloned for it. */
+export const TaskAttachment = z.object({
+  kind: z.enum(["file", "repo"]),
+  /** The file's name as the user saw it, or `owner/repo`. */
+  name: z.string(),
+  /** Where it is, relative to the task folder. */
+  path: z.string(),
+  bytes: z.number().int().nullable(),
+  /** The repository's link. */
+  url: z.string().nullable(),
+});
+export type TaskAttachment = z.infer<typeof TaskAttachment>;
 
 /** Why a task failed, in words the island can show. */
 export const FailureReason = z.enum([
@@ -96,6 +131,8 @@ export const Task = z.object({
     }),
   ),
   waitingReason: z.enum(["agent_paused", "daily_limit", "computer_offline"]).nullable(),
+  /** Files and repositories copied into the task folder before the first step. */
+  attachments: z.array(TaskAttachment),
   modelProfileId: z.string(),
   workspace: z.string(),
   budget: Budget,

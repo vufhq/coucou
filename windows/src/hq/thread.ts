@@ -4,13 +4,15 @@
 // minis in the exchanges keep their animation). An exchange is one line; a
 // click opens it on its own (sidechat.ts), through `openExchange`.
 
-import type { OrchApproval } from "../core/orchestrator";
+import { Bridge } from "../core/bridge";
+import type { OrchApproval, OrchAttachment } from "../core/orchestrator";
 import { approvalLabel } from "../core/orchestrator";
 import { language, t, tl, tn } from "../i18n/i18n";
 import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { renderMarkdown } from "../views/markdown";
 import { agentAvatar } from "./avatar";
+import { sizeLabel } from "./model";
 import type { HqStore, ThreadItem } from "./types";
 
 export interface ThreadView {
@@ -87,7 +89,7 @@ export function createThread(store: HqStore, openExchange: (key: string) => void
       case "time":
         return h("div", { class: "hq-separator", text: separatorLabel(item.at) });
       case "user":
-        return h("div", { class: "hq-thread-row user" }, h("div", { class: "hq-bubble user", text: item.text }));
+        return userMessage(item);
       case "agent":
         return agentMessage(agentId, item);
       case "exchange":
@@ -107,6 +109,31 @@ export function createThread(store: HqStore, openExchange: (key: string) => void
   }
 
   // ── Messages ────────────────────────────────────────────────────────────────
+
+  /** What the user wrote, with the files and repositories that went with it below. */
+  function userMessage(item: Extract<ThreadItem, { kind: "user" }>): HTMLElement {
+    const row = h("div", { class: "hq-thread-row user" }, h("div", { class: "hq-bubble user", text: item.text }));
+    if (item.attachments?.length) {
+      const files = h("div", { class: "hq-files user" });
+      for (const attachment of item.attachments) files.append(attachmentChip(attachment));
+      row.append(files);
+    }
+    return row;
+  }
+
+  /** A file the user sent (its name and size), or a repository (a click opens it on GitHub). */
+  function attachmentChip(attachment: OrchAttachment): HTMLElement {
+    const repo = attachment.kind === "repo";
+    const detail = repo ? t("GitHub repository") : attachment.bytes !== null ? sizeLabel(attachment.bytes) : "";
+    const chip = h(
+      repo ? "button" : "div",
+      { class: repo ? "hq-file sent link" : "hq-file sent", title: repo ? (attachment.url ?? "") : attachment.name },
+      h("span", { class: "hq-file-icon" }, svg(repo ? ICONS.pull : ICONS.doc, 20, repo ? { stroke: 1.8 } : undefined)),
+      h("span", { class: "hq-file-text" }, h("span", { class: "hq-file-name", text: attachment.name }), h("span", { class: "hq-file-status", text: detail })),
+    );
+    if (repo && attachment.url) chip.addEventListener("click", () => void Bridge.openUrl(attachment.url!));
+    return chip;
+  }
 
   function agentMessage(agentId: string, item: Extract<ThreadItem, { kind: "agent" }>): HTMLElement {
     const bubble = h("div", { class: item.failed ? "hq-bubble agent failed" : "hq-bubble agent" });

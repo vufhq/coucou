@@ -608,6 +608,23 @@ export async function onDragDrop(handler: (e: DragDropPayload) => void) {
   };
 }
 
+/**
+ * Files picked in an `<input type="file">`, handed to Rust like a drop: they
+ * come back as a `file-drag` drop with their real paths (WebView2 only).
+ * False where that is not possible (Linux), so the page can say so.
+ */
+export function sendPickedFiles(files: FileList): boolean {
+  const webview = (window as unknown as { chrome?: { webview?: WebView2Bridge } }).chrome?.webview;
+  if (!IS_TAURI || !webview) return false;
+  if (files.length > 0) webview.postMessageWithAdditionalObjects("coucou-file-drop", files);
+  return true;
+}
+
+/** Whether `sendPickedFiles` can work here. */
+export function canPickFiles(): boolean {
+  return IS_TAURI && !!(window as unknown as { chrome?: { webview?: WebView2Bridge } }).chrome?.webview;
+}
+
 export async function onEvent<T>(name: string, handler: (payload: T) => void) {
   if (!IS_TAURI) return () => {};
   return listen<T>(name, (e) => handler(e.payload));

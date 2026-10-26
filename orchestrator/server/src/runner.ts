@@ -27,6 +27,7 @@ import {
   type WorkerOpName,
 } from "@coucou-orchestrator/protocol";
 import { createHash, randomUUID } from "node:crypto";
+import { attachmentStep, plannedAttachments, type AttachmentError, type Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
 import { ModelError } from "./model/adapter.ts";
 import type { ModelRouter } from "./model/router.ts";
@@ -51,6 +52,8 @@ export interface RunnerOptions {
    * already tried the fallbacks).
    */
   transientRetryDelaysMs?: number[];
+  /** Where attached files wait; without it a task cannot take any. */
+  uploads?: Uploads | null;
 }
 
 type ModelAnswer = { decision: Decision; profileId: string };
@@ -172,6 +175,7 @@ export class Runner {
       modelRetries: 2,
       transientRetryDelaysMs: [5_000, 20_000],
       maxParallel: Number.POSITIVE_INFINITY,
+      uploads: null,
       ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
     } as Required<RunnerOptions>;
   }
@@ -196,10 +200,17 @@ export class Runner {
 
   // ── Commands from the API ─────────────────────────────────────────────────
 
-  submit(req: CreateTaskRequest): { task: Task; created: boolean } {
+  submit(req: CreateTaskRequest): { task: Task; created: boolean } | AttachmentError {
+    // A retry gets the task it already made, whose uploads are taken by now.
+    const existing = this.store.taskByIdempotencyKey(req.idempotencyKey);
+    if (existing) return { task: existing, created: false };
+    const { attachments: uploadIds, links, ...rest } = req;
+    if ((uploadIds?.length ?? 0) > 0 && !this.options.uploads) return { error: "attachments are not available" };
+    const attachments = plannedAttachments(this.store, { attachments: uploadIds, links });
+    if ("error" in attachments) return attachments;
     const agentId = req.agentId ?? this.pickAgent();
     const profile = req.modelProfileId ?? this.store.agent(agentId)?.modelProfileId ?? this.options.defaultModelProfile;
-    const out = this.store.createTask({ ...req, agentId }, profile);
+    const out = this.store.createTask({ ...rest, agentId, attachments }, profile);
     if (out.created) {
       this.events.emit("task.queued", out.task.agentId, out.task.id, { prompt: out.task.prompt });
       this.pumpAll();
@@ -510,6 +521,16 @@ export class Runner {
         if (await this.advanceStep(task, last)) continue;
         return;
       }
+      // The user's files and repositories come first, one step each, before
+      // the model is asked anything. A failed one is left for the model to see.
+      const attachments = this.store.taskAttachments(task.id);
+      const pending = attachments[task.steps];
+      if (pending) {
+        const { note, op } = attachmentStep(pending);
+        const step = this.store.addStep({ taskId, note, op: op.op, args: op.args });
+        this.startJob(task, step);
+        continue;
+      }
       const pauseRequested = this.store.pauseRequested(task.id);
       const agent = this.store.agent(task.agentId);
       if (pauseRequested || agent?.paused) {
@@ -653,6 +674,11 @@ export class Runner {
   }
 
   private judge(task: Task, step: Step): void {
+    // The backend's own steps (attachments) were never the model's proposal.
+    if (step.n <= this.store.taskAttachments(task.id).length) {
+      this.startJob(task, step);
+      return;
+    }
     const op = { op: step.op, args: step.args };
     const verdict = decide(op, { approvedDomains: this.store.approvedDomains(task.agentId) });
     if (verdict.verdict === "allow") {
@@ -1160,6 +1186,26 @@ ${fenceText(agent.persona ?? "(none)")}
       );
     }
     lines.push(`Task: ${task.prompt}`, "", `Task folder: ${task.workspace}`, "");
+    if (task.attachments.length > 0) {
+      // Names come from the user's PC and GitHub: data, fenced like the rest.
+      lines.push(
+        "The user attached these with the message; the first steps below copied them into the task folder:",
+        ...task.attachments.map((item) =>
+          item.kind === "file"
+            ? `- ${item.path} (the file ${fenceText(item.name)}, ${item.bytes ?? 0} bytes)`
+            : `- ${item.path}/ (a clone of ${item.url})`,
+        ),
+        "",
+      );
+    }
+    const parent = task.parentTaskId ? this.store.task(task.parentTaskId) : null;
+    if (parent && parent.attachments.length > 0) {
+      lines.push(
+        `The request that handed you this came with files, in its own task folder /computer/tasks/${parent.id} (read them with terminal.shell):`,
+        ...parent.attachments.map((item) => `- /computer/tasks/${parent.id}/${item.path}${item.kind === "repo" ? "/" : ""}`),
+        "",
+      );
+    }
     for (const item of this.store.taskAnswers(task.id)) {
       lines.push(
         `The agent asked: ${item.question.text}`,
@@ -1221,6 +1267,8 @@ ${fenceText(agent.persona ?? "(none)")}
   }
 
   private taskEnded(task: Task): void {
+    // The copies in the task folder stay; the backend's own goes.
+    this.options.uploads?.forgetTask(task.id);
     if (task.parentTaskId) this.poke(task.parentTaskId);
     const computerId = this.store.agentIncludingRetired(task.agentId)?.computerId;
     if (computerId) this.emitComputerStatuses(computerId);

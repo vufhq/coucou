@@ -22,6 +22,9 @@ export const SHELL_MAX_TIMEOUT_SEC = 600;
 
 export const HttpUrl =z.url({ protocol: /^https?$/, error: "http or https URL" }).max(2_000);
 
+/** The largest file the user may attach to a message. */
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
 export const WORKER_OPS = {
   "browser.navigate": z.object({ url: HttpUrl }).strict(),
   "browser.extract_text": z.object({ maxChars: z.number().int().min(100).max(50_000).optional() }).strict(),
@@ -32,6 +35,15 @@ export const WORKER_OPS = {
   "fs.list": z.object({}).strict(),
   "fs.read": z.object({ path: RelPath }).strict(),
   "fs.fetch": z.object({ path: RelPath }).strict(),
+  // A file the user attached, pulled from the backend into the task folder.
+  "fs.receive": z
+    .object({
+      path: RelPath,
+      upload: z.uuid(),
+      bytes: z.number().int().min(0).max(MAX_ATTACHMENT_BYTES),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    })
+    .strict(),
   "terminal.run": z.object({ argv: z.array(z.string().min(1).max(1_000)).min(1).max(32) }).strict(),
   // A bash command line on the shared computer, as its sandboxed `runner`
   // user. `cwd` is a folder under the task folder, or `~/…` for the agent's
@@ -132,20 +144,25 @@ export interface Operation {
   args: Record<string, unknown>;
 }
 
-/** Operations that change nothing: safe to run again after a lost worker. */
+/**
+ * Operations that change nothing, or only write the same bytes again: safe to
+ * run again after a lost worker.
+ */
 export const READ_ONLY_OPS: ReadonlySet<WorkerOpName> = new Set([
   "browser.navigate",
   "browser.extract_text",
   "fs.list",
   "fs.read",
   "fs.fetch",
+  "fs.receive",
 ]);
 
 /**
  * Operations only the backend asks for, on the user's behalf (a file
- * download for Coucou). A model answer naming one is refused.
+ * download for Coucou, a file the user attached). A model answer naming one
+ * is refused.
  */
-export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch"]);
+export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch", "fs.receive"]);
 
 /** What a model may propose. */
 export const MODEL_OP_NAMES = ALL_OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op));

@@ -322,6 +322,15 @@
   background: var(--hq-hover);
 }
 
+/* What the user sent: under their bubble, on the right. A file is not a button. */
+.hq-files.user {
+  justify-content: flex-end;
+}
+
+.hq-file.sent:not(.link):hover {
+  background: var(--hq-raised);
+}
+
 .hq-file:disabled {
   opacity: 0.7;
 }
@@ -838,6 +847,96 @@
 
 .hq-composer:focus-within {
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Files dragged over the window land here. */
+.hq-composer.dropping {
+  border-color: color-mix(in srgb, var(--hq-link) 70%, transparent);
+  background: color-mix(in srgb, var(--hq-link) 8%, var(--hq-raised));
+}
+
+/* Files and repositories waiting to go with the next message. */
+.hq-composer-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hq-composer-tray[hidden] {
+  display: none;
+}
+
+.hq-composer-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  max-width: 240px;
+  padding: 0 6px 0 6px;
+  border: 1px solid var(--hq-line);
+  border-radius: 12px;
+  background: var(--hq-raised);
+  color: var(--hq-text);
+}
+
+.hq-composer-chip.failed {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hq-red) 45%, transparent);
+}
+
+.hq-composer-chip-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--hq-link) 22%, transparent);
+  color: var(--hq-link);
+}
+
+.hq-composer-chip-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-inline-end: 4px;
+}
+
+.hq-composer-chip-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hq-composer-chip-detail {
+  font-size: 11.5px;
+  color: var(--hq-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hq-composer-chip.failed .hq-composer-chip-detail {
+  color: var(--hq-red);
+}
+
+.hq-composer-chip-remove {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--hq-secondary);
+  cursor: default;
+}
+
+.hq-composer-chip-remove:hover {
+  background: var(--hq-hover);
+  color: var(--hq-text);
 }
 
 .hq-composer-input {

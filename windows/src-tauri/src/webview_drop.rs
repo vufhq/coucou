@@ -10,15 +10,16 @@
 // Edge does. The page accepts the HTML5 drag (src/core/bridge.ts) and hands the
 // dropped File objects back with `chrome.webview.postMessageWithAdditionalObjects`;
 // here they turn back into real paths and reach the island as a `file-drag` drop.
+//
+// Coucou HQ takes files the same way (dropped on it, or picked with the
+// composer's file chooser, whose File objects come back here too).
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2File, ICoreWebView2WebMessageReceivedEventArgs2,
 };
 use webview2_com::{take_pwstr, WebMessageReceivedEventHandler};
 use wv2_core::{Interface, PWSTR};
-
-use crate::island::{self, WINDOW_LABEL};
 
 #[derive(serde::Serialize, Clone)]
 struct FileDrop {
@@ -27,8 +28,9 @@ struct FileDrop {
     paths: Vec<String>,
 }
 
-pub fn install(app: &AppHandle) {
-    let Some(win) = island::window(app) else { return };
+/// Listens for dropped (or picked) files on the window `label`.
+pub fn install(app: &AppHandle, label: &'static str) {
+    let Some(win) = app.get_webview_window(label) else { return };
     let handle = app.clone();
     let result = win.with_webview(move |webview| unsafe {
         let core = match webview.controller().CoreWebView2() {
@@ -56,7 +58,7 @@ pub fn install(app: &AppHandle) {
                 paths.push(take_pwstr(path));
             }
             crate::files::allow_dropped(paths.iter().cloned());
-            let _ = handle.emit_to(WINDOW_LABEL, "file-drag", FileDrop { kind: "drop", paths });
+            let _ = handle.emit_to(label, "file-drag", FileDrop { kind: "drop", paths });
             Ok(())
         }));
         let mut token = 0i64;

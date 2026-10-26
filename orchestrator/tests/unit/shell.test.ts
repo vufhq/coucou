@@ -45,6 +45,7 @@ function ctx(signal = new AbortController().signal): OpContext & { events: strin
     signal,
     report: (_type, payload) => events.push(String(payload.text)),
     upload: async () => {},
+    download: async () => Buffer.alloc(0),
     events,
   };
 }
