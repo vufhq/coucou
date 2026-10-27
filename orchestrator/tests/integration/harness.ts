@@ -15,7 +15,7 @@ import { ModelRouter } from "../../server/src/model/router.ts";
 import { BackendClient } from "../../worker/src/client.ts";
 import { Journal } from "../../worker/src/journal.ts";
 import type { BrowserDriver, BrowserPage } from "../../worker/src/ops/browser.ts";
-import { Worker } from "../../worker/src/worker.ts";
+import { Worker, type WorkerOptions } from "../../worker/src/worker.ts";
 
 export const API_TOKEN = "test-api-token-0123456789";
 export const WORKER_TOKEN = "test-worker-token-0123456789";
@@ -103,7 +103,7 @@ export async function startBackend(
   ports?: { api: number; worker: number },
   /** More model profiles, by id, beside the default "scripted" one. */
   extraModels: Record<string, ModelAdapter> = {},
-  options: { vmProbe?: VmProbe; retentionDays?: number; agents?: string[]; maxParallel?: number } = {},
+  options: { vmProbe?: VmProbe; retentionDays?: number; agents?: string[]; maxParallel?: number; tasksPerComputer?: number } = {},
 ): Promise<Running> {
   const config: Config = {
     dataDir,
@@ -117,6 +117,7 @@ export async function startBackend(
     defaultModelProfile: "scripted",
     agents: (options.agents ?? ["agent-01"]).map((id) => ({ id, name: id, vmId: `test:${id}` })),
     maxParallel: options.maxParallel ?? 2,
+    tasksPerComputer: options.tasksPerComputer ?? 2,
   };
   const models = new ModelRouter();
   models.register(
@@ -168,12 +169,15 @@ export function startWorker(
   browser: BrowserDriver,
   agentId = "agent-01",
   token = workerTokenFor(agentId),
+  /** More options, such as the folder the computers share (/computer) or a shell. */
+  extra: Partial<WorkerOptions> = {},
 ): { worker: Worker; done: Promise<void> } {
   const worker = new Worker({
     client: new BackendClient(`http://127.0.0.1:${workerPort}`, token, agentId),
     journal: new Journal(workspace),
     browser,
     workspace,
+    ...extra,
     heartbeatMs: 300,
     claimWaitMs: 300,
   });

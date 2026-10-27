@@ -68,10 +68,14 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
 
   const setStatus = (computerId: string, status: "ready" | "busy") => {
     if (!store.setComputerStatus(computerId, status)) return;
-    for (const agent of store.agentsOnComputer(computerId)) {
+    // Any agent can run on any computer, so a change shows on all of them.
+    for (const agent of store.agents()) {
       events.emit("agent.status_changed", agent.id, null, { status: agent.status });
     }
   };
+  /** Whether the computer is running a job right now. */
+  const holdsJob = (computerId: string): boolean =>
+    store.db.prepare("SELECT 1 FROM jobs WHERE agent_id = ? AND status = 'claimed' LIMIT 1").get(computerId) !== undefined;
 
   /** A job this agent holds right now, or null. */
   const heldJob = (agentId: string, jobId: string): JobRow | null => {
@@ -160,7 +164,8 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
           cancel,
         };
       }
-      setStatus(agentId, "ready");
+      // A worker runs a few jobs at once: it asks for the next while one runs.
+      setStatus(agentId, holdsJob(agentId) ? "busy" : "ready");
       if (cancel.length > 0 || closed || Date.now() >= until) return { job: null, cancel };
       await new Promise((r) => setTimeout(r, 250));
     }
@@ -222,9 +227,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
     if (!job || job.agentId !== caller(req)) return reply.code(404).send({ error: "not_found" });
     // A repeated report (the worker retrying after a lost answer) is fine.
     if (job.status === "claimed") finish(job, outcome.data);
-    if (!store.db.prepare("SELECT 1 FROM jobs WHERE agent_id = ? AND status = 'claimed' LIMIT 1").get(job.agentId)) {
-      setStatus(job.agentId, "ready");
-    }
+    if (!holdsJob(job.agentId)) setStatus(job.agentId, "ready");
     return { ok: true, status: store.job(job.id)?.status };
   });
 

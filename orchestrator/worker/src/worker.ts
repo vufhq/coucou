@@ -1,6 +1,7 @@
 // The worker loop: say hello (with the journal), claim a job, validate it
 // again, run it under its deadline while heartbeats keep its lease, report
-// the outcome until the backend has it, repeat. One job at a time.
+// the outcome until the backend has it, repeat. Up to WORKER_SLOTS jobs at
+// once: the computer works on a few tasks together, one operation each.
 //
 // The backend is allowed to vanish at any moment: the job carries on, its
 // outcome waits in the journal, and the next hello hands it over.
@@ -25,7 +26,9 @@ import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.4.0";
+export const WORKER_VERSION = "0.5.0";
+/** How many jobs run at once. The backend sends a computer at most ORCH_TASKS_PER_COMPUTER tasks. */
+export const WORKER_SLOTS = 4;
 
 const HEALTH_EVERY_MS = 60_000;
 const PRUNE_EVERY_MS = 6 * 60 * 60_000;
@@ -73,7 +76,7 @@ export interface WorkerOptions {
 export class Worker {
   private readonly o: Required<WorkerOptions>;
   private stopped = false;
-  private current: AbortController | null = null;
+  private readonly current = new Set<AbortController>();
   private retentionDays = 0;
   private healthAt = 0;
   private prunedAt = 0;
@@ -84,7 +87,7 @@ export class Worker {
 
   stop(): void {
     this.stopped = true;
-    this.current?.abort();
+    for (const controller of this.current) controller.abort();
   }
 
   /** Disk space and browser, as reported to the backend. */
@@ -113,6 +116,7 @@ export class Worker {
   async run(): Promise<void> {
     let backoff = 500;
     let greeted = false;
+    const running = new Set<Promise<unknown>>();
     while (!this.stopped) {
       try {
         if (!greeted) {
@@ -128,7 +132,11 @@ export class Worker {
           greeted = true;
           this.o.log("connected to the backend");
         }
-        await this.prune();
+        if (running.size >= WORKER_SLOTS) {
+          await Promise.race(running);
+          continue;
+        }
+        if (running.size === 0) await this.prune();
         let health: WorkerHealth | undefined;
         if (Date.now() - this.healthAt >= HEALTH_EVERY_MS) {
           health = await this.health();
@@ -136,15 +144,23 @@ export class Worker {
         }
         const claim = await this.o.client.claim(this.o.claimWaitMs, health);
         backoff = 500;
-        if (claim.job) await this.handle(claim.job);
+        if (claim.job) {
+          const job: Promise<unknown> = this.handle(claim.job)
+            .catch((err: unknown) => this.o.log(`job ${claim.job?.id} failed: ${err instanceof Error ? err.message : String(err)}`))
+            .finally(() => running.delete(job));
+          running.add(job);
+        }
       } catch (err) {
         if (this.stopped) break;
+        // The next hello hands the journal over: the jobs still running finish first.
+        await Promise.all(running);
         greeted = false;
         this.o.log(`backend unreachable (${err instanceof Error ? err.message : String(err)}); retrying`);
         await sleep(backoff);
         backoff = Math.min(backoff * 2, 15_000);
       }
     }
+    await Promise.all(running);
   }
 
   /** Runs one job and makes sure its outcome reaches the backend. */
@@ -184,7 +200,7 @@ export class Worker {
     if (!parsed.ok) return { status: "failed", error: { code: "invalid", message: parsed.error } };
 
     const controller = new AbortController();
-    this.current = controller;
+    this.current.add(controller);
     const deadline = setTimeout(() => controller.abort(new Error("deadline")), job.deadlineMs);
     let cancelled = false;
 
@@ -242,7 +258,7 @@ export class Worker {
     } finally {
       clearTimeout(deadline);
       clearInterval(heartbeat);
-      this.current = null;
+      this.current.delete(controller);
     }
   }
 

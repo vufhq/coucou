@@ -53,10 +53,10 @@ afterEach(async () => {
   dirs = [];
 });
 
-async function setup(model: ModelAdapter, computers = ["agent-01", "agent-02"], maxParallel = 3) {
+async function setup(model: ModelAdapter, computers = ["agent-01", "agent-02"], maxParallel = 3, tasksPerComputer = 2) {
   const dataDir = await tempDir("orch-phase7-");
   dirs.push(dataDir);
-  const r = await startBackend(dataDir, model, undefined, {}, { agents: computers, maxParallel });
+  const r = await startBackend(dataDir, model, undefined, {}, { agents: computers, maxParallel, tasksPerComputer });
   running.push(r);
   return r;
 }
@@ -236,7 +236,7 @@ describe("phase 7 teams", () => {
     expect((await createAgent(r, { name: "Fresh" })).computerId).toBe("agent-01");
   });
 
-  it("delegates on the coworkers' computer one at a time and returns fenced reports to Mochi", async () => {
+  it("delegates on a one-task computer one at a time and returns fenced reports to Mochi", async () => {
     let chiefReportPrompt = "";
     const model = new PerAgentModel({
       "agent-01": [
@@ -268,7 +268,8 @@ describe("phase 7 teams", () => {
         done("dev-b finished"),
       ],
     });
-    const r = await setup(model);
+    // One task at a time on that computer, so the coworkers take turns.
+    const r = await setup(model, undefined, undefined, 1);
     await createAgent(r, {
       name: "dev-a",
       role: "Developer",
@@ -280,6 +281,7 @@ describe("phase 7 teams", () => {
     dirs.push(workspace);
     const started = startWorker(workspace, r.workerPort, new FakeBrowser(), "agent-02");
     workers.push(started.worker);
+    await waitFor(() => r.backend.store.computer("agent-02")?.status !== "offline", 5_000, "agent-02 to say hello");
 
     const chief = await submit(r, "Delegate the reports", { agentId: "agent-01" });
     const completedChief = await finalTask(r, chief.id);

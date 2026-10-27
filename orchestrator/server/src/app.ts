@@ -53,8 +53,8 @@ export function createBackend(
   const store = new Store(join(config.dataDir, "orchestrator.db"));
   const firstComputer = config.agents[0];
   if (!firstComputer) throw new Error("at least one computer is required");
-  // Every agent shares the configured computer(s); agents left on one that was
-  // dropped from ORCH_AGENTS move to the first.
+  // Any configured computer runs any agent; an agent whose own computer was
+  // dropped from ORCH_AGENTS moves to the first.
   const moved = store.useComputers(config.agents);
   if (moved > 0) console.log(`orchestrator: moved ${moved} agent(s) to ${firstComputer.id}`);
   store.ensureChief({ ...firstComputer, modelProfileId: config.defaultModelProfile });
@@ -66,6 +66,7 @@ export function createBackend(
     leaseMs: config.leaseMs,
     defaultModelProfile: config.defaultModelProfile,
     maxParallel: config.maxParallel,
+    tasksPerComputer: config.tasksPerComputer,
     pollMs: opts.pollMs,
     modelRetries: opts.modelRetries,
     transientRetryDelaysMs: opts.transientRetryDelaysMs,

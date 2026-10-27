@@ -24,8 +24,10 @@ export interface Config {
   defaultModelProfile: string;
   /** Provisioned computers, each with its own WSL distro of the same name. */
   agents: { id: string; name: string; vmId: string }[];
-  /** How many computers may work at the same time; the others' tasks wait. */
+  /** How many tasks may be worked on at the same time, all computers together; the others wait. */
   maxParallel: number;
+  /** How many tasks one computer works on at once. */
+  tasksPerComputer: number;
 }
 
 /**
@@ -70,6 +72,9 @@ export function parseAgents(raw: string | undefined): Config["agents"] {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const base = env.LOCALAPPDATA ?? join(env.HOME ?? ".", ".local", "share");
+  const agents = parseAgents(env.ORCH_AGENTS);
+  // A worker runs up to 4 operations at once (WORKER_SLOTS), whatever this says.
+  const tasksPerComputer = Math.max(1, int(env.ORCH_TASKS_PER_COMPUTER, 2));
   return {
     dataDir: env.ORCH_DATA_DIR ?? join(base, "CoucouOrchestrator"),
     apiHost: "127.0.0.1",
@@ -80,7 +85,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     claimWaitMs: int(env.ORCH_CLAIM_WAIT_MS, 25_000),
     retentionDays: Math.max(0, int(env.ORCH_RETENTION_DAYS, 30)),
     defaultModelProfile: env.ORCH_MODEL_PROFILE ?? "claude-cli",
-    agents: parseAgents(env.ORCH_AGENTS),
-    maxParallel: Math.max(1, int(env.ORCH_MAX_PARALLEL, 2)),
+    agents,
+    // Unset: every computer full.
+    maxParallel: Math.max(1, int(env.ORCH_MAX_PARALLEL, agents.length * tasksPerComputer)),
+    tasksPerComputer,
   };
 }

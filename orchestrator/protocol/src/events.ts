@@ -46,7 +46,7 @@ export type EventType = z.infer<typeof EventType>;
 /** Payload shape for each event type. Unknown keys are refused. */
 export const EVENT_PAYLOADS = {
   "task.queued": z.object({ prompt: z.string() }).strict(),
-  "task.started": z.object({ prompt: z.string(), modelProfileId: z.string() }).strict(),
+  "task.started": z.object({ prompt: z.string(), modelProfileId: z.string(), computerId: z.string().optional() }).strict(),
   "task.completed": z
     .object({
       summary: z.string(),

@@ -1,0 +1,12 @@
+[Unit]
+Description=Coucou computer: the disk every computer shares, at /computer
+After=local-fs.target
+Before=coucou-worker.service coucou-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/coucou-worker/worker/provision/mount-computer.sh
+
+[Install]
+WantedBy=multi-user.target

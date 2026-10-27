@@ -46,6 +46,8 @@ export interface RunnerOptions {
   modelRetries?: number;
   /** How many agents may work at once, all together. */
   maxParallel?: number;
+  /** How many tasks one computer works on at once. */
+  tasksPerComputer?: number;
   /**
    * A model that timed out or could not be reached is asked again after each
    * of these pauses; a rate limit is not (it lasts hours, and the router has
@@ -87,6 +89,8 @@ Your computer:
   fs.write_artifact, then run it, test it, fix it and run it again. Pipes, redirects, && and scripts all work.
 - It starts in the task folder (the files the user sees). ~ is your own folder, kept between tasks: put projects you will
   come back to there. /computer/shared is shared with your teammates.
+- There are several computers, all on one shared disk: your folder and the task folders are the same on each, but a
+  later task may run on another computer, so a server you started is not there any more.
 - python3, uv, node, npm, git, curl and a C compiler are installed; there is no sudo and no apt. Put Python packages in a
   virtual environment ("uv venv" then "uv pip install …", or "uv run --with pkg script.py"), command-line tools with
   "uv tool install …", Node packages locally with npm. The internet is open; the user's PC and local network are not.
@@ -175,9 +179,15 @@ export class Runner {
       modelRetries: 2,
       transientRetryDelaysMs: [5_000, 20_000],
       maxParallel: Number.POSITIVE_INFINITY,
+      tasksPerComputer: 2,
       uploads: null,
       ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
     } as Required<RunnerOptions>;
+  }
+
+  /** How many tasks one computer works on at once. */
+  get tasksPerComputer(): number {
+    return this.options.tasksPerComputer;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -426,7 +436,7 @@ export class Runner {
   /**
    * Starts queued tasks, oldest first, on agents that are free, while fewer
    * than `maxParallel` tasks are being worked on. Each agent still does one
-   * task at a time.
+   * task at a time; each task goes to any computer with room for it.
    */
   pumpAll(): void {
     if (this.stopped) return;
@@ -447,30 +457,59 @@ export class Runner {
             !a.paused &&
             a.usage.tasksToday < a.limits.tasksPerDay &&
             a.usage.stepsToday < a.limits.stepsPerDay &&
-            !this.store.agentBusy(a.id) &&
-            !this.store.computerBusy(a.computerId),
+            !this.store.agentBusy(a.id),
         )
         .map((a) => this.store.nextQueued(a.id))
         .filter((t): t is Task => t !== null)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       const next = candidates[0];
       if (!next) return;
-      this.begin(next);
+      const computerId = this.pickComputer(next);
+      if (!computerId) return;
+      this.begin(next, computerId);
     }
   }
 
-  private begin(next: Task): void {
+  /**
+   * The computer for a task about to start: one with room, online first. An
+   * offline one is chosen only when none is online, so the task waits for it
+   * as before. Then the one the task last ran on (its browser session is
+   * there), the agent's own, the least loaded, the configured order.
+   */
+  private pickComputer(task: Task): string | null {
+    const agent = this.store.agent(task.agentId);
+    const online = (c: { status: string }) => c.status === "ready" || c.status === "busy";
+    const all = this.store.computers();
+    const pool = all.some(online) ? all.filter(online) : all;
+    const ranked = pool
+      .map((c, order) => ({
+        id: c.id,
+        load: this.store.computerLoad(c.id),
+        rank: c.id === task.computerId ? 0 : c.id === agent?.computerId ? 1 : 2,
+        order,
+      }))
+      .filter((c) => c.load < this.options.tasksPerComputer)
+      .sort((a, b) => a.rank - b.rank || a.load - b.load || a.order - b.order);
+    return ranked[0]?.id ?? null;
+  }
+
+  private begin(next: Task, computerId: string): void {
+    this.store.setTaskComputer(next.id, computerId);
     this.store.setWaitingReason(next.id, null);
     this.store.setTaskStatus(next.id, "starting");
     this.store.setTaskStatus(next.id, "running");
-    this.events.emit("task.started", next.agentId, next.id, { prompt: next.prompt, modelProfileId: next.modelProfileId });
-    const computerId = this.store.agent(next.agentId)?.computerId;
-    if (computerId) this.emitComputerStatuses(computerId);
+    this.events.emit("task.started", next.agentId, next.id, {
+      prompt: next.prompt,
+      modelProfileId: next.modelProfileId,
+      computerId,
+    });
+    this.emitAgentStatuses();
     this.drive(next.id);
   }
 
-  private emitComputerStatuses(computerId: string): void {
-    for (const agent of this.store.agentsOnComputer(computerId)) {
+  /** Every agent can run on every computer: a computer's change shows on all of them. */
+  private emitAgentStatuses(): void {
+    for (const agent of this.store.agents()) {
       this.events.emit("agent.status_changed", agent.id, null, { status: agent.status });
     }
   }
@@ -506,11 +545,20 @@ export class Runner {
         continue;
       }
       // The computer went away (VM stopped, PC asleep) with an operation for
-      // it pending: the task waits for it, and that wait does not count
+      // it pending: the operation moves to another computer with room if one
+      // is online; otherwise the task waits, and that wait does not count
       // against its time budget.
+      const open = this.openJob(task.id);
+      if (open) {
+        const job = this.store.job(open);
+        if (job?.status === "queued") {
+          const to = this.computerFor(task);
+          if (to !== job.agentId) this.store.moveJob(job.id, to);
+        }
+      }
       this.store.setWaitingForComputer(
         task.id,
-        this.openJob(task.id) !== null && this.store.agent(task.agentId)?.status === "offline",
+        open !== null && this.store.computer(this.store.job(open)?.agentId ?? this.taskComputer(task))?.status === "offline",
       );
       if (this.activeMs(task) > task.budget.timeoutMs) {
         return this.fail(task, "timeout", "the task ran out of time");
@@ -716,7 +764,7 @@ export class Runner {
     }
     const job = this.store.createJob({
       taskId: task.id,
-      agentId: agent.computerId,
+      agentId: this.computerFor(task),
       op: step.op as WorkerOpName,
       args: step.args,
       deadlineMs: jobDeadlineMs(step.op, step.args, task.budget.opTimeoutMs),
@@ -841,7 +889,7 @@ export class Runner {
     const existing = "id" in args.team ? this.store.team(args.team.id) : null;
     if ("id" in args.team && !existing) throw new Error(`unknown team ${args.team.id}`);
     if (this.store.agents().length + args.members.length > 12) throw new Error("too_many_agents");
-    // Every agent shares one computer: a computerId in the proposal is ignored.
+    // Any computer runs any agent; a computerId in the proposal is ignored.
     const computerId = this.store.defaultComputerId();
     if (!computerId) throw new Error("no computer is configured");
     const created: string[] = [];
@@ -1270,8 +1318,30 @@ ${fenceText(agent.persona ?? "(none)")}
     // The copies in the task folder stay; the backend's own goes.
     this.options.uploads?.forgetTask(task.id);
     if (task.parentTaskId) this.poke(task.parentTaskId);
-    const computerId = this.store.agentIncludingRetired(task.agentId)?.computerId;
-    if (computerId) this.emitComputerStatuses(computerId);
+    this.emitAgentStatuses();
+  }
+
+  /** Where the task's operations run: the computer it started on (the agent's own for older tasks). */
+  private taskComputer(task: Task): string {
+    return task.computerId ?? this.store.agentIncludingRetired(task.agentId)?.computerId ?? task.agentId;
+  }
+
+  /**
+   * The computer for the task's next operation: its own, unless that one is
+   * offline and another online one has room. The task moves there, files and
+   * all (the computers share one disk); only a browser session stays behind.
+   */
+  private computerFor(task: Task): string {
+    const current = this.taskComputer(task);
+    if (this.store.computer(current)?.status !== "offline") return current;
+    const other = this.store
+      .computers()
+      .find(
+        (c) => (c.status === "ready" || c.status === "busy") && this.store.computerLoad(c.id) < this.options.tasksPerComputer,
+      );
+    if (!other) return current;
+    this.store.setTaskComputer(task.id, other.id);
+    return other.id;
   }
 
   private finishGoal(task: Task, summary: string, achieved: boolean): void {
@@ -1338,7 +1408,7 @@ ${fenceText(agent.persona ?? "(none)")}
     for (const computer of this.store.computers()) {
       const seen = computer.lastSeenAt ? Date.parse(computer.lastSeenAt) : 0;
       if (computer.status !== "offline" && at - seen > 2 * this.options.leaseMs) {
-        if (this.store.setComputerStatus(computer.id, "offline")) this.emitComputerStatuses(computer.id);
+        if (this.store.setComputerStatus(computer.id, "offline")) this.emitAgentStatuses();
       }
     }
     this.pumpAll();

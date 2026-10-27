@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AgentEvent, Task } from "@coucou-orchestrator/protocol";
 import { ModelError, type ModelAdapter, type ModelInput, type ModelOutput } from "../../server/src/model/adapter.ts";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
+import type { ShellRunner } from "../../worker/src/ops/shell.ts";
 import type { Worker } from "../../worker/src/worker.ts";
 import {
   FakeBrowser,
@@ -52,9 +53,9 @@ async function setup(
   running.push(r);
   const browser = new FakeBrowser();
   browser.site.set(DOCS, { title: "Install guide", text: "Install with: pip install example\nRequires Python 3.10+." });
-  const { worker } = startWorker(workspace, r.workerPort, browser);
+  const { worker, done: workerDone } = startWorker(workspace, r.workerPort, browser);
   workers.push(worker);
-  return { r, model, browser, workspace, dataDir };
+  return { r, model, browser, workspace, dataDir, workerDone };
 }
 
 async function submit(r: Running, prompt = "Summarise the install docs into report.md", extra: Record<string, unknown> = {}) {
@@ -239,11 +240,11 @@ describe("reliability", () => {
   }, 20_000);
 
   it("waits for an offline computer without spending the task's time budget", async () => {
-    const { r, workspace } = await setup([act("fs.write_artifact", { path: "a.md", content: "x" }), done("saved")]);
+    const { r, workspace, workerDone } = await setup([act("fs.write_artifact", { path: "a.md", content: "x" }), done("saved")]);
     await waitFor(() => r.backend.store.computer("agent-01")?.status === "ready", 5_000, "the worker to connect");
     workers[0]!.stop();
     workers = [];
-    await new Promise((resolve) => setTimeout(resolve, 500)); // its last claim poll ends
+    await workerDone; // its last claim poll has ended, so it can take no job
     r.backend.store.setComputerStatus("agent-01", "offline");
     const task = await submit(r, "write a file", { budget: { timeoutMs: 10_000, opTimeoutMs: 60_000 } });
     await waitFor(
@@ -600,8 +601,7 @@ describe("several agents", () => {
       workers.push(worker);
     }
     await waitFor(async () => {
-      const res = await r.api<{ agents: { id: string; status: string }[] }>("/api/agents");
-      const ready = res.body.agents.filter((a) => a.status !== "offline").map((a) => a.id);
+      const ready = r.backend.store.computers().filter((c) => c.status !== "offline").map((c) => c.id);
       return ready.length === Object.keys(spaces).length ? ready : null;
     }, 5_000, "the workers to say hello");
     return { r, spaces };
@@ -640,9 +640,76 @@ describe("several agents", () => {
     const b = await submit(r, "write your file");
     expect([a.agentId, b.agentId].sort()).toEqual(["agent-01", "agent-02"]);
     await Promise.all([taskEnd(r, a.id), taskEnd(r, b.id)]);
+  });
 
-    const lone = await team(new TeamModel(1), { agents: ["agent-01", "agent-02"], maxParallel: 2, online: ["agent-02"] });
-    expect((await submit(lone.r, "write your file")).agentId).toBe("agent-02");
+  it("runs an agent on another computer when its own is offline, with the same folders", async () => {
+    const { r, spaces } = await team(new TeamModel(1), { agents: ["agent-01", "agent-02"], maxParallel: 2, online: ["agent-02"] });
+    const a = await submit(r, "write your file", { agentId: "agent-01" });
+    expect((await taskEnd(r, a.id)).at(-1)).toMatchObject({ type: "task.completed", agentId: "agent-01" });
+    expect(r.backend.store.task(a.id)?.computerId).toBe("agent-02");
+    expect(await readFile(join(spaces["agent-02"]!, "tasks", a.id, "agent-01.md"), "utf8")).toBe("agent-01");
+  });
+
+  it("runs three agents at once on two computers", async () => {
+    // Each first model call waits for the other two: only a pool that runs all three at once finishes.
+    const model = new TeamModel(3);
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, model, undefined, {}, { agents: ["agent-01", "agent-02"], maxParallel: 3 });
+    running.push(r);
+    for (const id of ["dev-a", "dev-b"]) {
+      await r.api("/api/agents", { body: { name: id, computerId: "agent-01" } });
+    }
+    // One disk for both computers, as /computer is in the VMs.
+    const shared = await tempDir("orch-shared-");
+    dirs.push(shared);
+    for (const id of ["agent-01", "agent-02"]) {
+      const workspace = await tempDir(`orch-ws-${id}-`);
+      dirs.push(workspace);
+      workers.push(startWorker(workspace, r.workerPort, new FakeBrowser(), id, undefined, { computer: shared }).worker);
+    }
+    const agents = (await r.api<{ agents: { id: string }[] }>("/api/agents")).body.agents.map((a) => a.id);
+    expect(agents).toHaveLength(3);
+    const tasks = await Promise.all(agents.map((agentId) => submit(r, "write your file", { agentId })));
+    const ends = await Promise.all(tasks.map((t) => taskEnd(r, t.id)));
+    expect(ends.map((e) => e.at(-1)?.type)).toEqual(["task.completed", "task.completed", "task.completed"]);
+    const computers = tasks.map((t) => r.backend.store.task(t.id)!.computerId);
+    expect(new Set(computers)).toEqual(new Set(["agent-01", "agent-02"]));
+    for (const [i, t] of tasks.entries()) {
+      expect(await readFile(join(shared, "tasks", t.id, `${agents[i]}.md`), "utf8")).toBe(agents[i]);
+    }
+  });
+
+  it("runs two tasks' commands at the same time on one computer", async () => {
+    const model: ModelAdapter = {
+      async generate(input: ModelInput): Promise<ModelOutput> {
+        const answer = input.prompt.includes("No steps yet.") ? act("terminal.shell", { command: "wait for the other" }) : done("ran");
+        return { text: JSON.stringify(answer), json: answer };
+      },
+    };
+    const dataDir = await tempDir("orch-data-");
+    dirs.push(dataDir);
+    const r = await startBackend(dataDir, model, undefined, {}, { agents: ["agent-01"], maxParallel: 2 });
+    running.push(r);
+    await r.api("/api/agents", { body: { name: "dev-a", computerId: "agent-01" } });
+    // Each command waits for the other: a worker that runs one job at a time never finishes.
+    let inFlight = 0;
+    const waiting: (() => void)[] = [];
+    const shell: ShellRunner = {
+      run: async () => {
+        inFlight++;
+        if (inFlight < 2) await new Promise<void>((resolve) => waiting.push(resolve));
+        else for (const go of waiting.splice(0)) go();
+        return { code: 0, signal: null, timedOut: false };
+      },
+    };
+    const workspace = await tempDir("orch-ws-");
+    dirs.push(workspace);
+    workers.push(startWorker(workspace, r.workerPort, new FakeBrowser(), "agent-01", undefined, { shell }).worker);
+    const tasks = await Promise.all(["agent-01", "dev-a"].map((agentId) => submit(r, "run it", { agentId })));
+    const ends = await Promise.all(tasks.map((t) => taskEnd(r, t.id)));
+    expect(ends.map((e) => e.at(-1)?.type)).toEqual(["task.completed", "task.completed"]);
+    expect(tasks.map((t) => r.backend.store.task(t.id)?.computerId)).toEqual(["agent-01", "agent-01"]);
   });
 
   it("knows each worker by its token: one agent can never act as another", async () => {

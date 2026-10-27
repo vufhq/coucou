@@ -13,7 +13,7 @@
 import { Bridge, canPickFiles, onDragDrop, onEvent, sendPickedFiles } from "../core/bridge";
 import { FlowBridge } from "../core/flow";
 import type { OrchAgent, OrchTask } from "../core/orchestrator";
-import { OrchestratorBridge } from "../core/orchestrator";
+import { OrchestratorBridge, taskComputerId } from "../core/orchestrator";
 import { language, t, tl } from "../i18n/i18n";
 import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
@@ -50,8 +50,8 @@ const MIC = "M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3zM6 11a6 6 0 
 export type WorkState = "working" | "computer" | "queued" | "team" | "paused";
 
 /**
- * The line for `task` (the agent's current one). `computerTaken`: another
- * agent is using the shared computer. Null when nothing is said: no task, or
+ * The line for `task` (the agent's current one). `computerTaken`: every
+ * computer is as busy as it gets. Null when nothing is said: no task, or
  * one waiting for the user (the thread shows the card).
  */
 export function workState(task: Pick<OrchTask, "status"> | null, computerTaken: boolean): WorkState | null {
@@ -372,13 +372,19 @@ export function createComposer(store: HqStore, onSent: () => void): Composer {
   /** The task a Stop click is cancelling, so the button stays disabled meanwhile. */
   let stopping: string | null = null;
 
-  /** Another agent's task holds the computer `agent` shares. */
+  /** Other agents' tasks fill every computer `agent` could run on. */
   function computerTaken(of: OrchAgent): boolean {
-    return store.snapshot().agents.some((other) => {
-      if (other.id === of.id || other.computerId !== of.computerId) return false;
-      const task = store.current(other.id);
-      return !!task && ON_COMPUTER.has(task.status);
-    });
+    const snap = store.snapshot();
+    const load = new Map<string, number>();
+    for (const other of snap.agents) {
+      const task = other.id === of.id ? null : store.current(other.id);
+      if (!task || !ON_COMPUTER.has(task.status)) continue;
+      const id = taskComputerId(task, other);
+      load.set(id, (load.get(id) ?? 0) + 1);
+    }
+    // An older backend runs one task per computer, each agent on its own.
+    const pool = snap.computers.some((c) => c.capacity) ? snap.computers : snap.computers.filter((c) => c.id === of.computerId);
+    return pool.length > 0 && pool.every((c) => (load.get(c.id) ?? 0) >= (c.capacity ?? 1));
   }
 
   function drawStatus() {

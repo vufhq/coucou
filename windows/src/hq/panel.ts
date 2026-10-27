@@ -11,6 +11,7 @@ import {
   OrchestratorBridge,
   agentLine,
   newTaskKey,
+  taskComputerId,
   type GoalSchedule,
   type MemoryNote,
   type OrchAgent,
@@ -176,16 +177,19 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
 
   function drawComputer(agent: OrchAgent) {
     const snap = store.snapshot();
-    const computer: OrchComputer | undefined =
-      snap.computers.find((c) => c.id === agent.computerId) ?? snap.computers[0];
+    // The computer the agent's task is on; any computer runs any agent.
+    const current = store.current(agent.id);
+    const shownId = current && USING.has(current.status) ? taskComputerId(current, agent) : agent.computerId;
+    const computer: OrchComputer | undefined = snap.computers.find((c) => c.id === shownId) ?? snap.computers[0];
     const users: string[] = [];
     const waiting: string[] = [];
     let mine: "using" | "waiting" | null = null;
     if (computer) {
       for (const other of snap.agents) {
-        if (other.computerId !== computer.id && !computer.agentIds.includes(other.id)) continue;
         const task = store.current(other.id);
         if (!task) continue;
+        // A queued task waits for whichever computer frees up first.
+        if (task.status !== "queued" && taskComputerId(task, other) !== computer.id) continue;
         if (USING.has(task.status)) {
           users.push(other.name);
           if (other.id === agent.id) mine = "using";
