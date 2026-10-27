@@ -82,7 +82,7 @@ if (!models.has(config.defaultModelProfile)) {
 
 const backend = createBackend(config, tokens, models);
 const keepAlives = config.agents
-  .filter((a) => a.vmId.startsWith("wsl:") && process.env.ORCH_KEEP_ALIVE !== "0")
+  .filter((a) => process.platform === "win32" && a.vmId.startsWith("wsl:") && process.env.ORCH_KEEP_ALIVE !== "0")
   .map((a) => keepWslAlive(a.vmId.slice(4), (line) => console.log(`orchestrator: ${line}`)));
 const { apiPort, workerPort } = await backend.listen();
 console.log(`orchestrator: API on http://${config.apiHost}:${apiPort}, workers on http://${config.workerHost}:${workerPort}`);
