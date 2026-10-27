@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   paused_from_status TEXT,
   inactive_ms INTEGER NOT NULL DEFAULT 0,
   inactive_since TEXT,
+  computer_id TEXT,
   attachments TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS tasks_by_status ON tasks(agent_id, status, created_at);
@@ -228,6 +229,7 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "tasks", column: "inactive_since", ddl: "ALTER TABLE tasks ADD COLUMN inactive_since TEXT" },
   { table: "steps", column: "management_state", ddl: "ALTER TABLE steps ADD COLUMN management_state TEXT" },
   { table: "tasks", column: "attachments", ddl: "ALTER TABLE tasks ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'" },
+  { table: "tasks", column: "computer_id", ddl: "ALTER TABLE tasks ADD COLUMN computer_id TEXT" },
 ];
 
 /** A file the user attached, waiting in the backend until its task copies it to the computer. */
@@ -539,7 +541,9 @@ export class Store {
   private agentFromRow(row: Row): Agent {
     const id = String(row.id);
     const computer = this.computer(String(row.computer_id ?? id));
-    const computerStatus = computer?.status ?? "offline";
+    // Any computer in the pool can run the agent: it is reachable while one is.
+    const online = this.computers().some((c) => c.status === "ready" || c.status === "busy");
+    const computerStatus = online ? "ready" : (computer?.status ?? "offline");
     const status: Agent["status"] =
       computerStatus === "offline" || computerStatus === "starting" || computerStatus === "error"
         ? computerStatus
@@ -947,17 +951,26 @@ export class Store {
     return row ? toTask(row) : null;
   }
 
-  computerBusy(computerId: string): boolean {
+  /** How many tasks are being worked on on this computer. */
+  computerLoad(computerId: string): number {
     const row = this.db
       .prepare(
-        `SELECT 1
-         FROM tasks JOIN agents ON agents.id = tasks.agent_id
-         WHERE agents.computer_id = ?
-           AND tasks.status IN ('starting','running','waiting_for_approval')
-         LIMIT 1`,
+        "SELECT COUNT(*) AS n FROM tasks WHERE computer_id = ? AND status IN ('starting','running','waiting_for_approval')",
       )
-      .get(computerId);
-    return row !== undefined;
+      .get(computerId) as Row;
+    return Number(row.n);
+  }
+
+  /** Hands a job no worker has claimed yet to another computer. */
+  moveJob(jobId: string, computerId: string): void {
+    this.db
+      .prepare("UPDATE jobs SET agent_id = ?, updated_at = ? WHERE id = ? AND status = 'queued'")
+      .run(computerId, now(), jobId);
+  }
+
+  /** The computer that runs the task's operations from now on. */
+  setTaskComputer(taskId: string, computerId: string): void {
+    this.db.prepare("UPDATE tasks SET computer_id = ? WHERE id = ?").run(computerId, taskId);
   }
 
   agentBusy(agentId: string): boolean {
@@ -1661,6 +1674,7 @@ function toTask(r: Row): Task {
     question: parseOrNull(r.question),
     answers: parse<AnswerRow[]>(r.answers ?? "[]"),
     waitingReason: (r.waiting_reason as Task["waitingReason"]) ?? null,
+    computerId: (r.computer_id as string | null) ?? null,
     attachments: parse<StoredAttachment[]>(r.attachments ?? "[]").map(({ kind, name, path, bytes, url }) => ({
       kind,
       name,

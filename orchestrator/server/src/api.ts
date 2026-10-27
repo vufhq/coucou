@@ -268,7 +268,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
         if (computer.status !== "offline" && computer.health?.diskTotalBytes &&
             computer.health.diskFreeBytes < LOW_DISK_BYTES) problems.push("low_disk");
         if (computer.status !== "offline" && computer.health && !computer.health.browserReady) problems.push("no_browser");
-        return { ...computer, problems };
+        return { ...computer, problems, capacity: runner.tasksPerComputer };
       }),
     );
     return { agents, teams: store.teams(), computers, approvals: store.pendingApprovals() };

@@ -1,6 +1,8 @@
 [Unit]
 Description=Coucou orchestrator worker
-After=network-online.target
+# /computer is the shared disk: never the VM's own folder by mistake.
+Requires=coucou-computer.service
+After=network-online.target coucou-computer.service
 Wants=network-online.target coucou-runner.socket
 
 [Service]

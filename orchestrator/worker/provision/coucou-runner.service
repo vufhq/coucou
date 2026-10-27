@@ -1,12 +1,12 @@
 [Unit]
 Description=Coucou computer: runs the agents' shell commands
-Requires=coucou-runner.socket
-After=coucou-runner.socket
+Requires=coucou-runner.socket coucou-computer.service
+After=coucou-runner.socket coucou-computer.service
 
 [Service]
 # Not the worker's user: what the agents run never sees the worker, its
-# token or its journal. /computer is the computer's disk: task folders, each
-# agent's own folder, and a shared one.
+# token or its journal. /computer is the disk every computer shares: task
+# folders, each agent's own folder, and a shared one.
 User=runner
 Group=computer
 WorkingDirectory=/opt/coucou-worker

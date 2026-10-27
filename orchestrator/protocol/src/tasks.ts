@@ -131,6 +131,8 @@ export const Task = z.object({
     }),
   ),
   waitingReason: z.enum(["agent_paused", "daily_limit", "computer_offline"]).nullable(),
+  /** The computer the task last ran on; null before it starts. Any free computer takes a task. */
+  computerId: z.string().nullable(),
   /** Files and repositories copied into the task folder before the first step. */
   attachments: z.array(TaskAttachment),
   modelProfileId: z.string(),
@@ -216,7 +218,10 @@ export const Computer = z.object({
   lastSeenAt: z.string().nullable(),
   health: Agent.shape.health,
   problems: z.array(z.enum(["vm_stopped", "worker_down", "low_disk", "no_browser"])),
+  /** The agents whose own computer it is. Any computer runs any agent's task. */
   agentIds: z.array(AgentId),
+  /** How many tasks it works on at once. */
+  capacity: z.number().int().positive(),
 });
 export type Computer = z.infer<typeof Computer>;
 

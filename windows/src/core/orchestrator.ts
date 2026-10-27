@@ -44,6 +44,8 @@ export interface OrchTask {
   waitingReason: "agent_paused" | "daily_limit" | "computer_offline" | null;
   /** Files and repositories the user sent with the message. Absent from an older backend. */
   attachments?: OrchAttachment[];
+  /** The computer the task runs on (any computer runs any agent). Absent from an older backend. */
+  computerId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -127,6 +129,13 @@ export interface OrchComputer {
   health: Record<string, unknown> | null;
   problems: AgentProblem[];
   agentIds: string[];
+  /** How many tasks it works on at once. Absent from an older backend, which ran one. */
+  capacity?: number;
+}
+
+/** Where a task runs: its own computer, or (older backend) its agent's. */
+export function taskComputerId(task: Pick<OrchTask, "computerId">, agent: Pick<OrchAgent, "computerId">): string {
+  return task.computerId ?? agent.computerId;
 }
 
 export type GoalSchedule =
