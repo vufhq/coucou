@@ -860,6 +860,7 @@ pub fn run() {
         .manage(Chat::default())
         .manage(shortcuts::Registry::default())
         .manage(recap::load())
+        .manage(orchestrator::new())
         .invoke_handler(tauri::generate_handler![
             boot,
             save_settings,
