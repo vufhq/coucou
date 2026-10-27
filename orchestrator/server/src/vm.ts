@@ -8,6 +8,13 @@
 // The `sleep` is left running when the backend stops, on purpose: a backend
 // restart must not take the VM down with a job in flight. Each start adds at
 // most one more idle process; `wsl --terminate agent-01` clears them all.
+//
+// wsl.exe is started through `cmd /c start /b`, never as a detached child: a
+// detached console program has no console, so Windows 11 opens one for it in
+// the default terminal, a window over whatever the user is doing (a game);
+// closing it kills the sleep and the next start opened another one. Here cmd
+// gets a console with no window, wsl.exe shares it, and as cmd's child it is
+// outside the backend's job, so it outlives the backend.
 
 import { execFile, spawn } from "node:child_process";
 
@@ -39,40 +46,56 @@ export interface KeepAlive {
   stop(): void;
 }
 
-export function keepWslAlive(distro: string, log: (line: string) => void): KeepAlive {
-  if (process.platform !== "win32" || !/^[A-Za-z0-9._-]{1,64}$/.test(distro)) return { stop() {} };
+/** Starts one idle `sleep` in the distro, with no window (see above). */
+export function startWslSleep(distro: string, log: (line: string) => void): void {
+  const child = spawn("cmd.exe", [`/d /c start "" /b wsl.exe -d ${distro} --exec sleep infinity`], {
+    stdio: "ignore",
+    windowsHide: true,
+    windowsVerbatimArguments: true,
+  });
+  child.on("error", (err) => log(`keep-alive for ${distro} could not start: ${err.message}`));
+}
+
+export const KEEP_ALIVE_CHECK_MS = 30_000;
+
+/**
+ * Starts the sleep, then checks every 30 s that the distro still runs and
+ * starts another when it doesn't (the sleep was killed, or WSL shut down).
+ */
+export function keepWslAlive(
+  distro: string,
+  log: (line: string) => void,
+  deps: { probe?: VmProbe; start?: typeof startWslSleep } = {},
+): KeepAlive {
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(distro)) return { stop() {} };
+  const probe = deps.probe ?? wslRunning;
+  const start = deps.start ?? startWslSleep;
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   // A distro that is not there yet (listed in ORCH_AGENTS before provision.ps1
-  // ran) fails at once: wait longer each time, up to 5 min, and say it once.
-  let delayMs = 10_000;
+  // ran) never comes up: check less often each time, up to 5 min, and say it once.
+  let delayMs = KEEP_ALIVE_CHECK_MS;
+  let failing = false;
 
-  const start = () => {
+  const check = async () => {
+    const running = await probe(`wsl:${distro}`);
     if (stopped) return;
-    const startedAt = Date.now();
-    const child = spawn("wsl.exe", ["-d", distro, "--exec", "sleep", "infinity"], {
-      stdio: "ignore",
-      windowsHide: true,
-      detached: true,
-    });
-    child.unref();
-    child.on("error", (err) => log(`keep-alive for ${distro} could not start: ${err.message}`));
-    child.on("exit", (code) => {
-      if (stopped) return;
-      const quick = Date.now() - startedAt < 5_000;
-      if (!quick) delayMs = 10_000;
-      if (delayMs === 10_000) {
-        log(
-          quick
-            ? `keep-alive for ${distro} could not start it (${code}); is it provisioned? Trying again, less and less often`
-            : `keep-alive for ${distro} ended (${code}); starting it again in 10 s`,
-        );
+    if (running === false) {
+      if (!failing) log(`keep-alive for ${distro}: it is not running; starting it again`);
+      else if (delayMs === KEEP_ALIVE_CHECK_MS) {
+        log(`keep-alive for ${distro} could not start it; is it provisioned? Trying again, less and less often`);
       }
-      timer = setTimeout(start, delayMs);
-      if (quick) delayMs = Math.min(delayMs * 2, 5 * 60_000);
-    });
+      if (failing) delayMs = Math.min(delayMs * 2, 5 * 60_000);
+      failing = true;
+      start(distro, log);
+    } else if (running) {
+      failing = false;
+      delayMs = KEEP_ALIVE_CHECK_MS;
+    }
+    timer = setTimeout(() => void check(), delayMs);
   };
-  start();
+  start(distro, log);
+  timer = setTimeout(() => void check(), delayMs);
 
   return {
     stop() {
