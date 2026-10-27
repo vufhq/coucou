@@ -26,7 +26,7 @@ import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.5.0";
+export const WORKER_VERSION = "0.5.2";
 /** How many jobs run at once. The backend sends a computer at most ORCH_TASKS_PER_COMPUTER tasks. */
 export const WORKER_SLOTS = 4;
 

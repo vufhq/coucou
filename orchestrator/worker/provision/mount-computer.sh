@@ -7,8 +7,16 @@
 # keeps no Linux owners), so the runner and the worker (group computer) can
 # both write, and nobody else can. case=dir: folders created here are case
 # sensitive, like on Linux, because the top one is.
+#
+# Also writes /etc/resolv.conf (wsl.conf stops WSL from generating it: WSL
+# links it into /mnt/wsl, which the worker and the runner cannot see, so
+# neither could look up a name). 10.255.255.254 is WSL's DNS tunnel, the one
+# resolver coucou-runner.service lets the runner reach.
 
 set -euo pipefail
+
+rm -f /etc/resolv.conf
+printf 'nameserver 10.255.255.254\n' > /etc/resolv.conf
 
 # COMPUTER_SHARE='D:\coucou-vms\shared', written by setup.sh.
 source /etc/coucou-worker/computer.env

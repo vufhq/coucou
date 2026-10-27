@@ -429,13 +429,18 @@ fn deliver_island_only(app: &AppHandle, event: &Value) {
 
 // ── The stream ────────────────────────────────────────────────────────────────
 
-pub fn setup(app: &AppHandle) {
-    app.manage(Orchestrator {
+/// Managed with the builder, before any window exists: a window's first calls
+/// can arrive while setup is still creating the others.
+pub fn new() -> Orchestrator {
+    Orchestrator {
         prefs: Mutex::new(load_prefs()),
         status: Mutex::new(Status { state: "off", error: None }),
         wake: Notify::new(),
         started: Mutex::new(None),
-    });
+    }
+}
+
+pub fn setup(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move { run(app).await });
 }
