@@ -318,9 +318,19 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   task's folder; run bash command lines on the computer (`terminal.shell`, see
   The computer). The older `terminal.run` (one command, no shell, as the
   worker's user) keeps its rules, so an outdated worker never runs free code.
-- **Runs without a click:** shell commands and writing or overwriting files.
-- **Needs your click:** the first visit to a site (approving it remembers the
-  site), and creating or retiring an agent. Coucou never approves on its own.
+- **Rule levels:** each agent has one, set only by you in HQ (`PUT
+  /api/agents/:id/rules`; no model operation can change it). New and existing
+  agents are at 2.
+
+  | Level | Asks before |
+  |---|---|
+  | 1 Ask before everything | every step but reading files and pages |
+  | 2 Ask before risky steps | a site's first visit, `terminal.run` beyond read-only commands |
+  | 3 Act freely within budget | nothing below |
+  | 4 Fully trusted | nothing below |
+
+- **Needs your click at every level:** creating or retiring an agent. Coucou
+  never approves on its own; approving a site remembers it.
 - **Always refused:** the host machine, the LAN, cloud metadata, URLs with
   credentials, and paths or command arguments that leave the task folder.
   Symlinks are not followed.

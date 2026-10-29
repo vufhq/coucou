@@ -88,6 +88,8 @@ export interface OrchAgent {
   /** Absent from a backend older than the health checks. */
   problems?: AgentProblem[];
   paused: boolean;
+  /** 1 asks before everything … 4 fully trusted; absent from a backend older than Phase 11. */
+  ruleLevel?: 1 | 2 | 3 | 4;
   limits: { tasksPerDay: number; stepsPerDay: number };
   usage: { tasksToday: number; stepsToday: number };
   kind: "chief" | "coworker";
@@ -236,6 +238,8 @@ export const OrchestratorBridge = {
   resumeAgent: (agentId: string) => callOrThrow<{ agent: OrchAgent }>("orchestrator_resume_agent", { agentId }),
   setLimits: (agentId: string, tasksPerDay: number, stepsPerDay: number) =>
     callOrThrow<{ agent: OrchAgent }>("orchestrator_set_limits", { agentId, tasksPerDay, stepsPerDay }),
+  setRules: (agentId: string, level: 1 | 2 | 3 | 4) =>
+    callOrThrow<{ agent: OrchAgent }>("orchestrator_set_rules", { agentId, level }),
   /** Changes an agent; null puts the default back, a missing field is left alone. */
   updateAgent: (agentId: string, identity: Partial<Pick<
     OrchAgent,

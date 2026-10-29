@@ -147,6 +147,18 @@ export const Task = z.object({
 });
 export type Task = z.infer<typeof Task>;
 
+/**
+ * How much an agent may do without the user's click, set by the user only:
+ * 1 asks before everything, 2 before risky steps, 3 acts freely within a
+ * daily budget, 4 is fully trusted. Some steps ask at every level.
+ */
+export const RuleLevel = z.number().int().min(1).max(4);
+export type RuleLevel = z.infer<typeof RuleLevel>;
+export const DEFAULT_RULE_LEVEL: RuleLevel = 2;
+
+export const AgentRules = z.object({ level: RuleLevel }).strict();
+export type AgentRules = z.infer<typeof AgentRules>;
+
 export const Agent = z.object({
   id: AgentId,
   name: z.string(),
@@ -176,6 +188,7 @@ export const Agent = z.object({
   persona: z.string().nullable(),
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
   paused: z.boolean(),
+  ruleLevel: RuleLevel,
   limits: z.object({
     tasksPerDay: z.number().int(),
     stepsPerDay: z.number().int(),

@@ -867,6 +867,16 @@ pub async fn orchestrator_set_limits(
     api(&app, Method::PUT, &format!("/api/agents/{}/limits", segment(&agent_id)?), Some(body)).await
 }
 
+/// The user's pick in HQ: how much the agent may do without a click (1–4).
+#[tauri::command]
+pub async fn orchestrator_set_rules(app: AppHandle, agent_id: String, level: u8) -> Result<Value, String> {
+    if !(1..=4).contains(&level) {
+        return Err("rule level must be 1 to 4".into());
+    }
+    let body = json!({ "level": level });
+    api(&app, Method::PUT, &format!("/api/agents/{}/rules", segment(&agent_id)?), Some(body)).await
+}
+
 #[tauri::command]
 pub async fn orchestrator_chat_history(app: AppHandle, agent_id: String) -> Result<Value, String> {
     let path = format!("/api/tasks?agentId={}&source=chat,delegated&limit=50", segment(&agent_id)?);

@@ -5264,6 +5264,61 @@
    "ru": "Стандартный вид",
    "id": "Tampilan bawaan"
   },
+  "Rules": {
+   "zh-Hans": "规则",
+   "hi": "नियम",
+   "es": "Reglas",
+   "ar": "القواعد",
+   "fr": "Règles",
+   "bn": "নিয়ম",
+   "pt-BR": "Regras",
+   "ru": "Правила",
+   "id": "Aturan"
+  },
+  "Ask before everything": {
+   "zh-Hans": "每一步都先询问",
+   "hi": "हर काम से पहले पूछें",
+   "es": "Preguntar antes de todo",
+   "ar": "السؤال قبل كل شيء",
+   "fr": "Demander avant tout",
+   "bn": "সবকিছুর আগে জিজ্ঞাসা করুন",
+   "pt-BR": "Perguntar antes de tudo",
+   "ru": "Спрашивать перед каждым шагом",
+   "id": "Tanya sebelum semuanya"
+  },
+  "Ask before risky steps": {
+   "zh-Hans": "有风险的步骤先询问",
+   "hi": "जोखिम भरे कदमों से पहले पूछें",
+   "es": "Preguntar antes de pasos arriesgados",
+   "ar": "السؤال قبل الخطوات الخطرة",
+   "fr": "Demander avant les étapes risquées",
+   "bn": "ঝুঁকিপূর্ণ ধাপের আগে জিজ্ঞাসা করুন",
+   "pt-BR": "Perguntar antes de passos arriscados",
+   "ru": "Спрашивать перед рискованными шагами",
+   "id": "Tanya sebelum langkah berisiko"
+  },
+  "Act freely within budget": {
+   "zh-Hans": "在预算内自由行动",
+   "hi": "बजट के भीतर खुलकर काम करें",
+   "es": "Actuar libremente dentro del presupuesto",
+   "ar": "التصرف بحرية ضمن الميزانية",
+   "fr": "Agir librement dans le budget",
+   "bn": "বাজেটের মধ্যে স্বাধীনভাবে কাজ করুন",
+   "pt-BR": "Agir livremente dentro do orçamento",
+   "ru": "Действовать свободно в рамках бюджета",
+   "id": "Bertindak bebas dalam anggaran"
+  },
+  "Fully trusted": {
+   "zh-Hans": "完全信任",
+   "hi": "पूरी तरह भरोसेमंद",
+   "es": "Plena confianza",
+   "ar": "موثوق تمامًا",
+   "fr": "Entière confiance",
+   "bn": "সম্পূর্ণ বিশ্বস্ত",
+   "pt-BR": "Confiança total",
+   "ru": "Полное доверие",
+   "id": "Sepenuhnya dipercaya"
+  },
   "Role": {
    "zh-Hans": "角色",
    "hi": "भूमिका",

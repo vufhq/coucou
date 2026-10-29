@@ -9,6 +9,7 @@ import {
   AgentId,
   AgentIdentity,
   AgentLimits,
+  AgentRules,
   ApprovalDecision,
   CreateAgentRequest,
   CreateGoalRequest,
@@ -347,6 +348,16 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
 
   app.post<{ Params: { id: string } }>("/api/agents/:id/resume", async (req, reply) => {
     if (!runner.resumeAgent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    return { agent: store.agent(req.params.id) };
+  });
+
+  // The user's click in HQ. No model operation sets a rule level.
+  app.put<{ Params: { id: string } }>("/api/agents/:id/rules", async (req, reply) => {
+    const body = AgentRules.safeParse(req.body);
+    if (!body.success) return bad(reply, body.error);
+    if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
+    store.setAgentRuleLevel(req.params.id, body.data.level);
+    events.emit("agent.updated", req.params.id, null, {});
     return { agent: store.agent(req.params.id) };
   });
 

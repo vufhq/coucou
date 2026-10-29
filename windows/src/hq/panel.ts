@@ -602,7 +602,7 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
     const snap = store.snapshot();
     const sig = JSON.stringify([
       avatarSignature(agent, 56, { working: store.working(agent.id), star: agent.kind === "chief" }),
-      agent.name, agent.role, agent.persona, agent.teamId, agent.paused, agent.status, agent.problems,
+      agent.name, agent.role, agent.persona, agent.teamId, agent.paused, agent.status, agent.problems, agent.ruleLevel,
       snap.teams.map((x) => [x.id, x.name, x.order]),
     ]);
     if (sig === settingsSig) return;
@@ -671,6 +671,21 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
       (o) => change({ outfit: o === "default" ? null : (o as OrchOutfit) }),
     );
 
+    // Absent from an older backend: no row, rather than one that can't save.
+    const rules = agent.ruleLevel === undefined ? null : select(
+      [
+        ["1", t("Ask before everything")],
+        ["2", t("Ask before risky steps")],
+        ["3", t("Act freely within budget")],
+        ["4", t("Fully trusted")],
+      ],
+      String(agent.ruleLevel),
+      (level) => {
+        note.textContent = "";
+        void OrchestratorBridge.setRules(agent.id, Number(level) as 1 | 2 | 3 | 4).then(() => store.reload(), fail);
+      },
+    );
+
     const pause = h("button", { class: "hq-pnl-btn", text: agent.paused ? t("Resume") : t("Pause") });
     pause.addEventListener("click", () => {
       pause.disabled = true;
@@ -705,6 +720,7 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
       field(t("Team"), teamControl(agent, change, fail)),
       field(t("Colour"), colors(agent, (hex) => change({ color: hex }))),
       field(t("Outfit"), outfit),
+      rules && field(t("Rules"), rules),
       h("div", { class: "hq-pnl-actions split" }, pause, retire),
       note,
     );

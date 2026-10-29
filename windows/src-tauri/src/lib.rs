@@ -927,6 +927,7 @@ pub fn run() {
             orchestrator::orchestrator_pause_agent,
             orchestrator::orchestrator_resume_agent,
             orchestrator::orchestrator_set_limits,
+            orchestrator::orchestrator_set_rules,
             orchestrator::orchestrator_update_agent,
             orchestrator::orchestrator_create_agent,
             orchestrator::orchestrator_retire_agent,
