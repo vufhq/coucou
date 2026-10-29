@@ -27,6 +27,7 @@ import {
 } from "@coucou-orchestrator/protocol";
 import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
+import type { Github } from "./github.ts";
 import type { ModelRouter } from "./model/router.ts";
 import { runBackendJob, type Downloads, type JobSignals } from "./jobs.ts";
 import { redactText } from "./redact.ts";
@@ -50,6 +51,8 @@ export interface ApiDeps {
   vmProbe: VmProbe;
   /** How long a file request waits for the worker. */
   fileTimeoutMs?: number;
+  /** The user's GitHub sign-in; without it the /api/github routes say so. */
+  github?: Github;
 }
 
 const TaskQuery = z.object({
@@ -351,14 +354,33 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     return { agent: store.agent(req.params.id) };
   });
 
-  // The user's click in HQ. No model operation sets a rule level.
+  // The user's click in HQ. No model operation sets a rule level or GitHub access.
   app.put<{ Params: { id: string } }>("/api/agents/:id/rules", async (req, reply) => {
     const body = AgentRules.safeParse(req.body);
     if (!body.success) return bad(reply, body.error);
     if (!store.agent(req.params.id)) return reply.code(404).send({ error: "not_found" });
-    store.setAgentRuleLevel(req.params.id, body.data.level);
+    if (body.data.level !== undefined) store.setAgentRuleLevel(req.params.id, body.data.level);
+    if (body.data.github !== undefined) store.setAgentGithub(req.params.id, body.data.github);
     events.emit("agent.updated", req.params.id, null, {});
     return { agent: store.agent(req.params.id) };
+  });
+
+  // The user's GitHub sign-in (Settings → Tasks). The tokens never leave the backend.
+  app.get("/api/github", async () => ({ github: deps.github?.status() ?? null }));
+
+  app.post("/api/github/connect", async (_req, reply) => {
+    if (!deps.github) return reply.code(404).send({ error: "not_found" });
+    try {
+      return { pending: await deps.github.connect(), github: deps.github.status() };
+    } catch (err) {
+      return reply.code(502).send({ error: "github", message: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.post("/api/github/disconnect", async (_req, reply) => {
+    if (!deps.github) return reply.code(404).send({ error: "not_found" });
+    deps.github.disconnect();
+    return { github: deps.github.status() };
   });
 
   app.put<{ Params: { id: string } }>("/api/agents/:id/limits", async (req, reply) => {

@@ -156,7 +156,11 @@ export const RuleLevel = z.number().int().min(1).max(4);
 export type RuleLevel = z.infer<typeof RuleLevel>;
 export const DEFAULT_RULE_LEVEL: RuleLevel = 2;
 
-export const AgentRules = z.object({ level: RuleLevel }).strict();
+/** At least one of: the level, whether the agent may use the user's GitHub account. */
+export const AgentRules = z
+  .object({ level: RuleLevel.optional(), github: z.boolean().optional() })
+  .strict()
+  .refine((r) => r.level !== undefined || r.github !== undefined, "level or github is required");
 export type AgentRules = z.infer<typeof AgentRules>;
 
 export const Agent = z.object({
@@ -189,6 +193,8 @@ export const Agent = z.object({
   status: z.enum(["offline", "starting", "ready", "busy", "error"]),
   paused: z.boolean(),
   ruleLevel: RuleLevel,
+  /** The user let this agent use their GitHub account. */
+  githubAllowed: z.boolean(),
   limits: z.object({
     tasksPerDay: z.number().int(),
     stepsPerDay: z.number().int(),

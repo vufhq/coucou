@@ -21,7 +21,25 @@ export interface PolicyContext {
   approvedDomains: readonly string[];
   /** The agent's rule level (protocol's RuleLevel); 2 when left out. */
   ruleLevel?: RuleLevel;
+  /** For git.*: left out, every GitHub operation is refused. */
+  github?: GithubContext;
 }
+
+export interface GithubContext {
+  /** The user switched this agent's GitHub access on in HQ. */
+  allowed: boolean;
+  /** Coucou is signed in to GitHub. */
+  connected: boolean;
+  /** Repos this agent cloned with git.clone → their default branch then. */
+  repos: Readonly<Record<string, string>>;
+  /** git.push steps this agent started today. */
+  pushesToday: number;
+  /** How many pushes a level-3 agent makes a day before it asks again. */
+  pushBudget: number;
+}
+
+/** Branches a push always asks for, whatever the level, beside the repo's default one. */
+const PROTECTED_BRANCHES = new Set(["main", "master"]);
 
 const EVERYTHING = "this agent asks before every action";
 
@@ -52,6 +70,10 @@ export function describeTarget(op: Operation): string {
       return String(a.path);
     case "browser.screenshot":
       return String(a.name);
+    case "git.clone":
+      return `${String(a.repo)} → ${String(a.dir)}`;
+    case "git.push":
+      return `${String(a.repo)} ← ${String(a.dir)} (${String(a.branch)})`;
     case "team.propose": {
       const team = a.team as { name?: string; id?: string };
       const members = a.members as { name: string; role: string }[];
@@ -115,6 +137,30 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
       // A download for the user, or a file the user attached, asked by the
       // backend; never a model's step.
       return { verdict: "deny", reason: "not an operation the model can use" };
+    // The user's account: risky. Pushing to the default branch asks at every level.
+    case "git.clone":
+    case "git.push": {
+      const gh = ctx.github;
+      if (!gh?.connected) return { verdict: "deny", reason: "Coucou is not signed in to GitHub (Settings → Tasks → GitHub)" };
+      if (!gh.allowed) return { verdict: "deny", reason: "this agent may not use the user's GitHub account (the user switches it on in HQ)" };
+      const repo = String(a.repo);
+      const known = Object.hasOwn(gh.repos, repo);
+      if (op.op === "git.clone") {
+        if (level === 1) return { verdict: "approve", reason: `${EVERYTHING}: clones ${repo}` };
+        if (level === 2 && !known) return { verdict: "approve", reason: `first clone of ${repo} through the user's GitHub account` };
+        return { verdict: "allow" };
+      }
+      if (!known) return { verdict: "deny", reason: `clone ${repo} with git.clone first; only repos cloned that way can be pushed` };
+      const branch = String(a.branch);
+      if (branch === gh.repos[repo] || PROTECTED_BRANCHES.has(branch)) {
+        return { verdict: "approve", reason: `pushes to ${branch}, the main branch of ${repo}` };
+      }
+      if (level <= 2) return { verdict: "approve", reason: `publishes the branch ${branch} to ${repo} on GitHub` };
+      if (level === 3 && gh.pushesToday >= gh.pushBudget) {
+        return { verdict: "approve", reason: `past today's budget of ${gh.pushBudget} pushes: publishes ${branch} to ${repo}` };
+      }
+      return { verdict: "allow" };
+    }
     case "team.propose":
       return { verdict: "approve", reason: "creating agents always needs the user's approval" };
     case "team.retire":

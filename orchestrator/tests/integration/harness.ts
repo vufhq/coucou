@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { AgentEvent } from "@coucou-orchestrator/protocol";
 import { createBackend, type Backend } from "../../server/src/app.ts";
 import type { Config } from "../../server/src/config.ts";
+import type { Github } from "../../server/src/github.ts";
 import type { ModelAdapter } from "../../server/src/model/adapter.ts";
 import type { VmProbe } from "../../server/src/vm.ts";
 import { ModelRouter } from "../../server/src/model/router.ts";
@@ -103,7 +104,15 @@ export async function startBackend(
   ports?: { api: number; worker: number },
   /** More model profiles, by id, beside the default "scripted" one. */
   extraModels: Record<string, ModelAdapter> = {},
-  options: { vmProbe?: VmProbe; retentionDays?: number; agents?: string[]; maxParallel?: number; tasksPerComputer?: number } = {},
+  options: {
+    vmProbe?: VmProbe;
+    retentionDays?: number;
+    agents?: string[];
+    maxParallel?: number;
+    tasksPerComputer?: number;
+    github?: Github;
+    riskyPerDay?: number;
+  } = {},
 ): Promise<Running> {
   const config: Config = {
     dataDir,
@@ -118,6 +127,7 @@ export async function startBackend(
     agents: (options.agents ?? ["agent-01"]).map((id) => ({ id, name: id, vmId: `test:${id}` })),
     maxParallel: options.maxParallel ?? 2,
     tasksPerComputer: options.tasksPerComputer ?? 2,
+    riskyPerDay: options.riskyPerDay ?? 10,
   };
   const models = new ModelRouter();
   models.register(
@@ -132,6 +142,7 @@ export async function startBackend(
     pollMs: 50,
     transientRetryDelaysMs: [20, 20],
     vmProbe: options.vmProbe ?? (async () => null),
+    github: options.github,
   });
   const { apiPort, workerPort } = await backend.listen();
   return {

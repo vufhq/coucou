@@ -7,6 +7,7 @@
 // outcome waits in the journal, and the next hello hands it over.
 
 import { statfs } from "node:fs/promises";
+import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   OP_NAMES,
@@ -22,11 +23,12 @@ import type { Journal } from "./journal.ts";
 import { PathError, ensureTaskDir } from "./paths.ts";
 import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } from "./ops/browser.ts";
 import { fetchFile, listFiles, readText, receiveFile, writeArtifact } from "./ops/fs.ts";
+import { GitError, gitClone, gitPush, type GitOptions } from "./ops/git.ts";
 import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
 import { CommandError, runCommand } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.5.3";
+export const WORKER_VERSION = "0.6.0";
 /** How many jobs run at once. The backend sends a computer at most ORCH_TASKS_PER_COMPUTER tasks. */
 export const WORKER_SLOTS = 4;
 
@@ -67,6 +69,8 @@ export interface WorkerOptions {
   computer?: string;
   /** Runs terminal.shell commands; without one the operation is refused. */
   shell?: ShellRunner | null;
+  /** For tests: another remote than github.com, more protocols. */
+  git?: Partial<GitOptions>;
   /** How often a running job's lease is renewed. */
   heartbeatMs?: number;
   claimWaitMs?: number;
@@ -82,7 +86,7 @@ export class Worker {
   private prunedAt = 0;
 
   constructor(options: WorkerOptions) {
-    this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, computer: options.workspace, shell: null, ...options };
+    this.o = { heartbeatMs: 5_000, claimWaitMs: 25_000, log: () => {}, computer: options.workspace, shell: null, git: {}, ...options };
   }
 
   stop(): void {
@@ -237,7 +241,7 @@ export class Worker {
         upload,
         download,
       };
-      const run = this.dispatch(ctx, parsed.op.op, parsed.op.args);
+      const run = this.dispatch(ctx, parsed.op.op, parsed.op.args, job.secrets?.github ?? null);
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
       });
@@ -252,7 +256,7 @@ export class Worker {
       if (controller.signal.aborted) {
         return { status: "failed", error: { code: "timeout", message: `no result within ${Math.round(job.deadlineMs / 1000)} s` } };
       }
-      const refused = err instanceof PathError || err instanceof CommandError || err instanceof BrowserError;
+      const refused = err instanceof PathError || err instanceof CommandError || err instanceof BrowserError || err instanceof GitError;
       const message = err instanceof Error ? err.message : String(err);
       return { status: "failed", error: { code: refused ? "refused" : "failed", message: message.slice(0, 1_000) } };
     } finally {
@@ -262,7 +266,13 @@ export class Worker {
     }
   }
 
-  private dispatch(ctx: OpContext, op: string, args: Record<string, unknown>): Promise<OpResult> {
+  /** `githubToken` came with this job (git.* only) and goes no further than git's environment. */
+  /** Private clones go in the worker's own workspace, out of the runner's reach. */
+  private gitOptions(): GitOptions {
+    return { privateDir: join(this.o.workspace, ".coucou", "git"), ...this.o.git };
+  }
+
+  private dispatch(ctx: OpContext, op: string, args: Record<string, unknown>, githubToken: string | null): Promise<OpResult> {
     const b = this.o.browser;
     switch (op) {
       case "browser.navigate":
@@ -286,6 +296,10 @@ export class Worker {
       case "terminal.shell":
         if (!this.o.shell) return Promise.reject(new CommandError("this computer has no shell runner"));
         return runShell(ctx, args as OpArgs<"terminal.shell">, this.o.shell);
+      case "git.clone":
+        return gitClone(ctx, args as OpArgs<"git.clone">, githubToken, this.gitOptions());
+      case "git.push":
+        return gitPush(ctx, args as OpArgs<"git.push">, githubToken, this.gitOptions());
       default:
         return Promise.reject(new CommandError(`unsupported operation ${op}`));
     }

@@ -36,8 +36,19 @@ const URL_SECRET_PARAM =
 const AUTH_SCHEME =
   /\b([Bb]earer|[Bb]asic|[Tt]oken|[Dd]igest)\s+(?=[A-Za-z0-9._~+/=-]*?(?:[0-9_~+/=]|\.[A-Za-z0-9]|[A-Za-z0-9][A-Z]))[A-Za-z0-9._~+/=-]{6,}/g;
 
+/**
+ * Secrets the backend itself holds (the user's GitHub tokens): removed by
+ * value, whatever their shape. Kept for the life of the process.
+ */
+const KNOWN_SECRETS = new Set<string>();
+
+export function addSecret(value: string): void {
+  if (value.length >= 8) KNOWN_SECRETS.add(value);
+}
+
 export function redactText(text: string): string {
   let out = text;
+  for (const secret of KNOWN_SECRETS) if (out.includes(secret)) out = out.split(secret).join(REPLACEMENT);
   for (const pattern of PATTERNS) out = out.replace(pattern, REPLACEMENT);
   out = out.replace(AUTH_SCHEME, `$1 ${REPLACEMENT}`);
   out = out.replace(KEY_VALUE, `$1${REPLACEMENT}`);

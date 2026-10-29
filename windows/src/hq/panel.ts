@@ -602,7 +602,7 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
     const snap = store.snapshot();
     const sig = JSON.stringify([
       avatarSignature(agent, 56, { working: store.working(agent.id), star: agent.kind === "chief" }),
-      agent.name, agent.role, agent.persona, agent.teamId, agent.paused, agent.status, agent.problems, agent.ruleLevel,
+      agent.name, agent.role, agent.persona, agent.teamId, agent.paused, agent.status, agent.problems, agent.ruleLevel, agent.githubAllowed,
       snap.teams.map((x) => [x.id, x.name, x.order]),
     ]);
     if (sig === settingsSig) return;
@@ -682,7 +682,20 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
       String(agent.ruleLevel),
       (level) => {
         note.textContent = "";
-        void OrchestratorBridge.setRules(agent.id, Number(level) as 1 | 2 | 3 | 4).then(() => store.reload(), fail);
+        void OrchestratorBridge.setRules(agent.id, { level: Number(level) as 1 | 2 | 3 | 4 }).then(() => store.reload(), fail);
+      },
+    );
+
+    // The click that lets this agent sign in to GitHub as the user (Settings → Tasks connects the account).
+    const github = agent.githubAllowed === undefined ? null : select(
+      [
+        ["off", t("Can't use your account")],
+        ["on", t("May use your GitHub account")],
+      ],
+      agent.githubAllowed ? "on" : "off",
+      (value) => {
+        note.textContent = "";
+        void OrchestratorBridge.setRules(agent.id, { github: value === "on" }).then(() => store.reload(), fail);
       },
     );
 
@@ -721,6 +734,7 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
       field(t("Colour"), colors(agent, (hex) => change({ color: hex }))),
       field(t("Outfit"), outfit),
       rules && field(t("Rules"), rules),
+      github && field(t("GitHub"), github),
       h("div", { class: "hq-pnl-actions split" }, pause, retire),
       note,
     );
