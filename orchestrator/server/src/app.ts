@@ -8,6 +8,7 @@ import { Uploads } from "./attachments.ts";
 import type { Config } from "./config.ts";
 import { EventLog } from "./events.ts";
 import { buildGateway } from "./gateway.ts";
+import { Github, memorySlot } from "./github.ts";
 import { Downloads, JobSignals } from "./jobs.ts";
 import type { ModelRouter } from "./model/router.ts";
 import { Runner } from "./runner.ts";
@@ -23,6 +24,7 @@ export interface Backend {
   events: EventLog;
   runner: Runner;
   scheduler: GoalScheduler;
+  github: Github;
   api: FastifyInstance;
   gateway: FastifyInstance;
   /** Starts listening and resumes in-flight tasks. Returns the bound ports. */
@@ -48,8 +50,11 @@ export function createBackend(
     schedulerPollMs?: number;
     /** Whether an agent's VM is running; the WSL check by default. */
     vmProbe?: VmProbe;
+    /** The user's GitHub sign-in; kept in memory only by default. */
+    github?: Github;
   } = {},
 ): Backend {
+  const github = opts.github ?? new Github({ clientId: config.githubClientId, slot: memorySlot() });
   const store = new Store(join(config.dataDir, "orchestrator.db"));
   const firstComputer = config.agents[0];
   if (!firstComputer) throw new Error("at least one computer is required");
@@ -71,9 +76,11 @@ export function createBackend(
     modelRetries: opts.modelRetries,
     transientRetryDelaysMs: opts.transientRetryDelaysMs,
     uploads,
+    github,
+    riskyPerDay: config.riskyPerDay,
   });
   const scheduler = new GoalScheduler(store, events, runner, opts.schedulerPollMs);
-  const api = buildApi({ store, events, runner, signals, downloads, uploads, models, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
+  const api = buildApi({ store, events, runner, signals, downloads, uploads, models, github, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
   const gateway = buildGateway({
     store,
     events,
@@ -81,6 +88,7 @@ export function createBackend(
     signals,
     downloads,
     uploads,
+    github,
     tokens: tokens.workers,
     leaseMs: config.leaseMs,
     claimWaitMs: config.claimWaitMs,
@@ -94,6 +102,7 @@ export function createBackend(
     events,
     runner,
     scheduler,
+    github,
     api,
     gateway,
     async listen() {

@@ -38,20 +38,21 @@ export async function blockedHost(host: string): Promise<boolean> {
   if (isIP(host)) return false;
   const cached = resolved.get(host);
   if (cached !== undefined) return cached;
-  let blocked = true;
+  let addrs: { address: string }[];
   try {
-    const addrs = await lookup(host, { all: true });
-    blocked = addrs.length === 0 || addrs.some((a) => isPrivateHost(a.address));
+    addrs = await lookup(host, { all: true });
   } catch {
-    blocked = true;
+    // Blocked, but not remembered: a failed lookup may work next time.
+    return true;
   }
+  const blocked = addrs.length === 0 || addrs.some((a) => isPrivateHost(a.address));
   resolved.set(host, blocked);
   return blocked;
 }
 
 export async function navigate(ctx: OpContext, args: OpArgs<"browser.navigate">, browser: BrowserDriver): Promise<OpResult> {
   const url = new URL(args.url);
-  if (await (browser.blocked ?? blockedHost)(url.hostname)) throw new BrowserError(`${url.hostname} is on a private network`);
+  if (await (browser.blocked ?? blockedHost)(url.hostname)) throw new BrowserError(`${url.hostname} is on a private network or could not be looked up`);
   const page = await browser.page(ctx.taskId);
   await page.goto(args.url, ctx.deadlineMs);
   const title = (await page.title()).slice(0, 200);

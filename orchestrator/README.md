@@ -310,6 +310,8 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name`. Any of them runs any agent's task; agents whose own computer was dropped from the list move to the first at startup |
 | `ORCH_TASKS_PER_COMPUTER` | `2` | How many tasks one computer works on at once (its worker runs up to 4 operations at once) |
 | `ORCH_MAX_PARALLEL` | computers × `ORCH_TASKS_PER_COMPUTER` | How many tasks may be worked on at the same time, all computers together. The others wait their turn |
+| `ORCH_GITHUB_CLIENT_ID` | unset | Client ID of your own GitHub App (device flow on, expiring tokens, Contents read/write, no secret). Without it GitHub stays off |
+| `ORCH_RISKY_PER_DAY` | `10` | Pushes a level-3 agent makes a day before it asks again |
 
 ## Safety model
 
@@ -318,9 +320,33 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   task's folder; run bash command lines on the computer (`terminal.shell`, see
   The computer). The older `terminal.run` (one command, no shell, as the
   worker's user) keeps its rules, so an outdated worker never runs free code.
-- **Runs without a click:** shell commands and writing or overwriting files.
-- **Needs your click:** the first visit to a site (approving it remembers the
-  site), and creating or retiring an agent. Coucou never approves on its own.
+- **Rule levels:** each agent has one, set only by you in HQ (`PUT
+  /api/agents/:id/rules`; no model operation can change it). New and existing
+  agents are at 2.
+
+  | Level | Asks before |
+  |---|---|
+  | 1 Ask before everything | every step but reading files and pages |
+  | 2 Ask before risky steps | a site's first visit, `terminal.run` beyond read-only commands |
+  | 3 Act freely within budget | a push past `ORCH_RISKY_PER_DAY` today |
+  | 4 Fully trusted | nothing below |
+
+- **GitHub:** you sign in once in Coucou (Settings → Tasks → GitHub: a code
+  to enter on github.com, through your own GitHub App, which only sees the
+  repos you installed it on). The tokens stay in Credential Manager
+  (`orchestrator-github`), are refreshed by the backend, and reach a computer
+  only inside a `git.clone` or `git.push` job, for git's own process; their
+  values are redacted everywhere. An agent uses the account only after you
+  switch it on in HQ. `git.clone` asks the first time per repo at levels 1–2;
+  `git.push` asks at 1–2 and at 3 past the day's budget. Only a repo the agent
+  cloned with `git.clone` can be pushed, never forced; a push to its default
+  branch, `main` or `master` asks at every level. The agent's repo is
+  untrusted (the shell can edit its `.git/config` and hooks), so the worker
+  copies the branch out with `git clone --bare --no-local` and pushes from that
+  clean copy. Disconnecting forgets the tokens; revoke the app on github.com
+  to cut it off there too.
+- **Needs your click at every level:** creating or retiring an agent. Coucou
+  never approves on its own; approving a site remembers it.
 - **Always refused:** the host machine, the LAN, cloud metadata, URLs with
   credentials, and paths or command arguments that leave the task folder.
   Symlinks are not followed.

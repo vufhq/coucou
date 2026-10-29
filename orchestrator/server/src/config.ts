@@ -28,6 +28,10 @@ export interface Config {
   maxParallel: number;
   /** How many tasks one computer works on at once. */
   tasksPerComputer: number;
+  /** The user's own GitHub App (device flow); public, no secret. GitHub is off without it. */
+  githubClientId?: string;
+  /** Risky actions (pushes) a level-3 agent makes a day before it asks again. */
+  riskyPerDay: number;
 }
 
 /**
@@ -89,5 +93,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // Unset: every computer full.
     maxParallel: Math.max(1, int(env.ORCH_MAX_PARALLEL, agents.length * tasksPerComputer)),
     tasksPerComputer,
+    githubClientId: env.ORCH_GITHUB_CLIENT_ID?.trim() || undefined,
+    riskyPerDay: Math.max(0, int(env.ORCH_RISKY_PER_DAY, 10)),
   };
 }

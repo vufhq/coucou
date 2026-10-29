@@ -73,6 +73,11 @@ export const Job = z.object({
   deadlineMs: z.number().int().positive(),
   /** The agent the task belongs to (not the computer): its own folder is `~`. */
   agentId: AgentId.optional(),
+  /**
+   * What this one job needs to sign in, added at claim time and never stored:
+   * the user's GitHub token, for git.* only.
+   */
+  secrets: z.object({ github: z.string().min(1).max(2_000).optional() }).strict().optional(),
 });
 export type Job = z.infer<typeof Job>;
 
