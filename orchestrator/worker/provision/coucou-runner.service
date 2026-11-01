@@ -27,7 +27,7 @@ ProtectProc=invisible
 InaccessiblePaths=-/workspace -/etc/coucou-worker -/run/credentials -/run/coucou-runner.sock
 # Folders WSL shares between every distro on the PC: other agents, and the
 # sockets of Podman, Docker or WSLg.
-InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix
+InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix -/mnt/coucou-share
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes
