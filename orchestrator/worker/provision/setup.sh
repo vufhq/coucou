@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
-# Sets up an agent's distro from inside it, as root:
-# `setup.sh agent-02 'D:\coucou-vms\shared'`.
-# provision.ps1 runs it after copying the worker to /opt/coucou-worker;
-# running it again updates in place.
+# Sets up an agent's computer from inside it, as root:
+#   `setup.sh agent-02 'D:\coucou-vms\shared'`        a WSL distro (provision.ps1)
+#   `setup.sh agent-02 /mnt/coucou-share lima`        a Lima VM on a Mac (provision.sh)
+# The provision script runs it after copying the worker to /opt/coucou-worker;
+# running it again updates in place. x86_64 and arm64 (Apple silicon) alike.
 #
 #   - patched Ubuntu, an unprivileged `agent` user (no sudo), /workspace
 #   - the computer: a second unprivileged `runner` user that runs the agents
 #     shell commands in /computer, with python3, uv, git and a C compiler
-#   - /computer: the Windows folder every computer shares, mounted by
-#     coucou-computer.service (only that folder; no Windows drive)
+#   - /computer: the host folder every computer shares, mounted by
+#     coucou-computer.service (only that folder; no Windows drive, no Mac home)
 #   - Node.js from nodejs.org, checked against its published SHA-256
 #   - the worker's dependencies and Chromium for Playwright, owned by root
-#   - /etc/wsl.conf (no Windows drives, no Windows programs) and the systemd unit
+#   - on WSL, /etc/wsl.conf (no Windows drives, no Windows programs); the systemd units
 
 set -euo pipefail
 
 NODE_VERSION="24.18.0"
 UV_VERSION="0.9.5"
-UV_SHA256="2cf10babba653310606f8b49876cfb679928669e7ddaa1fb41fb00ce73e64f66"
+UV_SHA256_X86_64="2cf10babba653310606f8b49876cfb679928669e7ddaa1fb41fb00ce73e64f66"
+UV_SHA256_AARCH64="9db0c2f6683099f86bfeea47f4134e915f382512278de95b2a0e625957594ff3"
 APP=/opt/coucou-worker
 AGENT_ID="${1:-agent-01}"
 COMPUTER_SHARE="${2:-D:\\coucou-vms\\shared}"
+COMPUTER_DRIVER="${3:-wsl}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "setup.sh must run as root" >&2
@@ -31,23 +34,45 @@ if [[ ! "$AGENT_ID" =~ ^[a-z0-9-]{1,24}$ || "$AGENT_ID" == "claude" ]]; then
   echo "setup.sh: invalid agent id: $AGENT_ID" >&2
   exit 1
 fi
-# A Windows folder path, nothing a shell could read as more.
-share_rule='^[A-Za-z]:[\][-A-Za-z0-9 ._\]+$'
+case "$COMPUTER_DRIVER" in
+  wsl)
+    # A Windows folder path, nothing a shell could read as more.
+    share_rule='^[A-Za-z]:[\][-A-Za-z0-9 ._\]+$'
+    ;;
+  lima)
+    # Where the Lima VM mounts the Mac's shared folder (worker/provision/lima/agent.yaml).
+    share_rule='^/mnt/coucou-share$'
+    ;;
+  *)
+    echo "setup.sh: invalid driver: $COMPUTER_DRIVER (wsl or lima)" >&2
+    exit 1
+    ;;
+esac
 if [[ ! "$COMPUTER_SHARE" =~ $share_rule ]]; then
   echo "setup.sh: invalid shared folder: $COMPUTER_SHARE" >&2
   exit 1
 fi
+
+case "$(uname -m)" in
+  x86_64) NODE_ARCH=x64; UV_ARCH=x86_64; UV_SHA256="$UV_SHA256_X86_64" ;;
+  aarch64 | arm64) NODE_ARCH=arm64; UV_ARCH=aarch64; UV_SHA256="$UV_SHA256_AARCH64" ;;
+  *) echo "setup.sh: unsupported processor: $(uname -m)" >&2; exit 1 ;;
+esac
 
 echo "==> Updating Ubuntu"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
 apt-get install -y --no-install-recommends ca-certificates curl xz-utils   git python3 python3-venv python3-pip build-essential unzip
+if [[ "$COMPUTER_DRIVER" == lima ]]; then
+  # /computer is the Mac folder seen through bindfs (mount-computer.sh).
+  apt-get install -y --no-install-recommends bindfs
+fi
 
 echo "==> Node.js ${NODE_VERSION}"
 if [[ "$(/usr/local/bin/node --version 2>/dev/null || true)" != "v${NODE_VERSION}" ]]; then
   tmp=$(mktemp -d)
-  tarball="node-v${NODE_VERSION}-linux-x64.tar.xz"
+  tarball="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
   curl -fsSLo "$tmp/$tarball" "https://nodejs.org/dist/v${NODE_VERSION}/${tarball}"
   curl -fsSLo "$tmp/SHASUMS256.txt" "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"
   (cd "$tmp" && grep " ${tarball}\$" SHASUMS256.txt | sha256sum -c -)
@@ -59,11 +84,11 @@ node --version
 echo "==> uv ${UV_VERSION}"
 if [[ "$(/usr/local/bin/uv --version 2>/dev/null || true)" != "uv ${UV_VERSION}"* ]]; then
   tmp=$(mktemp -d)
-  tarball="uv-x86_64-unknown-linux-gnu.tar.gz"
+  tarball="uv-${UV_ARCH}-unknown-linux-gnu.tar.gz"
   curl -fsSLo "$tmp/$tarball" "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${tarball}"
   echo "${UV_SHA256}  $tmp/$tarball" | sha256sum -c -
   tar -xzf "$tmp/$tarball" -C "$tmp" --no-same-owner
-  install -m 0755 "$tmp/uv-x86_64-unknown-linux-gnu/uv" "$tmp/uv-x86_64-unknown-linux-gnu/uvx" /usr/local/bin/
+  install -m 0755 "$tmp/uv-${UV_ARCH}-unknown-linux-gnu/uv" "$tmp/uv-${UV_ARCH}-unknown-linux-gnu/uvx" /usr/local/bin/
   rm -rf "$tmp"
 fi
 
@@ -92,7 +117,7 @@ usermod -aG computer agent
 
 echo "==> /computer: the folder every computer shares"
 install -d -m 0700 /etc/coucou-worker
-printf 'COMPUTER_SHARE=%q\n' "$COMPUTER_SHARE" > /etc/coucou-worker/computer.env
+printf 'COMPUTER_SHARE=%q\nCOMPUTER_DRIVER=%q\n' "$COMPUTER_SHARE" "$COMPUTER_DRIVER" > /etc/coucou-worker/computer.env
 chmod 0600 /etc/coucou-worker/computer.env
 if ! mountpoint -q /computer; then
   # This computer's own /computer, from before the shared folder: its files
@@ -124,8 +149,10 @@ PLAYWRIGHT_BROWSERS_PATH="$APP/browsers" npx --no-install playwright install --w
 chmod -R u=rwX,go=rX "$APP"
 rm -f "$APP/.env"
 
-echo "==> wsl.conf and the service"
-install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
+echo "==> The services"
+if [[ "$COMPUTER_DRIVER" == wsl ]]; then
+  install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
+fi
 install -m 0644 "$APP/worker/provision/coucou-worker.service" /etc/systemd/system/coucou-worker.service
 install -m 0644 "$APP/worker/provision/coucou-runner.service" /etc/systemd/system/coucou-runner.service
 install -m 0644 "$APP/worker/provision/coucou-runner.socket" /etc/systemd/system/coucou-runner.socket
@@ -143,4 +170,8 @@ if [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
 fi
 
-echo "==> Done. Restart the distro (wsl --terminate $AGENT_ID) to apply wsl.conf."
+if [[ "$COMPUTER_DRIVER" == wsl ]]; then
+  echo "==> Done. Restart the distro (wsl --terminate $AGENT_ID) to apply wsl.conf."
+else
+  echo "==> Done."
+fi

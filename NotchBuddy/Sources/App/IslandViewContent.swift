@@ -4606,6 +4606,12 @@ struct OutfitPillView: View {
 }
 
 private func drawOutfitIcon(context: GraphicsContext, size: CGSize, outfit: Outfit, seasonal: Outfit = .none) {
+    // A little Tofu instead of a little Mochi; None keeps its ⊘, Auto its badge (below).
+    let tofu = MochiCharacter.current == .tofu
+    if tofu && outfit != .none && outfit != .auto {
+        TofuRenderer.drawStill(context, size: size, outfit: outfit, fill: Color(hex: TofuColor.current.dark))
+        return
+    }
     let W = size.width, H = size.height
     let cx = W / 2, cy = H / 2
     let R: CGFloat = 6.5   // small scale for icon
@@ -4614,47 +4620,52 @@ private func drawOutfitIcon(context: GraphicsContext, size: CGSize, outfit: Outf
     case .auto:
         let iconR: CGFloat = 10.0
         let rx = iconR * 1.14, ry = iconR * 0.88
-        let mH = MochiH(R: iconR, yaw: 0, pitch: 0)
-        let bodyPath = mochiOutfitPath(rx, ry)
         let iconCY = cy + iconR * 0.62
+        if tofu {
+            TofuRenderer.drawStill(context, size: size, outfit: seasonal == .auto ? .none : seasonal,
+                                   fill: Color(hex: TofuColor.current.dark))
+        } else {
+            let mH = MochiH(R: iconR, yaw: 0, pitch: 0)
+            let bodyPath = mochiOutfitPath(rx, ry)
 
-        // Draw the seasonal outfit behind body
-        if seasonal != .none && seasonal != .auto {
-            drawOutfitBehindStatic(context: context, outfit: seasonal, H: mH,
-                                   cx: cx, cy: iconCY, tilt: 0, sx: 1, sy: 1,
-                                   roll: 0, morph: 0, isMini: false)
-        }
-        // Body
-        var ctx = context
-        ctx.translateBy(x: cx, y: iconCY)
-        ctx.fill(bodyPath, with: .linearGradient(
-            Gradient(colors: [Color(red: 0.929, green: 0.929, blue: 0.937),
-                              Color(red: 0.769, green: 0.773, blue: 0.792)]),
-            startPoint: CGPoint(x: rx*0.7, y: -ry*0.85),
-            endPoint:   CGPoint(x: -rx*0.8, y: ry*0.9)
-        ))
-        ctx.fill(bodyPath, with: .radialGradient(
-            Gradient(stops: [.init(color: .clear, location: 0.6),
-                             .init(color: Color.black.opacity(0.2), location: 1)]),
-            center: .zero, startRadius: iconR*0.15, endRadius: iconR*1.25
-        ))
-        // Eyes
-        var eyeCtx = ctx; eyeCtx.clip(to: bodyPath)
-        let ink = Color(red: 0.102, green: 0.082, blue: 0.071)
-        for f in mEyeFrames(mH) {
-            guard f.visible else { continue }
-            var ec = eyeCtx; ec.translateBy(x: f.x, y: f.y); ec.scaleBy(x: f.fx, y: f.fy)
-            let hh = max(f.h, f.w*0.3)
-            var pill = Path()
-            pill.addRoundedRect(in: CGRect(x: -f.w/2, y: -hh/2, width: f.w, height: hh),
-                                cornerSize: CGSize(width: min(f.w/2,hh/2), height: min(f.w/2,hh/2)))
-            ec.fill(pill, with: .color(ink))
-        }
-        // Front outfit
-        if seasonal != .none && seasonal != .auto {
-            drawOutfitFrontStatic(context: context, outfit: seasonal, H: mH,
-                                  cx: cx, cy: iconCY, tilt: 0, sx: 1, sy: 1,
-                                  roll: 0, morph: 0, isMini: false)
+            // Draw the seasonal outfit behind body
+            if seasonal != .none && seasonal != .auto {
+                drawOutfitBehindStatic(context: context, outfit: seasonal, H: mH,
+                                       cx: cx, cy: iconCY, tilt: 0, sx: 1, sy: 1,
+                                       roll: 0, morph: 0, isMini: false)
+            }
+            // Body
+            var ctx = context
+            ctx.translateBy(x: cx, y: iconCY)
+            ctx.fill(bodyPath, with: .linearGradient(
+                Gradient(colors: [Color(red: 0.929, green: 0.929, blue: 0.937),
+                                  Color(red: 0.769, green: 0.773, blue: 0.792)]),
+                startPoint: CGPoint(x: rx*0.7, y: -ry*0.85),
+                endPoint:   CGPoint(x: -rx*0.8, y: ry*0.9)
+            ))
+            ctx.fill(bodyPath, with: .radialGradient(
+                Gradient(stops: [.init(color: .clear, location: 0.6),
+                                 .init(color: Color.black.opacity(0.2), location: 1)]),
+                center: .zero, startRadius: iconR*0.15, endRadius: iconR*1.25
+            ))
+            // Eyes
+            var eyeCtx = ctx; eyeCtx.clip(to: bodyPath)
+            let ink = Color(red: 0.102, green: 0.082, blue: 0.071)
+            for f in mEyeFrames(mH) {
+                guard f.visible else { continue }
+                var ec = eyeCtx; ec.translateBy(x: f.x, y: f.y); ec.scaleBy(x: f.fx, y: f.fy)
+                let hh = max(f.h, f.w*0.3)
+                var pill = Path()
+                pill.addRoundedRect(in: CGRect(x: -f.w/2, y: -hh/2, width: f.w, height: hh),
+                                    cornerSize: CGSize(width: min(f.w/2,hh/2), height: min(f.w/2,hh/2)))
+                ec.fill(pill, with: .color(ink))
+            }
+            // Front outfit
+            if seasonal != .none && seasonal != .auto {
+                drawOutfitFrontStatic(context: context, outfit: seasonal, H: mH,
+                                      cx: cx, cy: iconCY, tilt: 0, sx: 1, sy: 1,
+                                      roll: 0, morph: 0, isMini: false)
+            }
         }
         // AUTO badge at bottom
         var badgeCtx = context

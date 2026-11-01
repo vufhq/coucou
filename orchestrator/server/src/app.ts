@@ -14,7 +14,7 @@ import { Runner } from "./runner.ts";
 import { GoalScheduler } from "./scheduler.ts";
 import { Store } from "./store.ts";
 import type { Tokens } from "./tokens.ts";
-import { wslRunning, type VmProbe } from "./vm.ts";
+import { vmRunning, type VmProbe } from "./vm.ts";
 
 const PRUNE_EVERY_MS = 6 * 60 * 60_000;
 
@@ -73,7 +73,7 @@ export function createBackend(
     uploads,
   });
   const scheduler = new GoalScheduler(store, events, runner, opts.schedulerPollMs);
-  const api = buildApi({ store, events, runner, signals, downloads, uploads, models, token: tokens.api, vmProbe: opts.vmProbe ?? wslRunning });
+  const api = buildApi({ store, events, runner, signals, downloads, uploads, models, token: tokens.api, vmProbe: opts.vmProbe ?? vmRunning });
   const gateway = buildGateway({
     store,
     events,

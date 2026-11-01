@@ -304,6 +304,8 @@ struct SettingsView: View {
             .padding(6)
         }
 
+        CharacterSettingsBox()
+
         GroupBox("Sound") {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Enable sounds", isOn: $state.soundEnabled)
@@ -2448,5 +2450,54 @@ extension SettingsView {
     init(embeddedSection: String) {
         self.init()
         self.embeddedSection = embeddedSection
+    }
+}
+
+/// Settings → General → Character: Mochi, or Tofu — a flat pebble with Mochi's
+/// moves and outfits — and Tofu's colour. Every engine reads them on each frame,
+/// so the island and the desktop Mochi change at once.
+private struct CharacterSettingsBox: View {
+    @AppStorage(MochiCharacter.defaultsKey) private var character: String = MochiCharacter.mochi.rawValue
+    @AppStorage(MochiCharacter.colorKey) private var tofuColor: String = TofuColor.default.rawValue
+
+    var body: some View {
+        GroupBox(String(localized: "Character")) {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker(String(localized: "Character"), selection: Binding(
+                    get: { MochiCharacter.parse(character) },
+                    set: { character = $0.rawValue }
+                )) {
+                    Text(verbatim: "Mochi").tag(MochiCharacter.mochi)
+                    Text(verbatim: "Tofu").tag(MochiCharacter.tofu)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                if MochiCharacter.parse(character) == .tofu {
+                    HStack(spacing: 8) {
+                        Text(String(localized: "Color"))
+                            .frame(width: 56, alignment: .leading)
+                        ForEach(TofuColor.allCases, id: \.self) { color in
+                            let on = TofuColor.parse(tofuColor) == color
+                            Button { tofuColor = color.rawValue } label: {
+                                Circle()
+                                    .fill(Color(hex: color.dark))
+                                    .frame(width: 18, height: 18)
+                                    .overlay(Circle().stroke(Color.primary.opacity(on ? 0.9 : 0), lineWidth: 2).padding(-3))
+                            }
+                            .buttonStyle(.plain)
+                            .help(color.rawValue)
+                            .accessibilityLabel(Text(verbatim: color.rawValue))
+                            .accessibilityAddTraits(on ? .isSelected : [])
+                        }
+                    }
+                    .padding(.leading, 2)
+                }
+                Text(String(localized: "tofu.hint"))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(6)
+        }
     }
 }

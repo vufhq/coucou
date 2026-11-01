@@ -1,6 +1,148 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Character" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الشخصية"
+          }
+        },
+        "bn" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "চরিত্র"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Figur"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Character"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnage"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "किरदार"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karakter"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personagem"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Персонаж"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角色"
+          }
+        }
+      }
+    },
+    "tofu.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu حصاة مسطّحة بحركات Mochi وأزيائه. يظهر في الجزيرة وعلى سطح المكتب."
+          }
+        },
+        "bn" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu একটি চ্যাপ্টা নুড়ি, Mochi-র মতো নড়াচড়া আর পোশাক নিয়ে। এটি আইল্যান্ডে আর ডেস্কটপে দেখা যায়।"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu ist ein flacher Kiesel mit Mochis Bewegungen und Outfits. Er erscheint in der Insel und auf dem Schreibtisch."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu is a flat pebble with Mochi's moves and outfits. It shows in the island and on the desktop."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu es un guijarro plano con los movimientos y los disfraces de Mochi. Aparece en la isla y en el escritorio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu est un galet tout plat, avec les mouvements et les tenues de Mochi. Il apparaît dans l'île et sur le bureau."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu एक सपाट कंकड़ है, जिसकी हरकतें और कपड़े Mochi जैसे हैं। यह आइलैंड में और डेस्कटॉप पर दिखता है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu adalah kerikil pipih dengan gerakan dan kostum Mochi. Ia muncul di pulau dan di desktop."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu é um seixo achatado com os movimentos e as roupas do Mochi. Ele aparece na ilha e na área de trabalho."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu — плоский камешек с движениями и нарядами Mochi. Он появляется на острове и на рабочем столе."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tofu 是一颗扁平的小卵石，拥有 Mochi 的动作和服装。它会出现在灵动岛和桌面上。"
+          }
+        }
+      }
+    },
     "update.ask.body" : {
       "extractionState" : "manual",
       "localizations" : {
