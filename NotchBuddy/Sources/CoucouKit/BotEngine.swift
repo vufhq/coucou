@@ -1110,6 +1110,10 @@ final class BotEngine: ObservableObject {
     // MARK: - Draw
 
     func draw(context: GraphicsContext, size: CGSize) {
+        if MochiCharacter.current == .tofu {
+            drawTofu(context: context, size: size)
+            return
+        }
         let W = size.width
         let H = size.height
         let R = W * 0.3
@@ -1146,57 +1150,91 @@ final class BotEngine: ObservableObject {
         drawEyes(ctx: &ctx, path: bodyPath, R: R, rx: rx, ry: ry)
 
         // Mouth hole — dark pill cutout inside the box face
-        // Spec: left/right margins 0.10R, top margin 0.08R from box top (-0.94R)
         if morph > 0.05 {
-            let hW = R * 1.80 * morph   // hole width = box width (2×1.0R) − 2×0.10R margin
-            let hH = slotH * R * morph  // hole height (spring-animated, scaled by morph)
-            let hX = -hW / 2
-            // Hole Y: box top is -R*0.94 at morph=1, lerped from -R*0.88 at morph=0
-            let boxTop = -R * (0.88 + 0.06 * morph)
-            let hY = boxTop + R * 0.08 * morph  // top margin scales with morph
-
-            var boxCtx = ctx
-            boxCtx.clip(to: bodyPath)  // everything clipped inside body
-
-            // Top rim — 1pt white 55% line at box top edge
-            var rim = Path()
-            rim.move(to: CGPoint(x: -R * 0.90 * morph, y: boxTop + 1))
-            rim.addLine(to: CGPoint(x: R * 0.90 * morph, y: boxTop + 1))
-            boxCtx.stroke(rim, with: .color(Color.white.opacity(0.55 * Double(morph))),
-                          style: StrokeStyle(lineWidth: 1, lineCap: .round))
-
-            // Hole interior — only draw if visibly open
-            if hH > 0.8 {
-                let hR = min(hW / 2, hH / 2)  // fully rounded when hH < hW (pill shape)
-                var hole = Path()
-                hole.addRoundedRect(in: CGRect(x: hX, y: hY, width: hW, height: hH),
-                                    cornerSize: CGSize(width: hR, height: hR))
-                boxCtx.fill(hole, with: .linearGradient(
-                    Gradient(colors: [Color(red: 0.027, green: 0.031, blue: 0.039),
-                                      Color(red: 0.063, green: 0.075, blue: 0.102)]),
-                    startPoint: CGPoint(x: 0, y: hY),
-                    endPoint: CGPoint(x: 0, y: hY + hH)
-                ))
-                // Bottom lip — 1pt white 28% highlight
-                if hH > 4 {
-                    let lipR = min(hR, (hW - 2) / 2)
-                    var lip = Path()
-                    lip.move(to: CGPoint(x: hX + lipR, y: hY + hH - 0.5))
-                    lip.addLine(to: CGPoint(x: hX + hW - lipR, y: hY + hH - 0.5))
-                    boxCtx.stroke(lip, with: .color(Color.white.opacity(0.28 * Double(morph))),
-                                  style: StrokeStyle(lineWidth: 1, lineCap: .round))
-                }
-            }
+            drawMouthHole(ctx: &ctx, bodyPath: bodyPath, R: R)
         }
 
         // Reset transform for hands, badge, particles which need world coords
         // (We'll pass world-space cx/cy to these helpers)
     }
 
+    /// The mailbox slot over the body (`bodyPath`, centred, in pixels): Mochi's or Tofu's.
+    private func drawMouthHole(ctx: inout GraphicsContext, bodyPath: Path, R: CGFloat) {
+        let hW = R * 1.80 * morph   // hole width = box width (2×1.0R) − 2×0.10R margin
+        let hH = slotH * R * morph  // hole height (spring-animated, scaled by morph)
+        let hX = -hW / 2
+        // Hole Y: box top is -R*0.94 at morph=1, lerped from -R*0.88 at morph=0
+        let boxTop = -R * (0.88 + 0.06 * morph)
+        let hY = boxTop + R * 0.08 * morph  // top margin scales with morph
+
+        var boxCtx = ctx
+        boxCtx.clip(to: bodyPath)  // everything clipped inside body
+
+        // Top rim — 1pt white 55% line at box top edge
+        var rim = Path()
+        rim.move(to: CGPoint(x: -R * 0.90 * morph, y: boxTop + 1))
+        rim.addLine(to: CGPoint(x: R * 0.90 * morph, y: boxTop + 1))
+        boxCtx.stroke(rim, with: .color(Color.white.opacity(0.55 * Double(morph))),
+                      style: StrokeStyle(lineWidth: 1, lineCap: .round))
+
+        // Hole interior — only draw if visibly open
+        if hH > 0.8 {
+            let hR = min(hW / 2, hH / 2)  // fully rounded when hH < hW (pill shape)
+            var hole = Path()
+            hole.addRoundedRect(in: CGRect(x: hX, y: hY, width: hW, height: hH),
+                                cornerSize: CGSize(width: hR, height: hR))
+            boxCtx.fill(hole, with: .linearGradient(
+                Gradient(colors: [Color(red: 0.027, green: 0.031, blue: 0.039),
+                                  Color(red: 0.063, green: 0.075, blue: 0.102)]),
+                startPoint: CGPoint(x: 0, y: hY),
+                endPoint: CGPoint(x: 0, y: hY + hH)
+            ))
+            // Bottom lip — 1pt white 28% highlight
+            if hH > 4 {
+                let lipR = min(hR, (hW - 2) / 2)
+                var lip = Path()
+                lip.move(to: CGPoint(x: hX + lipR, y: hY + hH - 0.5))
+                lip.addLine(to: CGPoint(x: hX + hW - lipR, y: hY + hH - 0.5))
+                boxCtx.stroke(lip, with: .color(Color.white.opacity(0.28 * Double(morph))),
+                              style: StrokeStyle(lineWidth: 1, lineCap: .round))
+            }
+        }
+
+    }
+
+    /// Tofu (Tofu.swift) in Mochi's place, from the same animated state. Hands and
+    /// outfits are drawn here too; the badge, mood extras and particles stay the engine's.
+    private func drawTofu(context: GraphicsContext, size: CGSize) {
+        let W = size.width, H = size.height, R = W * 0.3
+        let cx = W / 2 + ox * R
+        let cy = H / 2 + particleOverhang / 2 + oy * R + R * 0.06
+        var pose = TofuPose()
+        pose.yaw = yaw; pose.pitch = pitch; pose.roll = roll
+        pose.rigidRoll = outfit != .none && outfitPresence > 0.05
+        pose.tilt = tilt; pose.sx = sx; pose.sy = sy; pose.es = es
+        pose.blush = max(blush, moodHot * 0.85); pose.tint = tint; pose.hands = hands; pose.morph = morph
+        pose.col = col; pose.state = state; pose.eye = eyeShapeNow()
+        // Minis never wear an outfit on the Mac.
+        pose.outfit = isMini ? .none : outfit
+        pose.presence = outfitPresence
+        pose.physDx = physDx; pose.physDy = physDy
+        pose.waveStart = waveStart; pose.waveUntil = waveUntil; pose.isMini = isMini
+        pose.fill = bodyColor.map { Color(cgColor: $0) } ?? Color(hex: TofuColor.current.dark)
+        let open = self.open
+        let hooks = TofuHooks(
+            eye: { [unowned self] c, shape, w, h, sd in
+                self.drawEyeShape(ctx: &c, shape: shape, w: w, h: h, open: open, sd: sd, R: R)
+            },
+            mouth: { [unowned self] c, body in self.drawMouthHole(ctx: &c, bodyPath: body, R: R) },
+            overBody: { [unowned self] c, body, rx, ry in self.drawMoodTint(ctx: &c, path: body, rx: rx, ry: ry) }
+        )
+        TofuRenderer.draw(context, pose: pose, R: R, cx: cx, cy: cy, hooks: hooks)
+    }
+
     // MARK: - Draw hands behind body (called before draw() so hands appear under Mochi)
 
     func drawHandsBehind(context: GraphicsContext, size: CGSize) {
-        guard hands > 0.01, !isMini else { return }
+        guard hands > 0.01, !isMini, MochiCharacter.current == .mochi else { return }
         let W = size.width, H = size.height
         let R = W * 0.3
         // Only draw hands when Mochi is large enough to be meaningful (not compact/peek)
@@ -1320,7 +1358,7 @@ final class BotEngine: ObservableObject {
     }
 
     func drawOutfitBehind(context: GraphicsContext, size: CGSize) {
-        guard outfit != .none, !isMini else { return }
+        guard outfit != .none, !isMini, MochiCharacter.current == .mochi else { return }
         let W = size.width, H = size.height, R = W * 0.3
         let cx = W / 2 + ox * R
         let cy = H / 2 + particleOverhang / 2 + oy * R + R * 0.06
@@ -1334,7 +1372,7 @@ final class BotEngine: ObservableObject {
     }
 
     func drawOutfitFront(context: GraphicsContext, size: CGSize) {
-        guard outfit != .none, !isMini else { return }
+        guard outfit != .none, !isMini, MochiCharacter.current == .mochi else { return }
         let W = size.width, H = size.height, R = W * 0.3
         let cx = W / 2 + ox * R
         let cy = H / 2 + particleOverhang / 2 + oy * R + R * 0.06
@@ -1495,7 +1533,8 @@ final class BotEngine: ObservableObject {
         }
     }
 
-    private func drawEyes(ctx: inout GraphicsContext, path: Path, R: CGFloat, rx: CGFloat, ry: CGFloat) {
+    /// The eyes' shape this frame: the state's, an emote's, or the dance's and the mailbox's.
+    private func eyeShapeNow() -> EyeShape {
         var shape = eyeOverride ?? cfg.eye
         // Dance: happy eyes in calm states
         if isDancing && dancingLevel > 0.15 && !isMini && (state == .idle || state == .finished) {
@@ -1506,6 +1545,11 @@ final class BotEngine: ObservableObject {
             if isChewing { shape = .happy }
             else if slotHTarget > 0.05 || slotH > 0.10 { shape = .cup }
         }
+        return shape
+    }
+
+    private func drawEyes(ctx: inout GraphicsContext, path: Path, R: CGFloat, rx: CGFloat, ry: CGFloat) {
+        let shape = eyeShapeNow()
         ctx.clip(to: path)
 
         // Build eye frames: use mEyeFrames for position/foreshortening, but keep roll in eyePitch
