@@ -1,0 +1,46 @@
+# An agent's computer on a Mac: a Lima VM on Apple's Virtualization framework.
+# provision.sh creates it as `coucou-<agent id>` and sets the shared folder
+# (.mounts[0].location); nothing here comes from a task or a model.
+#
+# The computer sees none of the Mac but the shared folder: Lima's default
+# mounts (your home folder, /tmp/lima) are replaced by that one, and no port
+# the agents open inside is forwarded to the Mac.
+vmType: vz
+os: Linux
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: aarch64
+  - location: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: x86_64
+cpus: 2
+memory: 4GiB
+disk: 40GiB
+
+# Only the shared folder, at /mnt/coucou-share; mount-computer.sh shows it at
+# /computer through bindfs. provision.sh fills in the location.
+mountType: virtiofs
+mounts:
+  - location: "~/Library/Application Support/Coucou/computers/shared"
+    mountPoint: /mnt/coucou-share
+    writable: true
+
+# Lima forwards every port a guest program listens on to the Mac's loopback;
+# an agent's server must stay inside its computer.
+portForwards:
+  - guestIP: "127.0.0.1"
+    guestPortRange: [1, 65535]
+    proto: any
+    ignore: true
+  - guestIP: "0.0.0.0"
+    guestIPMustBeZero: false
+    guestPortRange: [1, 65535]
+    proto: any
+    ignore: true
+
+containerd:
+  system: false
+  user: false
+ssh:
+  forwardAgent: false
+  forwardX11: false
+  loadDotSSHPubKeys: false
