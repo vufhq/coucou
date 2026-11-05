@@ -867,6 +867,48 @@ pub async fn orchestrator_set_limits(
     api(&app, Method::PUT, &format!("/api/agents/{}/limits", segment(&agent_id)?), Some(body)).await
 }
 
+/// The user's pick in HQ: how much the agent may do without a click (1–4),
+/// and whether it may use their GitHub account.
+#[tauri::command]
+pub async fn orchestrator_set_rules(
+    app: AppHandle,
+    agent_id: String,
+    level: Option<u8>,
+    github: Option<bool>,
+) -> Result<Value, String> {
+    if level.is_some_and(|l| !(1..=4).contains(&l)) {
+        return Err("rule level must be 1 to 4".into());
+    }
+    let mut body = serde_json::Map::new();
+    if let Some(level) = level {
+        body.insert("level".into(), json!(level));
+    }
+    if let Some(github) = github {
+        body.insert("github".into(), json!(github));
+    }
+    if body.is_empty() {
+        return Err("nothing to change".into());
+    }
+    api(&app, Method::PUT, &format!("/api/agents/{}/rules", segment(&agent_id)?), Some(Value::Object(body))).await
+}
+
+/// The backend's GitHub sign-in: who is signed in, or the code waiting for the user.
+#[tauri::command]
+pub async fn orchestrator_github(app: AppHandle) -> Result<Value, String> {
+    api(&app, Method::GET, "/api/github", None).await
+}
+
+/// Starts the device flow; the backend polls GitHub and keeps the tokens.
+#[tauri::command]
+pub async fn orchestrator_github_connect(app: AppHandle) -> Result<Value, String> {
+    api(&app, Method::POST, "/api/github/connect", Some(json!({}))).await
+}
+
+#[tauri::command]
+pub async fn orchestrator_github_disconnect(app: AppHandle) -> Result<Value, String> {
+    api(&app, Method::POST, "/api/github/disconnect", Some(json!({}))).await
+}
+
 #[tauri::command]
 pub async fn orchestrator_chat_history(app: AppHandle, agent_id: String) -> Result<Value, String> {
     let path = format!("/api/tasks?agentId={}&source=chat,delegated&limit=50", segment(&agent_id)?);

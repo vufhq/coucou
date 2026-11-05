@@ -4,6 +4,7 @@
 import { join } from "node:path";
 import { createBackend } from "./app.ts";
 import { loadConfig } from "./config.ts";
+import { Github, keyringSlot } from "./github.ts";
 import { ClaudeCliAdapter } from "./model/claude-cli.ts";
 import { CursorCliAdapter } from "./model/cursor-cli.ts";
 import { OpenAICompatibleAdapter } from "./model/openai-compatible.ts";
@@ -80,7 +81,9 @@ if (!models.has(config.defaultModelProfile)) {
   process.exit(1);
 }
 
-const backend = createBackend(config, tokens, models);
+// The user's GitHub sign-in lives in Credential Manager, beside the tokens.
+const github = new Github({ clientId: config.githubClientId, slot: await keyringSlot() });
+const backend = createBackend(config, tokens, models, { github });
 const keepAlives = config.agents
   .filter((a) => {
     if (process.env.ORCH_KEEP_ALIVE === "0") return false;

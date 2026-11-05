@@ -9,6 +9,7 @@ import type { z } from "zod";
 import {
   ClaimRequest,
   EVENT_PAYLOADS,
+  GITHUB_OPS,
   Heartbeat,
   Hello,
   JobOutcome,
@@ -19,6 +20,7 @@ import {
 } from "@coucou-orchestrator/protocol";
 import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
+import type { Github } from "./github.ts";
 import type { Downloads, JobSignals } from "./jobs.ts";
 import { redact } from "./redact.ts";
 import type { Runner } from "./runner.ts";
@@ -33,6 +35,8 @@ export interface GatewayDeps {
   downloads: Downloads;
   /** Files attached to messages, which fs.receive jobs copy to the computer. */
   uploads?: Uploads;
+  /** The user's GitHub sign-in, for git.* jobs. */
+  github?: Github;
   /** Agent id → its worker token. */
   tokens: ReadonlyMap<string, string>;
   leaseMs: number;
@@ -156,11 +160,30 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
         });
         continue;
       }
+      // A git.* job carries the user's GitHub token, for that job only: never
+      // in the jobs table, an event or a log.
+      let secrets: { github: string } | undefined;
+      if (job && GITHUB_OPS.has(job.op)) {
+        const token = await deps.github?.token().catch(() => null);
+        if (!token) {
+          finish(job, { status: "failed", error: { code: "refused", message: "Coucou is not signed in to GitHub any more: the user signs in again in Settings → Tasks" } });
+          continue;
+        }
+        secrets = { github: token };
+      }
       if (job) {
         setStatus(agentId, "busy");
         const owner = store.task(job.taskId)?.agentId;
         return {
-          job: { id: job.id, taskId: job.taskId, op: job.op, args: job.args, deadlineMs: job.deadlineMs, ...(owner ? { agentId: owner } : {}) },
+          job: {
+            id: job.id,
+            taskId: job.taskId,
+            op: job.op,
+            args: job.args,
+            deadlineMs: job.deadlineMs,
+            ...(owner ? { agentId: owner } : {}),
+            ...(secrets ? { secrets } : {}),
+          },
           cancel,
         };
       }

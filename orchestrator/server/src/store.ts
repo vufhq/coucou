@@ -8,6 +8,7 @@ import { dirname } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import {
   DEFAULT_BUDGET,
+  DEFAULT_RULE_LEVEL,
   type Agent,
   type AgentOutfit,
   type AgentLimits,
@@ -19,6 +20,7 @@ import {
   type JobOutcome,
   type Note,
   type OpName,
+  type RuleLevel,
   type Schedule,
   type Task,
   type TaskAttachment,
@@ -65,7 +67,10 @@ CREATE TABLE IF NOT EXISTS agents (
   computer_id TEXT,
   created_by TEXT NOT NULL DEFAULT 'system',
   persona TEXT,
-  retired_at TEXT
+  retired_at TEXT,
+  rule_level INTEGER NOT NULL DEFAULT 2,
+  github_allowed INTEGER NOT NULL DEFAULT 0,
+  github_repos TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS agents_by_computer ON agents(computer_id, retired_at);
 CREATE TABLE IF NOT EXISTS tasks (
@@ -213,6 +218,9 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "agents", column: "created_by", ddl: "ALTER TABLE agents ADD COLUMN created_by TEXT NOT NULL DEFAULT 'system'" },
   { table: "agents", column: "persona", ddl: "ALTER TABLE agents ADD COLUMN persona TEXT" },
   { table: "agents", column: "retired_at", ddl: "ALTER TABLE agents ADD COLUMN retired_at TEXT" },
+  { table: "agents", column: "rule_level", ddl: "ALTER TABLE agents ADD COLUMN rule_level INTEGER NOT NULL DEFAULT 2" },
+  { table: "agents", column: "github_allowed", ddl: "ALTER TABLE agents ADD COLUMN github_allowed INTEGER NOT NULL DEFAULT 0" },
+  { table: "agents", column: "github_repos", ddl: "ALTER TABLE agents ADD COLUMN github_repos TEXT NOT NULL DEFAULT '{}'" },
   { table: "tasks", column: "context", ddl: "ALTER TABLE tasks ADD COLUMN context TEXT" },
   { table: "tasks", column: "source", ddl: "ALTER TABLE tasks ADD COLUMN source TEXT NOT NULL DEFAULT 'user'" },
   { table: "tasks", column: "parent_task_id", ddl: "ALTER TABLE tasks ADD COLUMN parent_task_id TEXT" },
@@ -675,6 +683,41 @@ export class Store {
 
   setAgentPaused(id: string, paused: boolean): void {
     this.db.prepare("UPDATE agents SET paused = ? WHERE id = ?").run(paused ? 1 : 0, id);
+  }
+
+  /** Only the user's API call sets it: no model operation reaches here. */
+  setAgentRuleLevel(id: string, level: RuleLevel): void {
+    this.db.prepare("UPDATE agents SET rule_level = ? WHERE id = ?").run(level, id);
+  }
+
+  /** Only the user's API call sets it, like the rule level. */
+  setAgentGithub(id: string, allowed: boolean): void {
+    this.db.prepare("UPDATE agents SET github_allowed = ? WHERE id = ?").run(allowed ? 1 : 0, id);
+  }
+
+  /** Repos the agent cloned with git.clone → their default branch at the time. */
+  githubRepos(id: string): Record<string, string> {
+    const row = this.db.prepare("SELECT github_repos FROM agents WHERE id = ?").get(id) as Row | undefined;
+    return row ? parse<Record<string, string>>(row.github_repos) : {};
+  }
+
+  addGithubRepo(id: string, repo: string, defaultBranch: string): void {
+    const repos = { ...this.githubRepos(id), [repo]: defaultBranch };
+    this.db.prepare("UPDATE agents SET github_repos = ? WHERE id = ?").run(json(repos), id);
+  }
+
+  /** git.push steps the agent started (or that wait for the user) today. */
+  githubPushesToday(id: string, at = new Date()): number {
+    const [start, end] = localDayRange(at);
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM steps
+         JOIN tasks ON tasks.id = steps.task_id
+         WHERE tasks.agent_id = ? AND steps.op = 'git.push' AND steps.job_id IS NOT NULL
+           AND steps.created_at >= ? AND steps.created_at < ?`,
+      )
+      .get(id, start, end) as Row;
+    return Number(row.n);
   }
 
   setAgentLimits(id: string, limits: AgentLimits): void {
@@ -1641,6 +1684,8 @@ function toAgent(r: Row, usage: Agent["usage"], computer: ComputerRow | null, st
     persona: (r.persona as string | null) ?? null,
     status,
     paused: Number(r.paused ?? 0) === 1,
+    ruleLevel: Number(r.rule_level ?? DEFAULT_RULE_LEVEL) as RuleLevel,
+    githubAllowed: Number(r.github_allowed ?? 0) === 1,
     limits: {
       tasksPerDay: Number(r.tasks_per_day ?? 30),
       stepsPerDay: Number(r.steps_per_day ?? 300),

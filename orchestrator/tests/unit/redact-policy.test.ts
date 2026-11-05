@@ -73,3 +73,41 @@ describe("policy", () => {
     expect(domainOf("www.bbc.co.uk")).toBe("bbc.co.uk");
   });
 });
+
+describe("rule levels", () => {
+  const at = (ruleLevel: 1 | 2 | 3 | 4) => ({ approvedDomains: ["python.org"], ruleLevel });
+  const verdict = (op: string, args: Record<string, unknown>, level: 1 | 2 | 3 | 4) =>
+    decide({ op, args } as Parameters<typeof decide>[0], at(level)).verdict;
+
+  it("asks before every action at level 1, reading aside", () => {
+    expect(verdict("terminal.shell", { command: "ls" }, 1)).toBe("approve");
+    expect(verdict("fs.write_artifact", { path: "a.md", content: "" }, 1)).toBe("approve");
+    expect(verdict("terminal.run", { argv: ["ls"] }, 1)).toBe("approve");
+    expect(verdict("browser.navigate", { url: "https://docs.python.org/" }, 1)).toBe("approve");
+    expect(verdict("fs.read", { path: "a.md" }, 1)).toBe("allow");
+    expect(verdict("browser.extract_text", {}, 1)).toBe("allow");
+  });
+
+  it("keeps today's rules at level 2, the default", () => {
+    expect(verdict("terminal.shell", { command: "ls" }, 2)).toBe("allow");
+    expect(verdict("browser.navigate", { url: "https://pypi.org/" }, 2)).toBe("approve");
+    expect(decide({ op: "browser.navigate", args: { url: "https://pypi.org/" } }, { approvedDomains: [] }).verdict).toBe("approve");
+  });
+
+  it("lets new sites and commands through at levels 3 and 4", () => {
+    for (const level of [3, 4] as const) {
+      expect(verdict("browser.navigate", { url: "https://pypi.org/" }, level)).toBe("allow");
+      expect(verdict("terminal.run", { argv: ["rm", "-rf", "x"] }, level)).toBe("allow");
+    }
+  });
+
+  it("denies the same things and asks before creating or retiring agents at every level", () => {
+    for (const level of [1, 2, 3, 4] as const) {
+      expect(verdict("browser.navigate", { url: "http://192.168.1.10/" }, level)).toBe("deny");
+      expect(verdict("browser.navigate", { url: "https://u:p@python.org/" }, level)).toBe("deny");
+      expect(verdict("fs.fetch", { path: "a.png" }, level)).toBe("deny");
+      expect(verdict("team.retire", { agentId: "scout-2" }, level)).toBe("approve");
+      expect(verdict("team.propose", { team: { name: "T" }, members: [] }, level)).toBe("approve");
+    }
+  });
+});

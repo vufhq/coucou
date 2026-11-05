@@ -5264,6 +5264,61 @@
    "ru": "Стандартный вид",
    "id": "Tampilan bawaan"
   },
+  "Rules": {
+   "zh-Hans": "规则",
+   "hi": "नियम",
+   "es": "Reglas",
+   "ar": "القواعد",
+   "fr": "Règles",
+   "bn": "নিয়ম",
+   "pt-BR": "Regras",
+   "ru": "Правила",
+   "id": "Aturan"
+  },
+  "Ask before everything": {
+   "zh-Hans": "每一步都先询问",
+   "hi": "हर काम से पहले पूछें",
+   "es": "Preguntar antes de todo",
+   "ar": "السؤال قبل كل شيء",
+   "fr": "Demander avant tout",
+   "bn": "সবকিছুর আগে জিজ্ঞাসা করুন",
+   "pt-BR": "Perguntar antes de tudo",
+   "ru": "Спрашивать перед каждым шагом",
+   "id": "Tanya sebelum semuanya"
+  },
+  "Ask before risky steps": {
+   "zh-Hans": "有风险的步骤先询问",
+   "hi": "जोखिम भरे कदमों से पहले पूछें",
+   "es": "Preguntar antes de pasos arriesgados",
+   "ar": "السؤال قبل الخطوات الخطرة",
+   "fr": "Demander avant les étapes risquées",
+   "bn": "ঝুঁকিপূর্ণ ধাপের আগে জিজ্ঞাসা করুন",
+   "pt-BR": "Perguntar antes de passos arriscados",
+   "ru": "Спрашивать перед рискованными шагами",
+   "id": "Tanya sebelum langkah berisiko"
+  },
+  "Act freely within budget": {
+   "zh-Hans": "在预算内自由行动",
+   "hi": "बजट के भीतर खुलकर काम करें",
+   "es": "Actuar libremente dentro del presupuesto",
+   "ar": "التصرف بحرية ضمن الميزانية",
+   "fr": "Agir librement dans le budget",
+   "bn": "বাজেটের মধ্যে স্বাধীনভাবে কাজ করুন",
+   "pt-BR": "Agir livremente dentro do orçamento",
+   "ru": "Действовать свободно в рамках бюджета",
+   "id": "Bertindak bebas dalam anggaran"
+  },
+  "Fully trusted": {
+   "zh-Hans": "完全信任",
+   "hi": "पूरी तरह भरोसेमंद",
+   "es": "Plena confianza",
+   "ar": "موثوق تمامًا",
+   "fr": "Entière confiance",
+   "bn": "সম্পূর্ণ বিশ্বস্ত",
+   "pt-BR": "Confiança total",
+   "ru": "Полное доверие",
+   "id": "Sepenuhnya dipercaya"
+  },
   "Role": {
    "zh-Hans": "角色",
    "hi": "भूमिका",
@@ -6480,6 +6535,116 @@
    "pt-BR": "{name} tem mais de 20 MB.",
    "ru": "{name} больше 20 МБ.",
    "id": "{name} lebih besar dari 20 MB."
+  },
+  "GitHub": {
+   "zh-Hans": "GitHub",
+   "hi": "GitHub",
+   "es": "GitHub",
+   "ar": "GitHub",
+   "fr": "GitHub",
+   "bn": "GitHub",
+   "pt-BR": "GitHub",
+   "ru": "GitHub",
+   "id": "GitHub"
+  },
+  "Can't use your account": {
+   "zh-Hans": "不能使用你的账户",
+   "hi": "आपका खाता उपयोग नहीं कर सकता",
+   "es": "No puede usar tu cuenta",
+   "ar": "لا يمكنه استخدام حسابك",
+   "fr": "Ne peut pas utiliser ton compte",
+   "bn": "আপনার অ্যাকাউন্ট ব্যবহার করতে পারবে না",
+   "pt-BR": "Não pode usar sua conta",
+   "ru": "Не может использовать ваш аккаунт",
+   "id": "Tidak bisa memakai akunmu"
+  },
+  "May use your GitHub account": {
+   "zh-Hans": "可以使用你的 GitHub 账户",
+   "hi": "आपका GitHub खाता उपयोग कर सकता है",
+   "es": "Puede usar tu cuenta de GitHub",
+   "ar": "يمكنه استخدام حسابك على GitHub",
+   "fr": "Peut utiliser ton compte GitHub",
+   "bn": "আপনার GitHub অ্যাকাউন্ট ব্যবহার করতে পারবে",
+   "pt-BR": "Pode usar sua conta do GitHub",
+   "ru": "Может использовать ваш аккаунт GitHub",
+   "id": "Boleh memakai akun GitHub-mu"
+  },
+  "Set ORCH_GITHUB_CLIENT_ID in the orchestrator's .env to sign in.": {
+   "zh-Hans": "在编排器的 .env 中设置 ORCH_GITHUB_CLIENT_ID 后即可登录。",
+   "hi": "साइन इन करने के लिए ऑर्केस्ट्रेटर की .env में ORCH_GITHUB_CLIENT_ID सेट करें।",
+   "es": "Define ORCH_GITHUB_CLIENT_ID en el .env del orquestador para iniciar sesión.",
+   "ar": "عيّن ORCH_GITHUB_CLIENT_ID في ملف .env الخاص بالمنسّق لتسجيل الدخول.",
+   "fr": "Définis ORCH_GITHUB_CLIENT_ID dans le .env de l'orchestrateur pour te connecter.",
+   "bn": "সাইন ইন করতে অর্কেস্ট্রেটরের .env-এ ORCH_GITHUB_CLIENT_ID সেট করুন।",
+   "pt-BR": "Defina ORCH_GITHUB_CLIENT_ID no .env do orquestrador para entrar.",
+   "ru": "Чтобы войти, задайте ORCH_GITHUB_CLIENT_ID в .env оркестратора.",
+   "id": "Atur ORCH_GITHUB_CLIENT_ID di .env orkestrator untuk masuk."
+  },
+  "Signed in as {login}. Agents use it only when you allow them in HQ.": {
+   "zh-Hans": "已登录为 {login}。只有你在 HQ 中允许的智能体才会使用它。",
+   "hi": "{login} के रूप में साइन इन है। एजेंट इसे तभी उपयोग करते हैं जब आप HQ में अनुमति दें।",
+   "es": "Sesión iniciada como {login}. Los agentes solo la usan si los autorizas en HQ.",
+   "ar": "تم تسجيل الدخول باسم {login}. لا يستخدمه الوكلاء إلا إذا سمحت لهم في HQ.",
+   "fr": "Connecté en tant que {login}. Les agents ne l'utilisent que si tu les y autorises dans HQ.",
+   "bn": "{login} হিসেবে সাইন ইন করা আছে। HQ-তে আপনি অনুমতি দিলে তবেই এজেন্টরা এটি ব্যবহার করে।",
+   "pt-BR": "Conectado como {login}. Os agentes só a usam se você permitir no HQ.",
+   "ru": "Вход выполнен как {login}. Агенты пользуются им, только если вы разрешите это в HQ.",
+   "id": "Masuk sebagai {login}. Agen hanya memakainya jika kamu mengizinkan di HQ."
+  },
+  "Disconnect GitHub? To revoke Coucou's access too, remove it in GitHub's settings.": {
+   "zh-Hans": "断开 GitHub？如需同时撤销 Coucou 的访问权限，请在 GitHub 设置中移除它。",
+   "hi": "GitHub डिस्कनेक्ट करें? Coucou की पहुँच भी रद्द करने के लिए उसे GitHub की सेटिंग्स में हटाएँ।",
+   "es": "¿Desconectar GitHub? Para revocar también el acceso de Coucou, quítalo en los ajustes de GitHub.",
+   "ar": "قطع الاتصال بـ GitHub؟ لإلغاء وصول Coucou أيضًا، أزله من إعدادات GitHub.",
+   "fr": "Déconnecter GitHub ? Pour retirer aussi l'accès de Coucou, supprime-le dans les réglages de GitHub.",
+   "bn": "GitHub সংযোগ বিচ্ছিন্ন করবেন? Coucou-র প্রবেশাধিকারও বাতিল করতে GitHub-এর সেটিংসে এটি সরান।",
+   "pt-BR": "Desconectar o GitHub? Para revogar também o acesso do Coucou, remova-o nas configurações do GitHub.",
+   "ru": "Отключить GitHub? Чтобы отозвать и доступ Coucou, удалите его в настройках GitHub.",
+   "id": "Putuskan GitHub? Untuk mencabut akses Coucou juga, hapus di pengaturan GitHub."
+  },
+  "Enter the code {code} on github.com, then come back.": {
+   "zh-Hans": "在 github.com 上输入代码 {code}，然后回到这里。",
+   "hi": "github.com पर कोड {code} डालें, फिर वापस आएँ।",
+   "es": "Introduce el código {code} en github.com y vuelve.",
+   "ar": "أدخل الرمز {code} على github.com، ثم عُد.",
+   "fr": "Saisis le code {code} sur github.com, puis reviens.",
+   "bn": "github.com-এ কোড {code} লিখুন, তারপর ফিরে আসুন।",
+   "pt-BR": "Digite o código {code} em github.com e volte.",
+   "ru": "Введите код {code} на github.com и вернитесь.",
+   "id": "Masukkan kode {code} di github.com, lalu kembali."
+  },
+  "Open GitHub": {
+   "zh-Hans": "打开 GitHub",
+   "hi": "GitHub खोलें",
+   "es": "Abrir GitHub",
+   "ar": "فتح GitHub",
+   "fr": "Ouvrir GitHub",
+   "bn": "GitHub খুলুন",
+   "pt-BR": "Abrir o GitHub",
+   "ru": "Открыть GitHub",
+   "id": "Buka GitHub"
+  },
+  "Lets the agents you allow clone and push your repos.": {
+   "zh-Hans": "让你允许的智能体克隆和推送你的仓库。",
+   "hi": "आपके अनुमति दिए एजेंट आपकी रिपॉज़िटरी क्लोन और पुश कर सकेंगे।",
+   "es": "Permite que los agentes que autorices clonen y suban tus repositorios.",
+   "ar": "يتيح للوكلاء الذين تسمح لهم استنساخ مستودعاتك والدفع إليها.",
+   "fr": "Permet aux agents que tu autorises de cloner et pousser tes dépôts.",
+   "bn": "আপনার অনুমোদিত এজেন্টরা আপনার রিপো ক্লোন ও পুশ করতে পারবে।",
+   "pt-BR": "Permite que os agentes autorizados clonem e enviem seus repositórios.",
+   "ru": "Разрешённые вами агенты смогут клонировать ваши репозитории и отправлять в них изменения.",
+   "id": "Agen yang kamu izinkan bisa meng-clone dan push repo-mu."
+  },
+  "Sign in": {
+   "zh-Hans": "登录",
+   "hi": "साइन इन करें",
+   "es": "Iniciar sesión",
+   "ar": "تسجيل الدخول",
+   "fr": "Se connecter",
+   "bn": "সাইন ইন",
+   "pt-BR": "Entrar",
+   "ru": "Войти",
+   "id": "Masuk"
   }
  }
 }

@@ -5,7 +5,7 @@
 
 import { h, clear } from "../../views/dom";
 import { t } from "../../i18n/i18n";
-import { onEvent } from "../../core/bridge";
+import { Bridge, onEvent } from "../../core/bridge";
 import {
   ACTIVE,
   PAUSABLE,
@@ -20,6 +20,7 @@ import {
   type OrchApproval,
   type OrchComputer,
   type OrchEvent,
+  type OrchGithub,
   type OrchGoal,
   type OrchOutfit,
   type OrchStatus,
@@ -84,6 +85,9 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
   let draft = "";
   let models: string[] = [];
   let model: string | null = null;
+  /** The backend's GitHub sign-in; null from an older backend. */
+  let github: OrchGithub | null = null;
+  let githubPoll: ReturnType<typeof setTimeout> | null = null;
   const goals = new Map<string, OrchGoal[]>();
   const memories = new Map<string, MemoryNote[]>();
   const memoryDrafts = new Map<string, string>();
@@ -130,6 +134,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
           ? OrchestratorBridge.memory(agent.id).then((r) => memories.set(agent.id, r.notes ?? []), () => memories.set(agent.id, []))
           : Promise.resolve(),
       ]));
+      github = (await OrchestratorBridge.github().catch(() => null))?.github ?? null;
       selected ??= tasks[0]?.id ?? null;
       if (models.length === 0) {
         const m = await OrchestratorBridge.models().catch(() => null);
@@ -172,6 +177,45 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     });
     connection.append(card(row(t("Orchestrator backend"), line, sw)));
     if (enabled && s) drawStartBackend(s);
+    if (connected() && github) drawGithub(github);
+  }
+
+  /**
+   * The user's GitHub account, for the agents they allow in HQ. The backend
+   * signs in with a code the user enters on github.com and keeps the tokens.
+   */
+  function drawGithub(gh: OrchGithub) {
+    const fail = (err: unknown) => {
+      note = String(err);
+      draw();
+    };
+    let detail: string;
+    let action: HTMLElement | null = null;
+    if (!gh.configured) {
+      detail = t("Set ORCH_GITHUB_CLIENT_ID in the orchestrator's .env to sign in.");
+    } else if (gh.connected) {
+      detail = t("Signed in as {login}. Agents use it only when you allow them in HQ.", { login: gh.login ?? "?" });
+      action = button(t("Disconnect"), () => {
+        if (!window.confirm(t("Disconnect GitHub? To revoke Coucou's access too, remove it in GitHub's settings."))) return;
+        void OrchestratorBridge.githubDisconnect().then(() => reload(), fail);
+      }, "danger", true);
+    } else if (gh.pending) {
+      detail = t("Enter the code {code} on github.com, then come back.", { code: gh.pending.userCode });
+      const uri = gh.pending.verificationUri;
+      action = button(t("Open GitHub"), () => void Bridge.openUrl(uri), "", true);
+    } else {
+      detail = gh.error ?? t("Lets the agents you allow clone and push your repos.");
+      action = button(t("Sign in"), () => {
+        void OrchestratorBridge.githubConnect().then((res) => {
+          void Bridge.openUrl(res.pending.verificationUri);
+          return reload();
+        }, fail);
+      }, "primary", true);
+    }
+    connection.append(card(row(t("GitHub"), detail, action)));
+    // While the user signs in on github.com, look again every few seconds.
+    if (githubPoll) clearTimeout(githubPoll);
+    githubPoll = gh.pending && page.isConnected ? setTimeout(() => void reload(), 3_000) : null;
   }
 
   /** Whether Coucou starts the backend when it is not running, and from which folder. */

@@ -79,6 +79,15 @@ export interface OrchApproval {
 /** What the backend found wrong with an agent's computer (AgentProblem in the protocol). */
 export type AgentProblem = "vm_stopped" | "worker_down" | "low_disk" | "no_browser" | "daily_limit";
 
+/** The backend's GitHub sign-in (Settings → Tasks). The tokens never come to Coucou. */
+export interface OrchGithub {
+  configured: boolean;
+  connected: boolean;
+  login: string | null;
+  pending: { userCode: string; verificationUri: string; expiresAt: string } | null;
+  error: string | null;
+}
+
 export interface OrchAgent {
   id: string;
   name: string;
@@ -88,6 +97,10 @@ export interface OrchAgent {
   /** Absent from a backend older than the health checks. */
   problems?: AgentProblem[];
   paused: boolean;
+  /** 1 asks before everything … 4 fully trusted; absent from a backend older than Phase 11. */
+  ruleLevel?: 1 | 2 | 3 | 4;
+  /** The user let it use their GitHub account; absent from an older backend. */
+  githubAllowed?: boolean;
   limits: { tasksPerDay: number; stepsPerDay: number };
   usage: { tasksToday: number; stepsToday: number };
   kind: "chief" | "coworker";
@@ -236,6 +249,12 @@ export const OrchestratorBridge = {
   resumeAgent: (agentId: string) => callOrThrow<{ agent: OrchAgent }>("orchestrator_resume_agent", { agentId }),
   setLimits: (agentId: string, tasksPerDay: number, stepsPerDay: number) =>
     callOrThrow<{ agent: OrchAgent }>("orchestrator_set_limits", { agentId, tasksPerDay, stepsPerDay }),
+  setRules: (agentId: string, rules: { level?: 1 | 2 | 3 | 4; github?: boolean }) =>
+    callOrThrow<{ agent: OrchAgent }>("orchestrator_set_rules", { agentId, level: rules.level ?? null, github: rules.github ?? null }),
+  /** null from a backend older than Phase 11. */
+  github: () => callOrThrow<{ github: OrchGithub | null }>("orchestrator_github"),
+  githubConnect: () => callOrThrow<{ pending: NonNullable<OrchGithub["pending"]>; github: OrchGithub }>("orchestrator_github_connect"),
+  githubDisconnect: () => callOrThrow<{ github: OrchGithub }>("orchestrator_github_disconnect"),
   /** Changes an agent; null puts the default back, a missing field is left alone. */
   updateAgent: (agentId: string, identity: Partial<Pick<
     OrchAgent,

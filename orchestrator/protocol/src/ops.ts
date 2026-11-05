@@ -20,6 +20,24 @@ export const RelPath = z
 export const SHELL_DEFAULT_TIMEOUT_SEC = 120;
 export const SHELL_MAX_TIMEOUT_SEC = 600;
 
+/** `owner/name` on github.com. */
+export const GithubRepo = z
+  .string()
+  .max(140)
+  .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/, "owner/name of a GitHub repository")
+  .refine((r) => !r.endsWith(".git") && !r.split("/")[1]!.startsWith("."), "owner/name, without .git");
+
+/** A branch name git accepts, never an option and never a full ref. */
+export const BranchName = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9_][A-Za-z0-9._\/-]*$/, "a branch name of letters, digits and . _ / -")
+  .refine(
+    (b) => !b.startsWith("refs/") && !b.includes("..") && !b.includes("//") && !b.endsWith("/") && !b.endsWith(".") && !b.endsWith(".lock") && !b.split("/").some((s) => s.startsWith(".")),
+    "not a valid branch name",
+  );
+
 export const HttpUrl =z.url({ protocol: /^https?$/, error: "http or https URL" }).max(2_000);
 
 /** The largest file the user may attach to a message. */
@@ -60,7 +78,16 @@ export const WORKER_OPS = {
       timeoutSec: z.number().int().min(1).max(SHELL_MAX_TIMEOUT_SEC).optional(),
     })
     .strict(),
+  // Through the user's GitHub account. The worker runs git itself, with the
+  // token only in that one process: the shell never gets it.
+  "git.clone": z.object({ repo: GithubRepo, dir: RelPath }).strict(),
+  // Pushes the local branch `branch` of the repo in `dir` to the same branch
+  // of `repo`, never forced. `repo` must be one this agent cloned with git.clone.
+  "git.push": z.object({ repo: GithubRepo, dir: RelPath, branch: BranchName }).strict(),
 } as const;
+
+/** Operations that use the user's GitHub account. */
+export const GITHUB_OPS: ReadonlySet<string> = new Set(["git.clone", "git.push"]);
 
 const Member = z
   .object({
