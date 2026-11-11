@@ -12,6 +12,6 @@ labels: bug
 
 **Windows version**
 
-**Coucou and worker versions**
+**Worker version**
 
 **Coucou version**
