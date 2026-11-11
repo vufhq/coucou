@@ -10,7 +10,7 @@ import { CursorCliAdapter } from "./model/cursor-cli.ts";
 import { OpenAICompatibleAdapter } from "./model/openai-compatible.ts";
 import { CLAUDE_CLI_PROFILE, CURSOR_CLI_PROFILE, ModelRouter } from "./model/router.ts";
 import { loadTokens } from "./tokens.ts";
-import { keepVmAlive, parseVmId } from "./vm.ts";
+import { keepWslAlive } from "./vm.ts";
 
 const config = loadConfig();
 
@@ -85,12 +85,8 @@ if (!models.has(config.defaultModelProfile)) {
 const github = new Github({ clientId: config.githubClientId, slot: await keyringSlot() });
 const backend = createBackend(config, tokens, models, { github });
 const keepAlives = config.agents
-  .filter((a) => {
-    if (process.env.ORCH_KEEP_ALIVE === "0") return false;
-    const kind = parseVmId(a.vmId)?.kind;
-    return (kind === "wsl" && process.platform === "win32") || (kind === "lima" && process.platform === "darwin");
-  })
-  .map((a) => keepVmAlive(a.vmId, (line) => console.log(`orchestrator: ${line}`)));
+  .filter((a) => process.platform === "win32" && a.vmId.startsWith("wsl:") && process.env.ORCH_KEEP_ALIVE !== "0")
+  .map((a) => keepWslAlive(a.vmId.slice(4), (line) => console.log(`orchestrator: ${line}`)));
 const { apiPort, workerPort } = await backend.listen();
 console.log(`orchestrator: API on http://${config.apiHost}:${apiPort}, workers on http://${config.workerHost}:${workerPort}`);
 console.log(`orchestrator: data in ${config.dataDir}`);

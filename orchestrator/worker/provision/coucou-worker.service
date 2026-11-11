@@ -32,7 +32,7 @@ UMask=0007
 # Folders WSL shares between every distro on the PC: other agents, and the
 # sockets of Podman, Docker or WSLg (whose user ids can equal ours). Never
 # reachable from here.
-InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix -/mnt/coucou-share
+InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix
 ProtectHome=yes
 PrivateTmp=yes
 ProtectKernelTunables=yes

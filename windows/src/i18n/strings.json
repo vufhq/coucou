@@ -1,5 +1,5 @@
 {
- "_generated": "By scripts/gen-strings.mjs from NotchBuddy/Resources/Localizable.xcstrings. Do not edit: run `node scripts/gen-strings.mjs`.",
+ "_about": "Strings keyed by their English text, with every language but English. First generated from the Mac app's catalog; edited by hand since. See src/i18n/i18n.ts.",
  "languages": [
   "en",
   "zh-Hans",
@@ -793,6 +793,17 @@
    "pt-BR": "Capturado. O Mochi pegou.",
    "ru": "Готово. Мочи проглотил снимок.",
    "id": "Tertangkap. Mochi menyimpannya."
+  },
+  "Character": {
+   "zh-Hans": "角色",
+   "hi": "किरदार",
+   "es": "Personaje",
+   "ar": "الشخصية",
+   "fr": "Personnage",
+   "bn": "চরিত্র",
+   "pt-BR": "Personagem",
+   "ru": "Персонаж",
+   "id": "Karakter"
   },
   "Chat": {
    "zh-Hans": "聊天",
@@ -6535,6 +6546,17 @@
    "pt-BR": "Hoje",
    "ru": "Сегодня",
    "id": "Hari ini"
+  },
+  "Tofu is a flat pebble with Mochi's moves and outfits. It shows in the island and on the desktop.": {
+   "zh-Hans": "Tofu 是一颗扁平的小卵石，拥有 Mochi 的动作和服装。它会出现在灵动岛和桌面上。",
+   "hi": "Tofu एक सपाट कंकड़ है, जिसकी हरकतें और कपड़े Mochi जैसे हैं। यह आइलैंड में और डेस्कटॉप पर दिखता है।",
+   "es": "Tofu es un guijarro plano con los movimientos y los disfraces de Mochi. Aparece en la isla y en el escritorio.",
+   "ar": "Tofu حصاة مسطّحة بحركات Mochi وأزيائه. يظهر في الجزيرة وعلى سطح المكتب.",
+   "fr": "Tofu est un galet tout plat, avec les mouvements et les tenues de Mochi. Il apparaît dans l'île et sur le bureau.",
+   "bn": "Tofu একটি চ্যাপ্টা নুড়ি, Mochi-র মতো নড়াচড়া আর পোশাক নিয়ে। এটি আইল্যান্ডে আর ডেস্কটপে দেখা যায়।",
+   "pt-BR": "Tofu é um seixo achatado com os movimentos e as roupas do Mochi. Ele aparece na ilha e na área de trabalho.",
+   "ru": "Tofu — плоский камешек с движениями и нарядами Mochi. Он появляется на острове и на рабочем столе.",
+   "id": "Tofu adalah kerikil pipih dengan gerakan dan kostum Mochi. Ia muncul di pulau dan di desktop."
   },
   "Too long for one message (4,096 characters at most).": {
    "zh-Hans": "单条消息过长（最多 4096 个字符）。",
