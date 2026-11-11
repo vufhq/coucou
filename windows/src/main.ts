@@ -6,14 +6,11 @@ import { Sound } from "./core/sound";
 import { State, type Settings } from "./core/state";
 import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
-import { registerPhoneLink } from "./island/phone-link";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
 import { registerShortcutHandlers } from "./island/shortcuts";
 import { registerVoiceHandlers } from "./island/voice";
 import { applySpotify, registerSpotifyHandlers } from "./island/spotify";
 import { SPOTIFY_ID } from "./core/spotify";
-import { Recap } from "./recap/recap";
-import { OrchestratorBridge } from "./core/orchestrator";
 import { GREETING_END } from "./mochi/greeting";
 import { applyCharacter } from "./mochi/character";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
@@ -23,20 +20,14 @@ function applyLanguage() {
   setLanguage(resolveLanguage(State.settings.language, systemLanguages()));
 }
 
-/** Once per launch, after the greeting: Coucou's Settings window opens, then
- *  Coucou HQ in front of it when the orchestrator is on. */
+/** Once per launch, after the greeting, Coucou HQ opens (it selects Mochi
+ *  itself, and says so when the orchestrator is off), unless Coucou started
+ *  with the computer or the user turned it off. */
 let hqOpened = false;
 async function openHqOnce() {
   if (hqOpened) return;
   hqOpened = true;
-  await Bridge.openHubPage("general");
-  try {
-    const { prefs } = await OrchestratorBridge.status();
-    // HQ selects Mochi itself.
-    if (prefs.enabled) await Bridge.showHq(null);
-  } catch {
-    // Outside Tauri, or the backend's settings can't be read: no HQ.
-  }
+  if (await Bridge.openHqAtLaunch()) await Bridge.showHq(null);
 }
 
 async function main() {
@@ -92,14 +83,6 @@ async function main() {
         setPaused(false);
         island.alert("settings");
         break;
-      case "open":
-        setPaused(false);
-        island.alert(State.defaultView());
-        break;
-      case "recap":
-        setPaused(false);
-        void Recap.open(island);
-        break;
       case "wardrobe":
         setPaused(false);
         island.alert("wardrobe");
@@ -145,19 +128,15 @@ async function main() {
 
   // The settings window writes preferences; apply them here without a restart.
   await onEvent<Settings>("settings-changed", (s) => {
-    const previousMain = State.mainPillId;
     State.settings = { ...State.settings, ...s };
     applyCharacter(State.settings);
     applyLanguage();
     island.applySettings();
     State.loadIntegrationTasks();
-    // A new main tool comes to the front, as on macOS.
-    if (State.mainPillId !== previousMain) State.setFocus(State.mainPillId);
     void refreshConfigured();
   });
 
   registerHookHandlers(island);
-  registerPhoneLink(island);
   registerIntegrationHandlers(island);
   registerShortcutHandlers(island, () => setPaused(false));
   registerVoiceHandlers();
@@ -167,14 +146,7 @@ async function main() {
     void Bridge.spotifyRefresh().then((s) => s && applySpotify(island, s));
   }
 
-  // Monday recap: app start (greeting over), an agent starting work, waking up.
-  const checkRecap = () => void Recap.check(island);
-  island.onGreetingDone = () => {
-    checkRecap();
-    void openHqOnce();
-  };
-  island.onWake = checkRecap;
-  await onEvent<null>("recap-check", checkRecap);
+  island.onGreetingDone = () => void openHqOnce();
 
   island.launch();
   // Moving the mouse out of the greeting cuts it short, and then it never says

@@ -56,9 +56,8 @@ test("placeholders are filled in every language, unknown ones are left as they a
   assert.equal(t("Uploading {name}", { name: "a.pdf" }), "Uploading a.pdf");
   assert.equal(t("Uploading {name}"), "Uploading {name}");
   inLanguage("hi", () => assert.equal(t("Uploading {name}", { name: "a.pdf" }), "a.pdf अपलोड हो रहा है"));
-  inLanguage("es", () => assert.equal(t("in {h} h {m}", { h: 1, m: 20 }), "en 1 h 20"));
-  assert.equal(t("{used}/{max} slots in use — the main tool doesn't take one.", { used: 2, max: 4 }),
-    "2/4 slots in use — the main tool doesn't take one.");
+  inLanguage("es", () => assert.equal(t("{from} to {to}", { from: 1, to: 20 }), "De 1 a 20"));
+  assert.equal(t("{used}/{max} slots in use.", { used: 2, max: 4 }), "2/4 slots in use.");
 });
 
 test("plurals follow each language's rules", () => {
@@ -77,10 +76,10 @@ test("plurals follow each language's rules", () => {
     assert.equal(files(21), "21 репозиторий");
   });
   inLanguage("zh-Hans", () => assert.equal(files(7), "7 个仓库"));
-  // The Mac's plural entry: Spanish one/other.
+  // Spanish one/other.
   inLanguage("es", () => {
-    assert.equal(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 1), "✓ Conectado · 1 modelo");
-    assert.equal(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 2), "✓ Conectado · 2 modelos");
+    assert.equal(tn("{count} model", "{count} models", 1), "1 modelo");
+    assert.equal(tn("{count} model", "{count} models", 2), "2 modelos");
   });
 });
 
@@ -220,8 +219,8 @@ test("every string the code shows is translated in every language", () => {
   assert.ok(keys.size > 300, `only ${keys.size} keys found — has the scan broken?`);
   const missing = [...keys].filter(([key]) => !isComplete(key)).map(([key, path]) => `${path}: ${JSON.stringify(key)}`);
   assert.deepEqual(missing, []);
-  // And the hand-written table carries nothing the code no longer uses.
-  const unused = Object.keys(EXTRA.strings).filter((key) => !keys.has(key));
+  // And the tables carry nothing the code no longer uses.
+  const unused = [...Object.keys(MAC.strings), ...Object.keys(EXTRA.strings)].filter((key) => !keys.has(key));
   assert.deepEqual(unused, []);
 });
 
@@ -237,7 +236,7 @@ test("lookup() answers from the merged tables", () => {
 // upload canvas or the recap that is exactly a translated string, and is not
 // the argument of t() / tl() / tn() / N_(), is English that would stay English.
 
-const CHECKED = ["src/views", "src/settings", "src/island", "src/upload", "src/recap", "src/mochi/wardrobe.ts", "src/main.ts"];
+const CHECKED = ["src/views", "src/settings", "src/island", "src/upload", "src/mochi/wardrobe.ts", "src/main.ts"];
 /** Literals that are a translated word but are values in the code, not text on screen. */
 const NOT_TEXT = new Set([
   "file", // the kind of a chat context: { kind: "file" }

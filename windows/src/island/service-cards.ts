@@ -1,11 +1,17 @@
-// What the island's service pills show, written as small read-only cards for the phone (docs/ANDROID_LINK.md,
-// "Service cards"). Rust sends a phone only the services its user ticked in Settings -> Android phone; what is built
-// here is the most each card can say, kept short on purpose: a headline, why, and three lines.
+// What the island's service pills show, as small read-only summaries that « OK Coucou » answers from
+// (island/voice.ts): a headline, why, and three lines, kept short on purpose.
 //
-// What never goes in a card: an email address or subject (Resend), a payment's description (Stripe), the text of an
-// n8n error, a link, a token. A card says what the pill's own header says and counts, nothing a click would reveal.
+// What never goes in a summary: an email address or subject (Resend), a payment's description (Stripe), the text of
+// an n8n error, a link, a token. A summary says what the pill's own header says and counts, nothing a click would reveal.
 
-import type { PhoneLinkService } from "../core/bridge";
+/** One service pill, summarised. */
+export interface ServiceCard {
+  id: string;
+  title: string;
+  headline: string;
+  reason?: string;
+  items: { label: string; detail: string }[];
+}
 import { State } from "../core/state";
 import { t } from "../i18n/i18n";
 
@@ -29,7 +35,7 @@ export function ago(value: unknown, now = Date.now()): string {
 const money = (cents: unknown) => (Number(cents ?? 0) / 100).toFixed(2);
 const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-type Builder = (now: number) => PhoneLinkService | null;
+type Builder = (now: number) => ServiceCard | null;
 
 function usable(id: string): boolean {
   const info = State.integrations[id];
@@ -117,8 +123,8 @@ const BUILDERS: Record<string, Builder> = {
 };
 
 /** The cards of the services the island has data for (Rust then keeps only the ones the user allowed). */
-export function serviceCards(now = Date.now()): PhoneLinkService[] {
-  const cards: PhoneLinkService[] = [];
+export function serviceCards(now = Date.now()): ServiceCard[] {
+  const cards: ServiceCard[] = [];
   for (const [id, build] of Object.entries(BUILDERS)) {
     if (id !== "integration_n8n" && !usable(id)) continue;
     const card = build(now);

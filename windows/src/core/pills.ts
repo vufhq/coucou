@@ -1,22 +1,18 @@
-// Every pill the island can show — port of PillCatalog.swift, the single source
-// of truth on macOS. IDs, names, colours, categories and subtitles are the Mac's,
-// in the Mac's order: they are contract values (settings, hook routing), so an
-// ID here never changes once shipped.
+// Every catalog pill the island can show: the chat's AI providers and the
+// services. IDs are contract values (settings, keys in the credential store),
+// so an ID here never changes once shipped. The orchestrator's agents have
+// pills too, made from the backend's list (State.syncOrchestratorAgents).
 //
-// What is added for Windows and Linux is `support` — not every Mac pill has
-// something behind it here — and `connect`, which says what makes the pill
-// "connected": its hooks being installed, a key in the OS credential store, or
-// nothing at all.
+// `support` says where a pill works, and `connect` what makes it "connected":
+// a key in the OS credential store, a model server, or nothing at all.
 
 import type { AgentSource } from "./state";
 import { N_ } from "../i18n/i18n";
 
-export type PillCategory = "workspace" | "agent" | "ai" | "service";
+export type PillCategory = "ai" | "service";
 
 /** Section titles (English keys, shown with `t()`), in display order. */
 export const PILL_CATEGORIES: { id: PillCategory; title: string }[] = [
-  { id: "workspace", title: N_("Where you code") },
-  { id: "agent", title: N_("Agents") },
   { id: "ai", title: N_("AI for the chat") },
   { id: "service", title: N_("Services") },
 ];
@@ -33,8 +29,6 @@ export type PillSupport = "yes" | "windows" | "linux" | "soon" | "no";
 
 /** What makes the pill connected. */
 export type PillConnect =
-  /** Hook events: connected once the hooks are installed (Mac #183). */
-  | { kind: "hooks" }
   /** A key in the credential store. */
   | { kind: "key"; key: string }
   /** A model server the chat is connected to (Settings → Local models). */
@@ -56,7 +50,6 @@ export interface PillDefinition {
 
 export type HostOs = "windows" | "linux";
 
-const hooks: PillConnect = { kind: "hooks" };
 const key = (k: string): PillConnect => ({ kind: "key", key: k });
 const none: PillConnect = { kind: "none" };
 const server = (field: "ollamaUrl" | "lmstudioUrl"): PillConnect => ({ kind: "server", field });
@@ -71,35 +64,6 @@ const ACCENT = {
 };
 
 export const PILL_CATALOG: readonly PillDefinition[] = [
-  // ── Where you code ─────────────────────────────────────────────────────────
-  { id: "integration_claude", name: "Claude Code", color: "#F5F6F8", category: "workspace",
-    subtitle: N_("Integration"), source: "claudeCode", support: "yes", connect: hooks },
-  // Claude Code in Cursor's terminal: the same hooks as Claude Code.
-  { id: "agent_cursor", name: "Cursor", color: "#C0C4CC", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  // ── Agents ─────────────────────────────────────────────────────────────────
-  { id: "agent_gemini", name: "Gemini CLI", color: "#8AB4F8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_copilot", name: "Copilot CLI", color: "#818CF8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_muse", name: "Muse Code", color: "#38BDF8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  // A plugin that starts the relay, written from Settings → Agents (agents.rs).
-  { id: "agent_opencode", name: "OpenCode", color: "#4ADE80", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_amp", name: "Amp", color: "#F59E0B", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_hermes", name: "Hermes", color: "#C084FC", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  // Claude Code sessions run from the Claude desktop app: the relay tags them
-  // from CLAUDE_CODE_ENTRYPOINT, so there is nothing to install. The app has no
-  // Linux build.
-  { id: "agent_claude-desktop", name: "Claude Desktop", color: "#D97757", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "windows", connect: none },
   // ── AI for the chat ────────────────────────────────────────────────────────
   { id: "ai_anthropic", name: "Anthropic", color: ACCENT.anthropic, category: "ai",
     subtitle: N_("Chat"), source: "n8n", support: "yes", connect: key("anthropic-api-key") },
@@ -136,10 +100,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: none },
 ];
 
-/** The always-on pill unless the user picks another workspace tool. */
-export const DEFAULT_MAIN_PILL = "integration_claude";
-
-/** How many declared pills may sit next to the main one. */
+/** How many catalog pills may be declared. */
 export const MAX_DECLARED = 4;
 
 /** The OS this page runs on. Only the Windows webview says "Windows". */
@@ -163,85 +124,38 @@ export function isComingSoon(id: string): boolean {
   return pillDefinition(id)?.support === "soon";
 }
 
-/** True for pills whose sessions arrive as hook events (Mac #183). */
-export function isHookPill(id: string): boolean {
-  return pillDefinition(id)?.connect.kind === "hooks";
-}
-
-/** Workspace tools that can be the main pill. */
-export function mainPillChoices(os: HostOs = HOST_OS): PillDefinition[] {
-  return availablePills(os).filter((p) => p.category === "workspace" && p.support !== "soon");
-}
-
-/** PillDefinition.sessionSubtitle — next to the name in a live session's card. */
-export function sessionSubtitle(id: string): string {
-  switch (id) {
-    case "integration_claude": return "Claude Code";
-    case "agent_cursor": return "Cursor";
-    case "agent_codex": return "Codex";
-    case "agent_hermes": return "Hermes";
-    case "agent_claude-desktop": return "Claude Desktop";
-    default: return N_("Agent");
-  }
-}
-
-export interface Declared {
-  mainPill: string;
-  activeIntegrations: string[];
-}
-
 /**
- * The declaration as it may be used: a main pill this build can run (else the
- * default), and declared pills this build offers, without duplicates and
- * without the main pill, which never takes a slot. Same rules as
- * AppState.loadIntegrationTasks on macOS.
+ * The declared pills as they may be used: pills this build offers, without
+ * duplicates, at most MAX_DECLARED.
  */
-export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
-  const mains = new Set(mainPillChoices(os).map((p) => p.id));
-  const mainPill = mains.has(d.mainPill) ? d.mainPill : DEFAULT_MAIN_PILL;
+export function sanitizeDeclared(ids: readonly string[] | undefined, os: HostOs = HOST_OS): string[] {
   const offered = new Set(availablePills(os).map((p) => p.id));
-  const activeIntegrations: string[] = [];
-  for (const id of d.activeIntegrations ?? []) {
-    if (id !== mainPill && offered.has(id) && !activeIntegrations.includes(id)) {
-      activeIntegrations.push(id);
-    }
+  const out: string[] = [];
+  for (const id of ids ?? []) {
+    if (offered.has(id) && !out.includes(id) && out.length < MAX_DECLARED) out.push(id);
   }
-  return { mainPill, activeIntegrations };
+  return out;
 }
 
 /**
  * Declares or undeclares a pill. Returns the new list, or null when the click
- * changes nothing: the main pill is never toggled, an unknown pill never
- * declared, and a fifth pill never added.
+ * changes nothing: an unknown pill is never declared, and a fifth never added.
  */
-export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): string[] | null {
-  if (id === d.mainPill) return null;
+export function toggleDeclared(declared: readonly string[], id: string, os: HostOs = HOST_OS): string[] | null {
   if (!availablePills(os).some((p) => p.id === id)) return null;
-  if (d.activeIntegrations.includes(id)) return d.activeIntegrations.filter((x) => x !== id);
-  if (d.activeIntegrations.length >= MAX_DECLARED) return null;
-  return [...d.activeIntegrations, id];
+  if (declared.includes(id)) return declared.filter((x) => x !== id);
+  if (declared.length >= MAX_DECLARED) return null;
+  return [...declared, id];
 }
 
 /**
- * Picks a new main pill. The old main pill is not declared on its own, and the
- * new one leaves the declared list so it does not take a slot twice.
+ * Pill order: the orchestrator's agents first (the backend orders them among
+ * themselves), then the catalog's pills in catalog order, then anything else.
+ * Pills of equal rank keep their order.
  */
-export function chooseMainPill(d: Declared, id: string, os: HostOs = HOST_OS): Declared | null {
-  if (!mainPillChoices(os).some((p) => p.id === id)) return null;
-  return { mainPill: id, activeIntegrations: d.activeIntegrations.filter((x) => x !== id) };
-}
-
-/**
- * Pill order: the main pill first, then pills from outside the catalog (any
- * other tagged agent), then the catalog's pills in catalog order. Pills of equal
- * rank keep their order. Mirrors sortTasksByCatalog on macOS, with the main
- * pill (not always VS Code here) leading.
- */
-export function orderPills<T extends { id: string; orchestrator?: unknown }>(tasks: T[], mainPill: string): T[] {
+export function orderPills<T extends { id: string; orchestrator?: unknown }>(tasks: T[]): T[] {
   const index = new Map(PILL_CATALOG.map((p, i) => [p.id, i]));
-  // The orchestrator's agents come last, in the backend's order.
-  const rank = (t: T) =>
-    t.id === mainPill ? -2 : t.orchestrator ? PILL_CATALOG.length : index.has(t.id) ? index.get(t.id)! : -1;
+  const rank = (t: T) => (t.orchestrator ? -1 : index.get(t.id) ?? PILL_CATALOG.length);
   return tasks
     .map((t, i) => ({ t, i }))
     .sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i)

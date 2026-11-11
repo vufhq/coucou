@@ -58,24 +58,16 @@ pub fn present(key: &str) -> bool {
 
 // ── Entries only Rust reads and writes ───────────────────────────────────────
 //
-// The phone link's certificate, key and pairing token, and the relay's room, end-to-end key and access key.
-// They are not in KNOWN_KEYS
-// on purpose: the island has `secret_present` / `secret_set` / `secret_clear`
+// The orchestrator's API token. It is not in KNOWN_KEYS on purpose: the island has `secret_present` / `secret_set` / `secret_clear`
 // for those, and none of the three may be reachable from a webview.
 
 /// Every entry of that kind. Anything outside this list is refused.
 pub const INTERNAL_KEYS: &[&str] = &[
-    "phone-link-cert",
-    "phone-link-key",
-    "phone-link-token",
-    "phone-relay-room",
-    "phone-relay-key",
-    "phone-relay-access",
     // Written by the orchestrator backend on its first start (orchestrator.rs).
     "orchestrator-token",
 ];
 
-/// Whether the keystore would accept this key through `get_internal` / `set_internal`.
+/// Whether the keystore would accept this key through `get_internal`.
 pub fn is_internal(key: &str) -> bool {
     INTERNAL_KEYS.contains(&key)
 }
@@ -91,24 +83,12 @@ pub fn get_internal(key: &str) -> Option<String> {
     internal_entry(key).ok()?.get_password().ok().filter(|v| !v.is_empty())
 }
 
-pub fn set_internal(key: &str, value: &str) -> Result<(), String> {
-    let entry = internal_entry(key)?;
-    if value.is_empty() {
-        // An empty value means "forget it" (the relay's access key); some keystores refuse an empty password.
-        return match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(e.to_string()),
-        };
-    }
-    entry.set_password(value).map_err(|e| e.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn the_phone_links_secrets_cannot_be_reached_from_the_island() {
+    fn internal_secrets_cannot_be_reached_from_the_island() {
         // The island's commands go through `get`/`set`/`clear`/`present`, which
         // only know KNOWN_KEYS.
         for key in INTERNAL_KEYS {
@@ -119,20 +99,6 @@ mod tests {
             assert!(!present(key), "{key}");
         }
         // And the other way round: a key of the island is not an internal one.
-        assert!(set_internal("github-token", "x").is_err());
-    }
-
-    /// Windows Credential Manager caps a secret's size. The phone link stores its certificate (about
-    /// 600 hex characters) and key there, so prove that a secret of that size round-trips through the
-    /// real store. A separate service name: this can never touch a user's real entries.
-    #[cfg(windows)]
-    #[test]
-    fn a_certificate_sized_secret_round_trips_through_credential_manager() {
-        let entry = keyring::Entry::new("fr.louisraille.coucou.test", "phone-link-size-check").unwrap();
-        let big: String = (0..1_200).map(|i| char::from(b"0123456789abcdef"[i % 16])).collect();
-        entry.set_password(&big).expect("Credential Manager refused a certificate-sized secret");
-        let back = entry.get_password().expect("could not read it back");
-        let _ = entry.delete_credential();
-        assert_eq!(back, big);
+        assert!(!is_internal("github-token"));
     }
 }

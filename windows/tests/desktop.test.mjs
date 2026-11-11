@@ -98,18 +98,10 @@ test("shouldRetractOnLanding", () => {
   assert.equal(shouldRetractOnLanding(false), false, "must not retract when no alert on landing");
 });
 
-test("a permission or a question sends him back to the island", () => {
+test("an approval or an agent's question sends him back to the island", () => {
   assert.equal(alertActive({ pendingApproval: null, tasks: [{ state: "working" }] }), false);
-  assert.equal(alertActive({ pendingApproval: { requestId: "r" }, tasks: [] }), true);
+  assert.equal(alertActive({ pendingApproval: { requestId: "r", pillId: "agent_agent-01" }, tasks: [] }), true);
   assert.equal(alertActive({ pendingApproval: null, tasks: [{ state: "idle" }, { state: "question" }] }), true);
-  // The question card (#216) is the same card with `questions`: it flies him home too.
-  const question = {
-    requestId: "q", sessionId: "s", pillId: "integration_claude", tool: "AskUserQuestion", command: "",
-    questions: [{ question: "Which?", options: [{ label: "A", description: "" }], multiSelect: false }],
-  };
-  assert.equal(alertActive({ pendingApproval: question, tasks: [{ state: "idle" }] }), true);
-  // Any agent's permission card counts, Codex's included.
-  assert.equal(alertActive({ pendingApproval: { requestId: "r", pillId: "agent_codex" }, tasks: [] }), true);
 });
 
 // ── Linux drags ───────────────────────────────────────────────────────────────

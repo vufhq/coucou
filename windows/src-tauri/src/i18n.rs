@@ -265,11 +265,11 @@ mod tests {
     #[test]
     fn plurals_follow_the_language() {
         set_for_test("en");
-        assert_eq!(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 1, &[]), "✓ Connected · 1 model");
-        assert_eq!(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 3, &[]), "✓ Connected · 3 models");
+        assert_eq!(tn("{count} model", "{count} models", 1, &[]), "1 model");
+        assert_eq!(tn("{count} model", "{count} models", 3, &[]), "3 models");
         set_for_test("es");
-        assert_eq!(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 1, &[]), "✓ Conectado · 1 modelo");
-        assert_eq!(tn("✓ Connected · {count} model", "✓ Connected · {count} models", 4, &[]), "✓ Conectado · 4 modelos");
+        assert_eq!(tn("{count} model", "{count} models", 1, &[]), "1 modelo");
+        assert_eq!(tn("{count} model", "{count} models", 4, &[]), "4 modelos");
         assert_eq!(plural_category("ru", 21), "one");
         assert_eq!(plural_category("ru", 23), "few");
         assert_eq!(plural_category("ru", 25), "many");

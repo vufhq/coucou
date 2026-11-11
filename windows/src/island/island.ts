@@ -7,7 +7,6 @@ import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
-  QUESTION_PICKER_H,
   type BotEmoteName, type IslandMode, type IslandViewName,
 } from "../core/layout";
 import { Sound } from "../core/sound";
@@ -19,17 +18,14 @@ import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from ".
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
-import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
-import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 
 const BOT_OVERHANG = 40;
-const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
 /** Extra canvas on each side of Mochi, for the witch hat's brim and the Santa hat's tip. */
 const BOT_SIDE = 24;
 /** Same margin as the Rust hit test (src-tauri/src/island.rs). */
@@ -100,10 +96,8 @@ export class Island {
   private prevViewBeforeConfused: IslandViewName = "overview";
   private lastSyncedView: IslandViewName | null = null;
 
-  /** The launch greeting ended, or the island came out of hidden — two of the
-   *  moments the Monday recap may open (see src/recap/recap.ts). */
+  /** The launch greeting ended: Coucou HQ may open (src/main.ts). */
   onGreetingDone: (() => void) | null = null;
-  onWake: (() => void) | null = null;
 
   /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
@@ -169,15 +163,9 @@ export class Island {
         // A pill with a waiting request opens on its card: going back to it
         // after looking at another pill brings the card up again.
         const req = State.pendingApproval;
-        if (req?.pillId === id) this.setView(req.questions ? "question" : "approval");
+        if (req?.pillId === id) this.setView("approval");
       },
-      openTerminal: () => {
-        const task = State.focusTask;
-        // Sessions from the Claude desktop app live there, not in a terminal.
-        if (task?.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-        else void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
-      },
-      // The ↗ button — same targets as openAgentTarget() on macOS.
+      // The ↗ button: HQ for an agent, the service's own page for a service.
       openTarget: () => {
         const task = State.focusTask;
         if (!task) return;
@@ -194,10 +182,7 @@ export class Island {
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
         };
-        if (task.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-        else if (task.id === "integration_claude" || task.sessionId) {
-          void Bridge.openSession(task.sessionId ?? null, task.sessionCwd ?? null);
-        } else if (task.id === "integration_n8n") void Bridge.openN8n();
+        if (task.id === "integration_n8n") void Bridge.openN8n();
         else if (task.id === SPOTIFY_ID) void Bridge.spotifyOpen();
         else if (urls[task.id]) void Bridge.openUrl(urls[task.id]);
       },
@@ -210,20 +195,6 @@ export class Island {
         if (!req) return;
         Sound.play(d === "deny" ? "blip" : "approve");
         void Bridge.approvalDecision(req.requestId, d);
-        this.closeApproval();
-      },
-      answer: (answers) => {
-        const req = State.pendingApproval;
-        if (!req) return;
-        Sound.play("approve");
-        void Bridge.approvalAnswer(req.requestId, answers);
-        this.closeApproval();
-      },
-      answerInTerminal: () => {
-        const req = State.pendingApproval;
-        if (!req) return;
-        Sound.play("blip");
-        void Bridge.approvalDecline(req.requestId);
         this.closeApproval();
       },
       toggleSound: () => {
@@ -336,9 +307,6 @@ export class Island {
         case "home":
           this.expand(State.defaultView());
           if (!this.wasInIsland) this.fsm.mouseLeft();
-          // Hooks may have been installed in a terminal since: the idle cards
-          // say so on the next open, without polling while the island is shut.
-          void refreshHookPills();
           break;
         case "coucou":
           this.expand("greeting");
@@ -346,7 +314,6 @@ export class Island {
           break;
       }
       State.notify();
-      if (from === "hidden") this.onWake?.();
     };
   }
 
@@ -368,7 +335,6 @@ export class Island {
       void Bridge.focusWindow(false);
     }
     if (mode !== "expanded") {
-      closePlanCard();
       this.engine.resetMorph();
       // Nothing can be seen of the sequence once the island is shut, and leaving
       // it running would keep the frame loop awake — the island must cost
@@ -392,7 +358,6 @@ export class Island {
 
   expand(view: IslandViewName) {
     this.stopSequenceIfLeaving(view);
-    if (view !== "overview") closePlanCard();
     State.view = view;
     if (State.mode !== "expanded") this.setMode("expanded");
     else this.animateGeometry(false);
@@ -402,7 +367,6 @@ export class Island {
 
   setView(view: IslandViewName) {
     this.stopSequenceIfLeaving(view);
-    if (view !== "overview") closePlanCard();
     if (State.mode !== "expanded") {
       this.fsm.forceHome();
       State.view = view;
@@ -653,10 +617,7 @@ export class Island {
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   private targetSize(): { w: number; h: number; r: number } {
-    let { w, h } = islandSize(State.mode, State.view, State.chatLength);
-    if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
-      h = QUESTION_PICKER_H;
-    }
+    const { w, h } = islandSize(State.mode, State.view, State.chatLength);
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
     return { w, h, r };
   }
@@ -1072,12 +1033,8 @@ export class Island {
     if (!ctx) return;
 
     const focus = State.focusTask;
-    // While a plan card is open Mochi wears the plan's colour, like its pill.
-    this.engine.bodyColor = planCardOpen()
-      ? hexToRGB(openPlanColor())
-      : focus?.isIntegration
-        ? hexToRGB(focus.color)
-        : null;
+    // A catalog pill in front: Mochi wears its colour.
+    this.engine.bodyColor = focus?.isIntegration ? hexToRGB(focus.color) : null;
     this.engine.particleOverhang = BOT_OVERHANG;
     this.engine.lookX = this.lookX();
     this.engine.lookY = this.lookY();
@@ -1090,12 +1047,11 @@ export class Island {
         this.engine.slotHVel = 0;
       }
     }
-    // Only the main Mochi is dressed — the one of the main tool's pill (Settings →
-    // Active pills): a focused integration pill shows its own colours, unless
-    // the wardrobe is open (BotCanvasView.showOutfit, macOS).
-    // In the wardrobe the hovered outfit swaps in at once, without the drop-in.
+    // Mochi is dressed unless a catalog pill in front colours him, or the
+    // wardrobe is open. In the wardrobe the hovered outfit swaps in at once,
+    // without the drop-in.
     const inWardrobe = State.mode === "expanded" && State.view === "wardrobe";
-    const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
+    const mainFocused = !focus?.isIntegration;
     const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
     const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
     this.engine.setOutfit(showOutfit ? outfit : "none", !inWardrobe);

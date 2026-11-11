@@ -85,7 +85,7 @@ pub fn description(id: &str) -> &'static str {
         "toggleIsland" => n_("Open or close the island"),
         "openChat" => n_("Open the chat"),
         "goToAlert" => n_("Go to the waiting permission or question"),
-        "jumpToTerminal" => n_("Open the terminal"),
+        "jumpToTerminal" => n_("Open Coucou HQ"),
         "attachFrontWindow" => n_("Attach the front window to the chat"),
         "nextPill" => n_("Next pill"),
         "prevPill" => n_("Previous pill"),

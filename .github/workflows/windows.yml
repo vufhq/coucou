@@ -67,9 +67,8 @@ jobs:
           if ($tag -ne $cargo) { $bad += "Cargo.toml says $cargo" }
           if ($bad) { throw "tag says $tag but $($bad -join '; ')" }
 
-      # `npm run build` (run by tauri as beforeBuildCommand) builds coucou-hook
-      # first, which tauri.conf.json then bundles as a resource. `pack` then
-      # copies the installer out of target/ under its shipping name.
+      # `pack` builds the app and copies the installer out of target/ under its
+      # shipping name.
       - name: Build and pack the installer
         id: pack
         shell: pwsh
@@ -100,16 +99,12 @@ jobs:
           retention-days: 3
 
       # The unsigned NSIS installer is what Defender false-positives on, so the
-      # bare binaries go up as well. hooks.rs already falls back to looking for
-      # coucou-hook.exe next to coucou.exe, which is exactly this layout, so the
-      # portable pair runs with working Claude Code hooks and no installer.
+      # bare binary goes up as well: it runs with no installer.
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
           name: Coucou-Windows-portable
-          path: |
-            windows/target/release/coucou.exe
-            windows/target/release/coucou-hook.exe
+          path: windows/target/release/coucou.exe
           retention-days: 3
 
       - name: Publish the release

@@ -22,7 +22,7 @@ export const SHORTCUT_TEXT = {
   toggleIsland: N_("Open or close the island"),
   openChat: N_("Open the chat"),
   goToAlert: N_("Go to the waiting permission or question"),
-  jumpToTerminal: N_("Open the terminal"),
+  jumpToTerminal: N_("Open Coucou HQ"),
   attachFrontWindow: N_("Attach the front window to the chat"),
   nextPill: N_("Next pill"),
   prevPill: N_("Previous pill"),
@@ -34,7 +34,6 @@ export const SHORTCUT_TEXT = {
     byNumber: N_("Go to pill 1 to 9"),
     navItems: N_("Navigate list items"),
     open: N_("Open selected item"),
-    diff: N_("Open / close current diff"),
     send: N_("Send the message"),
     newChat: N_("Start a new chat"),
     settings: N_("Open Settings"),
@@ -358,7 +357,6 @@ export const ISLAND_SHORTCUTS: readonly { keys: string; description: string }[] 
   { keys: "Ctrl+1 – Ctrl+9", description: SHORTCUT_TEXT.island.byNumber },
   { keys: "Ctrl+↓ / Ctrl+↑", description: SHORTCUT_TEXT.island.navItems },
   { keys: "Ctrl+O", description: SHORTCUT_TEXT.island.open },
-  { keys: "Ctrl+E", description: SHORTCUT_TEXT.island.diff },
   { keys: "Ctrl+Enter", description: SHORTCUT_TEXT.island.send },
   { keys: "Ctrl+K", description: SHORTCUT_TEXT.island.newChat },
   { keys: "Ctrl+,", description: SHORTCUT_TEXT.island.settings },
@@ -373,8 +371,6 @@ export type IslandKeyAction =
   | { kind: "list"; delta: 1 | -1 }
   /** Ctrl+O: opens the highlighted item (⌘O). */
   | { kind: "openSelection" }
-  /** Ctrl+E: the latest edit's diff, or closes the one open (⌘E). */
-  | { kind: "diff" }
   | { kind: "newChat" }
   | { kind: "settings" }
   | { kind: "pin" };
@@ -403,8 +399,6 @@ export function islandKeyAction(
   if (letter === "k") return ctx.view === "prompt" ? { kind: "newChat" } : null;
   if (letter === "p") return { kind: "pin" };
   if (letter === "o") return { kind: "openSelection" };
-  // The diff lives in the overview's left card: ⌘E means something only there.
-  if (letter === "e") return ctx.view === "overview" ? { kind: "diff" } : null;
   if (e.key === "," || e.code === "Comma") return { kind: "settings" };
   return null;
 }

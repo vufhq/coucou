@@ -12,14 +12,6 @@ import { buildPrompt } from "./chat";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
 import { highlightRow, listRows, openRow } from "./github";
-import { pillDefinition, sessionSubtitle } from "../core/pills";
-import {
-  PlanCard, buildPlanPill, claudePillVisible, codexPillVisible, planCardOpen, refreshCodexPlanUsage,
-} from "./usage";
-import { buildDiffCard } from "./diff";
-import { lastTextStep } from "../core/diff";
-import { Bridge } from "../core/bridge";
-import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
 import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
 import { buildAgentCard, type AgentCardHost } from "./agent-card";
@@ -36,15 +28,10 @@ export interface ViewActions {
   /** Folds a waiting card to the compact island without answering it. */
   foldApproval(): void;
   setFocus(id: string): void;
-  openTerminal(): void;
-  /** The ↗ button: opens whatever the focused pill points at. */
+  /** The ↗ button (and Open in HQ): opens whatever the focused pill points at. */
   openTarget(): void;
   openUrl(url: string): void;
   decide(d: "allow" | "deny"): void;
-  /** Answers the question Claude Code asked: question text → chosen label. */
-  answer(answers: Record<string, string | string[]>): void;
-  /** Hands the pending request back to the terminal. */
-  answerInTerminal(): void;
   toggleSound(): void;
   setVolume(v: number): void;
   setAutoClose(seconds: number): void;
@@ -114,11 +101,6 @@ export function buildHeader(actions: ViewActions): ViewHost {
 
   const gearBtn = h("button", { title: tl("Settings"), onclick: () => go("settings") }, svg(ICONS.gear, 14));
   const soundBtn = h("button", { title: tl("Mute"), onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
-  // Plan usage pills (off by default): before the gear, Claude first, as on the Mac.
-  const claudePill = buildPlanPill(false);
-  const codexPill = buildPlanPill(true);
-  const planPills = h("div", { class: "plan-pills" }, claudePill.el, codexPill.el);
-  let codexShown = false;
 
   function go(v: IslandViewName) {
     actions.blip();
@@ -129,9 +111,8 @@ export function buildHeader(actions: ViewActions): ViewHost {
     "div",
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
-    h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
+    h("div", { class: "header-actions" }, gearBtn, soundBtn),
   );
-  const headerActions = el.lastElementChild as HTMLElement;
 
   return {
     el,
@@ -145,43 +126,15 @@ export function buildHeader(actions: ViewActions): ViewHost {
       gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, 14));
       clear(soundBtn);
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, 14));
-      syncPlanPills();
       el.style.opacity = v === "confused" ? "0" : "1";
     },
   };
-
-  function syncPlanPills() {
-    const claudeOn = claudePillVisible();
-    const codexOn = codexPillVisible();
-    claudePill.el.style.display = claudeOn ? "" : "none";
-    codexPill.el.style.display = codexOn ? "" : "none";
-    planPills.classList.toggle("on", claudeOn || codexOn);
-    // Both pills: the right side tightens so it still clears the screen edge.
-    headerActions.classList.toggle("both-plans", claudeOn && codexOn);
-    if (claudeOn) claudePill.sync();
-    if (codexOn) codexPill.sync();
-    // Codex is asked when its pill comes into view (stale answers only).
-    const shown = codexOn && State.mode === "expanded";
-    if (shown && !codexShown) refreshCodexPlanUsage();
-    codexShown = shown;
-  }
 }
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
 function buildOverview(actions: ViewActions): ViewHost {
-  /** The diff open in the left card (a FileDiff id), as activeDiffId on macOS. */
-  let activeDiffId: number | null = null;
-  const closeDiff = () => {
-    if (activeDiffId == null) return;
-    activeDiffId = null;
-    State.notify();
-  };
-  const ticker = new Ticker((diffId) => {
-    actions.blip();
-    activeDiffId = diffId;
-    State.notify();
-  });
+  const ticker = new Ticker();
   const who = h("div", { class: "who" });
   const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
   const leftBody = h("div", { class: "left-body" });
@@ -193,9 +146,6 @@ function buildOverview(actions: ViewActions): ViewHost {
   const left = card(null, leftBody, jump);
   const pills = h("div", { class: "pills" });
   const right = card(null, pills);
-  // Opened from a plan pill in the header: stands in for the left card.
-  const plan = new PlanCard();
-  let planTimer: number | null = null;
   // Spotify's card and pill are kept and updated in place: the progress bar
   // runs on, and a slider being dragged must not be rebuilt under the pointer.
   const spotifyCard = buildSpotifyCard();
@@ -224,27 +174,10 @@ function buildOverview(actions: ViewActions): ViewHost {
   let pillIds = "";
   let detailOpen = false;
   let lastFocus: string | null = null;
-  let mode: "ticker" | "card" | "plan" | "diff" | "spotify" | "agent" | null = null;
+  let mode: "ticker" | "card" | "spotify" | "agent" | null = null;
   let cardKey = "";
   /** The list row highlighted at the last sync, to scroll only when it moves. */
   let shownSelection: number | null = null;
-
-  // Leaving the overview or folding the island closes the diff, as on macOS.
-  State.subscribe(() => {
-    if (activeDiffId != null && (State.view !== "overview" || State.mode !== "expanded")) {
-      activeDiffId = null;
-    }
-  });
-  // Escape steps back out of the diff before it closes the island.
-  window.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key !== "Escape" || activeDiffId == null || State.view !== "overview") return;
-      e.stopImmediatePropagation();
-      closeDiff();
-    },
-    true,
-  );
 
   const hooks: IntegrationCardHooks = {
     get detailOpen() {
@@ -263,20 +196,6 @@ function buildOverview(actions: ViewActions): ViewHost {
     openSettings: () => actions.openSettingsWindow(),
   };
 
-  /** The countdowns move every 30 s while a card is open, and only then. */
-  function syncPlanTimer(open: boolean) {
-    const stop = () => {
-      if (planTimer != null) window.clearInterval(planTimer);
-      planTimer = null;
-    };
-    if (!open) return stop();
-    if (planTimer != null) return;
-    planTimer = window.setInterval(() => {
-      if (planCardOpen() && State.mode === "expanded") State.notify();
-      else stop();
-    }, 30_000);
-  }
-
   return {
     el,
     tick(nowMs: number) {
@@ -284,73 +203,24 @@ function buildOverview(actions: ViewActions): ViewHost {
       ticker.tick(nowMs);
       return ticker.animating;
     },
-    command(command) {
-      if (command === "openSelection") {
-        // Ctrl+O: what a click on the highlighted row does.
-        if (mode !== "card" || State.cardSelection == null) return;
-        openRow(listRows(leftBody)[State.cardSelection]);
-        return;
-      }
-      // Ctrl+E (⌘E, islandToggleDiff): closes the diff that is open, else
-      // opens the focused pill's latest edit.
-      if (activeDiffId != null) {
-        closeDiff();
-        return;
-      }
-      const task = State.focusTask;
-      const diffs = task ? State.sessionDiffs.get(task.id) : undefined;
-      const last = diffs?.[diffs.length - 1];
-      if (last?.id == null) return;
-      activeDiffId = last.id;
-      State.notify();
+    command() {
+      // Ctrl+O: what a click on the highlighted row does.
+      if (mode !== "card" || State.cardSelection == null) return;
+      openRow(listRows(leftBody)[State.cardSelection]);
     },
     sync() {
       const task = State.focusTask;
       if (task?.id !== lastFocus) {
         lastFocus = task?.id ?? null;
         detailOpen = false;
-        activeDiffId = null;
         cardKey = "";
         mode = null;
       }
 
-      // A workspace or agent pill with a live session keeps the ticker; every
-      // other pill shows its own card, exactly like IntegrationCardView.
+      // An agent at work keeps the ticker; every other pill shows its own card.
       const sessionActive = task != null && hasSessionTicker(task);
 
-      const planOpen = planCardOpen();
-      if (mode === "plan" && !planOpen) {
-        mode = null;
-        cardKey = "";
-      }
-      syncPlanTimer(planOpen);
-
-      // A diff that has since been dropped (cap, expiry, session end) just closes.
-      const diff = task && activeDiffId != null ? State.findDiff(task.id, activeDiffId) : null;
-      if (!diff) activeDiffId = null;
-
-      if (planOpen) {
-        if (mode !== "plan") {
-          clear(leftBody);
-          leftBody.append(plan.el);
-          mode = "plan";
-        }
-        plan.sync();
-      } else if (task && diff) {
-        const key = `diff~${task.id}~${diff.id}`;
-        if (key !== cardKey) {
-          cardKey = key;
-          mode = "diff";
-          clear(leftBody);
-          leftBody.append(buildDiffCard(diff, {
-            dismiss: () => {
-              actions.blip();
-              closeDiff();
-            },
-            open: (path) => void Bridge.openFileInVSCode(path),
-          }));
-        }
-      } else if (task?.orchestrator && task.state === "idle") {
+      if (task?.orchestrator && task.state === "idle") {
         // An agent at rest: its own card, kept per agent.
         let host = agentCards.get(task.id);
         if (!host) {
@@ -375,12 +245,11 @@ function buildOverview(actions: ViewActions): ViewHost {
           cardKey = "";
         }
         clear(who);
-        // The agent's name is already the pill's: the label says what kind of
-        // pill it is, as on the Mac (PillDefinition.sessionSubtitle).
+        // The agent's name is already the pill's: the label says what it is.
         who.append(
           dot(task.color, 7),
           h("span", { class: "name", text: task.name }),
-          h("span", { class: "tool", text: t(sessionSubtitle(task.id)) }),
+          h("span", { class: "tool", text: t("Agent") }),
         );
         if (task.steps.length > 1) {
           who.append(h("span", {
@@ -413,7 +282,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         }
       }
 
-      jump.style.display = detailOpen || mode === "plan" || mode === "diff" ? "none" : "";
+      jump.style.display = detailOpen ? "none" : "";
 
       // Ctrl+↓ Ctrl+↑ walk the open GitHub list (cardItemCount / cardSelection).
       const rows = mode === "card" ? listRows(leftBody) : [];
@@ -472,22 +341,13 @@ function buildOverview(actions: ViewActions): ViewHost {
   };
 }
 
-/**
- * IntegrationCardView.agentSessionActive: a workspace tool or an agent — or
- * any other tagged agent — with something going on.
- */
+/** An agent with something going on: its pill shows the ticker. */
 export function hasSessionTicker(task: AgentTask): boolean {
-  // A pill made for an agent's session (Gemini CLI, Codex… not declared) only
-  // exists while that session does: it keeps the ticker from the first event.
-  if (task.source === "agent" && !task.isIntegration) return true;
-  const category = pillDefinition(task.id)?.category;
-  const isSession = category === "workspace" || category === "agent" ||
-    (category == null && task.id.startsWith("agent_"));
-  return isSession && (task.state !== "idle" || task.steps.length > 0);
+  return task.source === "agent" && (task.state !== "idle" || task.steps.length > 0);
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
-  const label = task.id === "integration_claude" ? pillDefinition(task.id)!.name : task.name;
+  const label = task.name;
   const canvas = createMiniBot(task, 24);
   const offline = task.orchestrator?.status === "offline";
   const pill = h(
@@ -609,105 +469,6 @@ function buildApproval(actions: ViewActions): ViewHost {
   };
 }
 
-// ── Question ──────────────────────────────────────────────────────────────────
-
-function buildQuestion(actions: ViewActions): ViewHost {
-  const who = h("div");
-  const title = h("div", { class: "title question-text" });
-  const row = h("div", { class: "actions options" });
-  const fold = foldButton(actions);
-  const el = h("div", { class: "view" }, card("cyan", stack(116, 16, who, title, row), fold));
-
-  // Where we are in the request on screen: which question, what is answered so
-  // far, and what is ticked in a pick-several question.
-  let requestId = "";
-  let index = 0;
-  let answers: Record<string, string | string[]> = {};
-  let picked = new Set<string>();
-  // The buttons are only rebuilt when what they show changes: rebuilding them
-  // between a mouse-down and a mouse-up would swallow the click.
-  let rowKey = "";
-
-  const next = (question: string, answer: string | string[], total: number) => {
-    answers[question] = answer;
-    picked = new Set();
-    index += 1;
-    if (index >= total) actions.answer(answers);
-    else State.notify();
-  };
-
-  return {
-    el,
-    sync() {
-      const questions = State.pendingApproval?.questions;
-      clear(who);
-      // Only a request that is waiting can be folded away and come back.
-      fold.style.display = State.pendingApproval ? "" : "none";
-
-      // A question that arrived as a notification has nothing to pick from.
-      if (!questions) {
-        who.append(agentWho(State.focusTask, t("is asking a question")));
-        const task = State.focusTask;
-        title.textContent = (task && lastTextStep(task.steps)) ?? t("Claude needs an answer.");
-        if (rowKey !== "terminal") {
-          rowKey = "terminal";
-          clear(row);
-          row.append(h("div", { class: "sub", text: tl("Answer it in your terminal.") }));
-        }
-        return;
-      }
-
-      if (State.pendingApproval!.requestId !== requestId) {
-        requestId = State.pendingApproval!.requestId;
-        index = 0;
-        answers = {};
-        picked = new Set();
-      }
-      const q = questions[Math.min(index, questions.length - 1)];
-      const asking = questions.length > 1
-        ? t("is asking ({index} of {total})", { index: index + 1, total: questions.length })
-        : t("is asking");
-      who.append(agentWho(State.focusTask, asking));
-      title.textContent = q.question;
-      title.title = q.question;
-
-      const key = `${requestId}:${index}:${[...picked].join("|")}`;
-      if (rowKey === key) return;
-      rowKey = key;
-      clear(row);
-      for (const option of q.options) {
-        const on = picked.has(option.label);
-        const button = btn(option.label, on ? "primary" : "secondary", () => {
-          if (!q.multiSelect) {
-            next(q.question, option.label, questions.length);
-            return;
-          }
-          if (on) picked.delete(option.label);
-          else picked.add(option.label);
-          State.notify();
-        });
-        if (option.description) button.title = option.description;
-        row.append(button);
-      }
-      if (q.multiSelect) {
-        const done = btn(tl("Done"), "primary", () => {
-          if (picked.size > 0) next(q.question, [...picked], questions.length);
-        });
-        if (picked.size === 0) done.classList.add("off");
-        row.append(done);
-      }
-      row.append(
-        h("button", {
-          class: "link-btn",
-          style: "color:#8e939c",
-          text: tl("Answer in terminal"),
-          onclick: () => actions.answerInTerminal(),
-        }),
-      );
-    },
-  };
-}
-
 // ── Error ─────────────────────────────────────────────────────────────────────
 
 function buildError(actions: ViewActions): ViewHost {
@@ -725,10 +486,10 @@ function buildError(actions: ViewActions): ViewHost {
       const task = State.focusTask;
       clear(who);
       // agentWho already shows an agent's name: its label is just the kind.
-      const whoLabel = task?.source === "n8n" ? "n8n" : task?.source === "agent" ? t("Agent") : "Claude Code";
+      const whoLabel = task?.source === "n8n" ? "n8n" : t("Agent");
       who.append(agentWho(task, whoLabel));
       title.textContent = task?.source === "n8n" ? t("Workflow stopped.") : t("Session stopped on an error.");
-      detail.textContent = (task && lastTextStep(task.steps)) ?? t("No detail available.");
+      detail.textContent = task?.steps[task.steps.length - 1] ?? t("No detail available.");
     },
   };
 }
@@ -738,9 +499,8 @@ function buildError(actions: ViewActions): ViewHost {
 function buildFinished(actions: ViewActions): ViewHost {
   const who = h("div");
   const title = h("div", { class: "title one-line" });
-  const open = btn(tl("Open terminal"), "primary", () => actions.openTerminal());
   const row = h("div", { class: "actions" },
-    open,
+    btn(tl("Open in HQ"), "primary", () => actions.openTarget()),
     btn(tl("OK"), "secondary", () => actions.collapse()),
   );
   const el = h("div", { class: "view" }, card("green", stack(116, 16, who, title, row)));
@@ -748,15 +508,10 @@ function buildFinished(actions: ViewActions): ViewHost {
     el,
     sync() {
       clear(who);
-      const agent = State.focusTask?.source === "agent";
-      who.append(agentWho(State.focusTask, agent ? t("finished") : t("Claude Code finished")));
-      // The final message, else the last step that is not a diff (FinishedView).
+      who.append(agentWho(State.focusTask, t("finished")));
+      // The task's summary, else its last step.
       const task = State.focusTask;
-      title.textContent = task?.finalLine || (task && lastTextStep(task.steps)) || t("Session finished");
-      // Sessions from the Claude desktop app live there, not in a terminal.
-      const label = task?.id === "agent_claude-desktop" ? t("Open Claude") : t("Open terminal");
-      const span = open.firstElementChild as HTMLElement;
-      if (span.textContent !== label) span.textContent = label;
+      title.textContent = task?.finalLine || task?.steps[task.steps.length - 1] || t("Session finished");
     },
   };
 }
@@ -798,7 +553,6 @@ function buildSettings(actions: ViewActions): ViewHost {
   const segButtons = [10, 15, 30].map((s) =>
     h("button", { onclick: () => actions.setAutoClose(s) }, `${s}s`),
   );
-  const claudeBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
 
   const rows = h(
@@ -815,7 +569,6 @@ function buildSettings(actions: ViewActions): ViewHost {
     h(
       "div",
       { class: "settings-row", style: "gap:14px" },
-      claudeBadge,
       apiBadge,
       h("div", { class: "grow" }),
       h("button", {
@@ -839,11 +592,6 @@ function buildSettings(actions: ViewActions): ViewHost {
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
       autoLabel.textContent = t("Auto-close · {seconds}s", { seconds: Math.round(s.autoCloseInterval) });
       segButtons.forEach((b, i) => b.classList.toggle("on", s.autoCloseInterval === [10, 15, 30][i]));
-      clear(claudeBadge);
-      claudeBadge.append(
-        dot(s.hooksInstalled ? "#22C55E" : "#F4505E", 6),
-        h("span", { text: "Claude Code" }),
-      );
       clear(apiBadge);
       apiBadge.append(dot("#F4505E", 6), h("span", { text: "API" }));
     },
@@ -872,7 +620,6 @@ export function buildViews(
   map.set("overview", buildOverview(actions));
   map.set("empty", buildEmpty(actions));
   map.set("approval", buildApproval(actions));
-  map.set("question", buildQuestion(actions));
   map.set("error", buildError(actions));
   map.set("finished", buildFinished(actions));
   map.set("confused", buildConfused());
@@ -882,7 +629,6 @@ export function buildViews(
   map.set("upload", buildUpload());
   map.set("uploading", buildUploading());
   map.set("choose", buildChoose(actions));
-  map.set("recap", buildRecap(actions));
   map.set("wardrobe", buildWardrobe(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));

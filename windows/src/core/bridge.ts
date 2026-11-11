@@ -6,7 +6,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Settings } from "./state";
-import type { RecapHistory, RecapPrefs } from "../recap/summary";
 import type { SpotifyState } from "./spotify";
 
 export const IS_TAURI =
@@ -27,155 +26,8 @@ export interface BootInfo {
   /** Logical screen rect of the monitor the island lives on. */
   screen: { x: number; y: number; width: number; height: number; scale: number };
   version: string;
-  hookPath: string;
   /** False where the OS has no global cursor (Wayland): see Island.followPageCursor. */
   cursorPoll: boolean;
-}
-
-/** The phone link (src-tauri/src/phone_link): how it is, never its secrets. */
-export interface PhoneLinkStatus {
-  enabled: boolean;
-  running: boolean;
-  port: number;
-  host: string;
-  name: string;
-  clients: number;
-  error: string | null;
-  /** The relay connection ("Away from home Wi-Fi"). */
-  relayState: PhoneRelayState;
-}
-
-export type PhoneRelayState = "off" | "connecting" | "waiting" | "linked" | "accessRefused" | "unreachable" | "roomTaken" | "tooMany";
-
-/** The relay switch and address. The access key is write-only: only whether one is stored comes back. */
-export interface PhoneRelayStatus {
-  enabled: boolean;
-  url: string;
-  hasAccess: boolean;
-  state: PhoneRelayState;
-}
-
-/** Session details for the phone: the switch (off by default). */
-export interface PhoneDetailsStatus {
-  enabled: boolean;
-}
-
-/** Chat from the phone: the switch and the models the phone may use ("provider/model"). */
-export interface PhoneChatStatus {
-  enabled: boolean;
-  models: string[];
-}
-
-/** What the settings window shows to pair a phone. Only the settings window may ask. */
-export interface PhoneLinkPairing {
-  link: string;
-  qrSvg: string;
-  host: string;
-  port: number;
-  name: string;
-  /** The relay's host when this link also carries the relay fields. */
-  relay: string | null;
-}
-
-/** One session as the phone sees it; Rust stamps `updatedAt`. */
-export interface PhoneLinkSession {
-  pillId: string;
-  agent: string;
-  state: string;
-  statusText: string;
-  stepIndex: number;
-  stepCount: number;
-  /** Details, for a phone that has the capability (the user's switch). */
-  steps?: string[];
-  finalLine?: string;
-  /** A folder name, never a path. */
-  project?: string;
-  color?: string;
-  /** The files this session changed, for a phone that has `diffs` (Rust cuts them to a name and a count). */
-  files?: PhoneLinkFile[];
-}
-
-export interface PhoneLinkFile {
-  id: number;
-  /** A file name; Rust keeps only its last segment. */
-  name: string;
-  added: number;
-  removed: number;
-  tooLarge?: boolean;
-  isNew?: boolean;
-}
-
-/** One file's diff for the phone that asked: lines as [kind, text], kind "+", "-", " " or "@" (a hunk's first line). */
-export interface PhoneLinkDiff {
-  pillId: string;
-  fileId: number;
-  name: string;
-  added: number;
-  removed: number;
-  tooLarge: boolean;
-  gone: boolean;
-  lines: [string, string][];
-}
-
-/** One plan window for the phone: used percentage (as the island has it) and when it resets (epoch ms). */
-export interface PhoneLinkWindow {
-  usedPct: number;
-  resetsAt: number;
-}
-
-export interface PhoneLinkPlan {
-  fiveHour?: PhoneLinkWindow;
-  sevenDay?: PhoneLinkWindow;
-  resetCredits?: number;
-  planType?: string;
-  updatedAt: number;
-}
-
-export interface PhoneLinkUsage {
-  claude: PhoneLinkPlan | null;
-  codex: PhoneLinkPlan | null;
-}
-
-/** What one service pill says, for a phone whose user allowed it (Rust cuts every text to size). */
-export interface PhoneLinkService {
-  id: string;
-  title: string;
-  headline: string;
-  reason?: string;
-  items: { label: string; detail: string }[];
-}
-
-export interface PhoneServicesStatus {
-  /** The services allowed for the phone. */
-  services: string[];
-}
-
-export interface PhoneUsageStatus {
-  enabled: boolean;
-}
-
-export interface PhoneDiffsStatus {
-  enabled: boolean;
-}
-
-export interface PhoneLinkApproval {
-  requestId: string;
-  sessionId: string;
-  pillId: string;
-  tool: string;
-  command: string;
-}
-
-/** The question Claude Code is waiting on, for a phone that may answer it (phone_link/hub.rs). */
-export interface PhoneLinkQuestion {
-  requestId: string;
-  sessionId: string;
-  pillId: string;
-  questions: { question: string; options: { label: string; description: string }[]; multiSelect: boolean }[];
-}
-
-export interface PhoneAnswersStatus {
-  enabled: boolean;
 }
 
 export const Bridge = {
@@ -214,22 +66,6 @@ export const Bridge = {
   /** Tells the island to read the sounds folder again ("sounds-changed"). */
   reloadSounds: () => call<void>("reload_sounds"),
 
-  /** "Open terminal" → opens the folder in VS Code when `code` is on PATH. */
-  openInVSCode: (path: string | null) => call<boolean>("open_in_vscode", { path }),
-
-  /**
-   * "Open terminal": the window the session runs in when Rust found it
-   * (Windows; Linux on X11 and KDE Plasma), else the folder in VS Code.
-   */
-  openSession: (sessionId: string | null, path: string | null) =>
-    call<boolean>("open_session", { sessionId, path }),
-
-  /** The Claude desktop app, for the Claude Desktop pill (Windows only). */
-  openClaudeDesktop: () => call<boolean>("open_claude_desktop"),
-
-  /** The diff card's ↗: an existing file, in VS Code; never launched by its type. */
-  openFileInVSCode: (path: string) => call<boolean>("open_file_in_vscode", { path }),
-
   quit: () => call<void>("quit_app"),
 
   openSettingsWindow: () => call<void>("open_settings_window"),
@@ -237,100 +73,17 @@ export const Bridge = {
   openHubPage: (page: string) => call<void>("open_settings_window", { page }),
   /** Shows Coucou HQ, on that agent's thread when given. */
   showHq: (agentId?: string | null) => call<void>("show_hq", { agentId: agentId ?? null }),
+  openHqAtLaunch: () => call<boolean>("open_hq_at_launch"),
   /** Whether Coucou HQ is on screen; false outside Tauri. Asked once at load, then `hq-visible`. */
   hqShown: async (): Promise<boolean> => (await call<boolean>("hq_shown")) ?? false,
 
   /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
-  // ── Claude Code hooks ─────────────────────────────────────────────────────
-  hooksStatus: () => call<HookStatus>("hooks_status"),
-  /** Pill ID → whether that agent's hooks reach Coucou (read-only, Mac #183). */
-  agentHooksStatus: () => call<Record<string, boolean>>("agent_hooks_status"),
-  /** Diff to show before anything is written. `install: false` previews removal. */
-  hooksPreview: (install: boolean) => callOrThrow<HookPreview>("hooks_preview", { install }),
-  /**
-   * Writes ~/.claude/settings.json — only ever after an explicit click, and only
-   * when the file still matches the preview the user looked at.
-   */
-  hooksApply: (install: boolean, fingerprint: string) =>
-    callOrThrow<string>("hooks_apply", { install, fingerprint }),
-
-  // ── Other agents (Gemini CLI, Codex, Cursor…) ─────────────────────────────
-  agentHooksList: () => call<AgentHookStatus[]>("agent_hooks_list"),
-  /** Diff to show before anything is written. `install: false` previews removal. */
-  agentHooksPreview: (agent: string, install: boolean) =>
-    callOrThrow<AgentHookPlan>("agent_hooks_preview", { agent, install }),
-  /**
-   * Writes the agent's config — only ever after an explicit click, and only when
-   * it still matches the preview the user looked at. Returns the backups taken.
-   */
-  agentHooksApply: (agent: string, install: boolean, fingerprint: string) =>
-    callOrThrow<string>("agent_hooks_apply", { agent, install, fingerprint }),
-  // ── Plan usage: the status line relay, installed apart from the hooks ──────
-  /** Diff of the status line change. `install: false` previews taking the relay out. */
-  statusLinePreview: (install: boolean) => callOrThrow<HookPreview>("status_line_preview", { install }),
-  /** Same rules as hooksApply: an explicit click, and only for the diff that was shown. */
-  statusLineApply: (install: boolean, fingerprint: string) =>
-    callOrThrow<string>("status_line_apply", { install, fingerprint }),
-  /**
-   * Asks the Codex CLI (`codex app-server`) for its plan limits, as Codex's
-   * /status does. The raw `account/rateLimits/read` result, or null when Codex
-   * is missing, not signed in or slow (15 s).
-   */
-  codexPlanUsage: () => call<unknown>("codex_plan_usage"),
-
+  /** Allow or Deny on the island's card, for an orchestrator agent's request. */
   approvalDecision: (requestId: string, decision: "allow" | "deny") =>
     call<void>("approval_decision", { requestId, decision }),
-  /** "The card is up" — until this lands the relay only waits a moment. */
-  approvalAck: (requestId: string) => call<void>("approval_ack", { requestId }),
-  /** Answers a question Claude Code asked: question text → chosen label. */
-  approvalAnswer: (requestId: string, answers: Record<string, string | string[]>) =>
-    call<void>("approval_answer", { requestId, answers }),
 
-  /** "Nobody can act on this" — Claude Code asks in the terminal right away. */
-  approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
-
-  // ── Phone link (Coucou for Android) ───────────────────────────────────────
-  phoneLinkStatus: () => call<PhoneLinkStatus>("phone_link_status"),
-  /** Only ever from the switch in Settings. Throws with the reason if it cannot start. */
-  phoneLinkSetEnabled: (enabled: boolean) => callOrThrow<PhoneLinkStatus>("phone_link_set_enabled", { enabled }),
-  phoneLinkPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_pairing"),
-  /** A new code: the phone that had the old one is disconnected. */
-  phoneLinkNewPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_new_pairing"),
-  phoneDetailsStatus: () => call<PhoneDetailsStatus>("phone_details_status"),
-  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
-  phoneDetailsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDetailsStatus>("phone_details_set_enabled", { enabled }),
-  phoneAnswersStatus: () => call<PhoneAnswersStatus>("phone_answers_status"),
-  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
-  phoneAnswersSetEnabled: (enabled: boolean) => callOrThrow<PhoneAnswersStatus>("phone_answers_set_enabled", { enabled }),
-  phoneDiffsStatus: () => call<PhoneDiffsStatus>("phone_diffs_status"),
-  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
-  phoneDiffsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDiffsStatus>("phone_diffs_set_enabled", { enabled }),
-  /** The answer to a phone's request for a file's diff (the "phone-link-getdiff" event); `conn` says which phone. */
-  phoneLinkSendDiff: (conn: number, diff: PhoneLinkDiff) => call<void>("phone_link_send_diff", { conn, diff }),
-  phoneServicesStatus: () => call<PhoneServicesStatus>("phone_services_status"),
-  /** None by default; only from the ticks in Settings. Phones are reconnected so they learn about it. */
-  phoneServicesSet: (services: string[]) => callOrThrow<PhoneServicesStatus>("phone_services_set", { services }),
-  phoneLinkPublishServices: (services: PhoneLinkService[]) => call<void>("phone_link_publish_services", { services }),
-  phoneRelayStatus: () => call<PhoneRelayStatus>("phone_relay_status"),
-  /** Off by default; needs a valid wss:// address and a stored access key. */
-  phoneRelaySet: (enabled: boolean, url: string) => callOrThrow<PhoneRelayStatus>("phone_relay_set", { enabled, url }),
-  /** Write-only: stored in the OS keystore, never sent back. An empty value clears it. */
-  phoneRelaySetAccess: (access: string) => callOrThrow<PhoneRelayStatus>("phone_relay_set_access", { access }),
-  phoneUsageStatus: () => call<PhoneUsageStatus>("phone_usage_status"),
-  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
-  phoneUsageSetEnabled: (enabled: boolean) => callOrThrow<PhoneUsageStatus>("phone_usage_set_enabled", { enabled }),
-  phoneLinkPublishUsage: (usage: PhoneLinkUsage) => call<void>("phone_link_publish_usage", { usage }),
-  phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
-  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
-  phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),
-  phoneChatSetModels: (models: string[]) => callOrThrow<PhoneChatStatus>("phone_chat_set_models", { models }),
-  phoneLinkPublish: (sessions: PhoneLinkSession[], approval: PhoneLinkApproval | null) =>
-    call<void>("phone_link_publish", { sessions, approval }),
-  phoneLinkPublishQuestion: (question: PhoneLinkQuestion | null) => call<void>("phone_link_publish_question", { question }),
-  /** What Mochi wears ("auto" or an outfit), for phones that asked for it. */
-  phoneLinkPublishPrefs: (outfit: string) => call<void>("phone_link_publish_prefs", { outfit }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
   /** One chat turn. The API key and any file bytes never leave Rust. */
@@ -370,20 +123,6 @@ export const Bridge = {
   shortcutsStatus: () => call<ShortcutsReport>("shortcuts_status"),
   /** Lets go of every global shortcut while Settings records a new one. */
   shortcutsSuspend: (suspended: boolean) => call<void>("shortcuts_suspend", { suspended }),
-
-  // ── Weekly recap ──────────────────────────────────────────────────────────
-  /** Turns and decisions from `since` (Unix seconds) on, plus the recap prefs. */
-  recapHistory: (since: number) => call<RecapHistory>("recap_history", { since: Math.floor(since) }),
-  recapPrefs: () => call<RecapPrefs>("recap_prefs"),
-  recapSetEnabled: (enabled: boolean) => call<void>("recap_set_enabled", { enabled }),
-  recapSetHideProjects: (hide: boolean) => call<void>("recap_set_hide_projects", { hide }),
-  /** `week` is the Monday (YYYY-MM-DD) the recap opened on its own for. */
-  recapMarkShown: (week: string) => call<void>("recap_mark_shown", { week }),
-  recapClear: () => call<void>("recap_clear"),
-  /** Writes the PNG (a data URL) into Pictures or Downloads; returns its path. */
-  recapSavePng: (data: string, week: string) => callOrThrow<string>("recap_save_png", { data, week }),
-  /** Opens the folder of the image saved last. */
-  recapRevealSaved: () => call<void>("recap_reveal_saved"),
 
   // ── Mochi on the desktop (src-tauri/src/desktop.rs) ───────────────────────
   desktopInfo: () => call<DesktopInfo>("desktop_mochi_info"),
@@ -483,46 +222,6 @@ export interface DroppedFile {
   name: string;
   path: string;
   size: number;
-}
-
-export interface HookStatus {
-  installed: boolean;
-  /** Coucou's status line relay (plan usage) is the status line in settings.json. */
-  planRelayInstalled: boolean;
-  settingsPath: string;
-  hookPath: string;
-  hookReady: boolean;
-}
-
-/** One agent other than Claude Code, as agents.rs reports it. */
-export interface AgentHookStatus {
-  /** The `--agent` name; its pill is `agent_<id>`. */
-  id: string;
-  name: string;
-  installed: boolean;
-  /** The file (or files, one per line) Coucou writes. */
-  path: string;
-  hookReady: boolean;
-  /** The island can allow or deny this agent's permission requests. */
-  approvals: boolean;
-  /** What to do once it is written. */
-  note: string;
-}
-
-export interface AgentHookPlan {
-  diff: string;
-  /** Where each existing file is copied first, one per line; "" when none. */
-  backup: string;
-  path: string;
-  fingerprint: string;
-}
-
-export interface HookPreview {
-  diff: string;
-  backup: string;
-  settingsPath: string;
-  /** Hand back to hooksApply so only the reviewed diff is ever written. */
-  fingerprint: string;
 }
 
 /** Same as `call`, but surfaces the error so the UI can show what went wrong. */

@@ -21,23 +21,11 @@ pub struct Settings {
     pub open_on_hover: bool,
     pub absence_interval: f64,
     pub active_integrations: Vec<String>,
-    /// The always-on workspace pill (src/core/pills.ts checks it is one).
-    pub main_pill: String,
     /// "primary" = the main display, "cursor" = whichever display the mouse is on.
     pub screen: String,
     pub autostart: bool,
-    pub hooks_installed: bool,
     /// Claude model used by the chat. Changeable in the settings window.
     pub model: String,
-    /// Show the Claude plan pill (5 h and weekly limits) in the island's header.
-    /// Off until the user turns it on, so the header stays as it shipped.
-    pub show_plan_in_notch: bool,
-    /// Coucou's status line relay is the one in Claude Code's settings.json.
-    /// Like `hooks_installed`, the real state wins at launch over what was stored.
-    pub plan_relay_installed: bool,
-    /// Show the Codex plan pill (5 h / weekly limits from `codex app-server`).
-    /// Off by default; nothing is installed for it.
-    pub show_codex_plan_in_notch: bool,
     /// Who the chat talks to: "anthropic", a cloud provider of
     /// openai_compat.rs ("openai", "google", "openrouter"), or a model server
     /// of local_chat.rs ("ollama", "lmstudio", "custom"). Picked in the chat view.
@@ -75,34 +63,6 @@ pub struct Settings {
     /// Mochi on the desktop: whether he lives there, and his spot. Owned by
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
-    /// The phone link (phone_link/) is on: a TLS server for the Android app on
-    /// the local network. Off until the user turns it on in Settings → Phone;
-    /// owned by the Rust side, so what a webview sends back is ignored.
-    pub phone_link: bool,
-    /// The phone may chat through this computer's API keys (phone_link/chat.rs).
-    /// Off until the user turns it on in Settings → Android phone; owned by the
-    /// Rust side like `phone_link`, so what a webview sends back is ignored.
-    pub phone_chat: bool,
-    /// Which models the phone may use, as "provider/model". Empty allows none.
-    /// Also owned by the Rust side (phone_link::set_chat_models cleans it).
-    pub phone_chat_models: Vec<String>,
-    /// The phone may see session details (steps, last line, project folder name, colour). Off until the
-    /// user turns it on in Settings → Android phone; owned by the Rust side like `phone_link`.
-    pub phone_details: bool,
-    /// Let the phone answer the questions Claude Code asks (cap `answers`). Off by default; owned by Rust like the other phone switches.
-    pub phone_answers: bool,
-    /// Show the files an agent changed on the phone, and their diffs on request (cap `diffs`). Off by default; owned by Rust like the other phone switches.
-    pub phone_diffs: bool,
-    /// Show the Claude and Codex plan usage on the phone (cap `usage`). Off by default; owned by Rust like the other phone switches.
-    pub phone_usage: bool,
-    /// The service pills whose cards the phone may see, by pill id (cap `services`). None by default; owned by Rust like the other phone switches.
-    pub phone_services: Vec<String>,
-    /// Reach the phone through the user's own relay when it is not on this network (phone_link/relay_client.rs).
-    /// Off by default; owned by Rust like the other phone switches. The access key, the room and the pairing key live
-    /// in the OS keystore, never here.
-    pub phone_relay: bool,
-    /// The relay's address (`wss://…`), empty until the user enters it. Not a secret. Owned by Rust.
-    pub phone_relay_url: String,
     /// The date and time in the middle of the compact island. Off by default.
     pub show_clock: bool,
 }
@@ -142,14 +102,9 @@ impl Default for Settings {
                 "integration_vercel".into(),
                 "integration_github".into(),
             ],
-            main_pill: "integration_claude".into(),
             screen: "primary".into(),
             autostart: false,
-            hooks_installed: false,
             model: default_model(),
-            show_plan_in_notch: false,
-            plan_relay_installed: false,
-            show_codex_plan_in_notch: false,
             chat_provider: crate::chat::ANTHROPIC.into(),
             chat_models: BTreeMap::new(),
             ollama_url: String::new(),
@@ -162,26 +117,12 @@ impl Default for Settings {
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
-            phone_link: false,
-            phone_chat: false,
-            phone_chat_models: Vec::new(),
-            phone_details: false,
-            phone_answers: false,
-            phone_diffs: false,
-            phone_usage: false,
-            phone_services: Vec::new(),
-            phone_relay: false,
-            phone_relay_url: String::new(),
             show_clock: false,
         }
     }
 }
 
 pub use crate::platform::{config_dir, local_dir};
-
-pub fn hook_exe_path() -> PathBuf {
-    local_dir().join("bin").join(crate::platform::HOOK_EXE)
-}
 
 fn settings_path() -> PathBuf {
     config_dir().join("settings.json")
@@ -432,14 +373,9 @@ mod tests {
   "openOnHover": true,
   "absenceInterval": 60.0,
   "activeIntegrations": ["integration_notion"],
-  "mainPill": "agent_cursor",
   "screen": "cursor",
   "autostart": true,
-  "hooksInstalled": true,
   "model": "some-model",
-  "showPlanInNotch": true,
-  "planRelayInstalled": true,
-  "showCodexPlanInNotch": true,
   "chatProvider": "ollama",
   "chatModels": { "ollama": "llama3.2", "openai": "gpt-x" },
   "ollamaUrl": "http://127.0.0.1:11434",
@@ -452,16 +388,6 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "phoneLink": true,
-  "phoneChat": true,
-  "phoneChatModels": ["openai/gpt-x"],
-  "phoneDetails": true,
-  "phoneAnswers": true,
-  "phoneDiffs": true,
-  "phoneUsage": true,
-  "phoneServices": ["integration_stripe"],
-  "phoneRelay": true,
-  "phoneRelayUrl": "wss://relay.example.workers.dev",
   "showClock": true
 }"##;
 
@@ -569,100 +495,6 @@ mod tests {
     }
 
     #[test]
-    fn a_file_from_before_the_phone_link_keeps_it_off() {
-        // The link opens a port on the local network: it is never on by default,
-        // and an older file must not be read as consent.
-        assert!(!Settings::default().phone_link);
-        let loaded = parse(&custom_with("phoneLink", None)).unwrap();
-        assert!(!loaded.phone_link);
-        assert_eq!(loaded.mochi_outfit, "witchHat");
-        assert!(parse(&custom_with("phoneLink", Some(serde_json::json!(true)))).unwrap().phone_link);
-
-        // A value of the wrong type does not switch it on either, and costs nothing else.
-        let (dir, file) = scratch("phone-link");
-        std::fs::write(&file, custom_with("phoneLink", Some(serde_json::json!("yes")))).unwrap();
-        let odd = load_from(&file);
-        assert!(!odd.phone_link);
-        assert_eq!(odd.mochi_outfit, "witchHat");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn a_file_from_before_phone_chat_keeps_it_off_and_empty() {
-        // Chat spends the user's API credit: never on by default, and an older file is not consent.
-        let d = Settings::default();
-        assert!(!d.phone_chat);
-        assert!(d.phone_chat_models.is_empty());
-        let loaded = parse(&custom_with("phoneChat", None)).unwrap();
-        assert!(!loaded.phone_chat);
-        assert!(parse(&custom_with("phoneChat", Some(serde_json::json!(true)))).unwrap().phone_chat);
-        let odd = parse(&custom_with("phoneChat", Some(serde_json::json!("yes")))).unwrap();
-        assert!(!odd.phone_chat, "a wrong type does not switch it on");
-        assert_eq!(odd.mochi_outfit, "witchHat");
-        let models = parse(&custom_with("phoneChatModels", Some(serde_json::json!(["openai/gpt-x"])))).unwrap();
-        assert_eq!(models.phone_chat_models, vec!["openai/gpt-x".to_string()]);
-        let bad = parse(&custom_with("phoneChatModels", Some(serde_json::json!("openai/gpt-x")))).unwrap();
-        assert!(bad.phone_chat_models.is_empty());
-    }
-
-    #[test]
-    fn a_file_from_before_phone_answers_keeps_it_off() {
-        // Answering for the agent from the phone is never on by default; an older file is not consent.
-        assert!(!Settings::default().phone_answers);
-        assert!(!parse(&custom_with("phoneAnswers", None)).unwrap().phone_answers);
-        assert!(parse(&custom_with("phoneAnswers", Some(serde_json::json!(true)))).unwrap().phone_answers);
-        assert!(!parse(&custom_with("phoneAnswers", Some(serde_json::json!("yes")))).unwrap().phone_answers, "a wrong type does not switch it on");
-    }
-
-    #[test]
-    fn a_file_from_before_phone_diffs_keeps_it_off() {
-        // Showing what an agent changed on the phone is never on by default; an older file is not consent.
-        assert!(!Settings::default().phone_diffs);
-        assert!(!parse(&custom_with("phoneDiffs", None)).unwrap().phone_diffs);
-        assert!(parse(&custom_with("phoneDiffs", Some(serde_json::json!(true)))).unwrap().phone_diffs);
-        assert!(!parse(&custom_with("phoneDiffs", Some(serde_json::json!("yes")))).unwrap().phone_diffs, "a wrong type does not switch it on");
-    }
-
-    #[test]
-    fn a_file_from_before_phone_usage_keeps_it_off() {
-        assert!(!Settings::default().phone_usage);
-        assert!(!parse(&custom_with("phoneUsage", None)).unwrap().phone_usage);
-        assert!(parse(&custom_with("phoneUsage", Some(serde_json::json!(true)))).unwrap().phone_usage);
-        assert!(!parse(&custom_with("phoneUsage", Some(serde_json::json!("yes")))).unwrap().phone_usage, "a wrong type does not switch it on");
-    }
-
-    #[test]
-    fn a_file_from_before_the_relay_keeps_it_off_and_empty() {
-        assert!(!Settings::default().phone_relay);
-        assert!(Settings::default().phone_relay_url.is_empty());
-        let old = parse(&custom_with("phoneRelay", None)).unwrap();
-        assert!(!old.phone_relay);
-        assert!(parse(&custom_with("phoneRelay", Some(serde_json::json!(true)))).unwrap().phone_relay);
-        assert!(!parse(&custom_with("phoneRelay", Some(serde_json::json!("yes")))).unwrap().phone_relay, "a wrong type does not switch it on");
-        assert!(parse(&custom_with("phoneRelayUrl", Some(serde_json::json!(5)))).unwrap().phone_relay_url.is_empty());
-    }
-
-    #[test]
-    fn a_file_from_before_phone_services_shows_none() {
-        // Showing a service on the phone is never on by default; an older file is not consent.
-        assert!(Settings::default().phone_services.is_empty());
-        assert!(parse(&custom_with("phoneServices", None)).unwrap().phone_services.is_empty());
-        assert_eq!(parse(&custom_with("phoneServices", Some(serde_json::json!(["integration_stripe"])))).unwrap().phone_services, vec!["integration_stripe".to_string()]);
-        assert!(parse(&custom_with("phoneServices", Some(serde_json::json!("integration_stripe")))).unwrap().phone_services.is_empty(), "a wrong type shows none");
-    }
-
-    #[test]
-    fn a_file_from_before_phone_details_keeps_them_off() {
-        // Details can include commands and folder names: never on by default, an older file is not consent.
-        assert!(!Settings::default().phone_details);
-        assert!(!parse(&custom_with("phoneDetails", None)).unwrap().phone_details);
-        assert!(parse(&custom_with("phoneDetails", Some(serde_json::json!(true)))).unwrap().phone_details);
-        let odd = parse(&custom_with("phoneDetails", Some(serde_json::json!("yes")))).unwrap();
-        assert!(!odd.phone_details, "a wrong type does not switch it on");
-        assert_eq!(odd.mochi_outfit, "witchHat");
-    }
-
-    #[test]
     fn a_half_written_desktop_spot_costs_only_the_spot() {
         let loaded = parse(&custom_with(
             "desktopMochi",
@@ -724,7 +556,6 @@ mod tests {
             ("soundVolume", json!("loud")),
             ("soundEnabled", json!(1)),
             ("activeIntegrations", json!("integration_n8n")),
-            ("mainPill", json!(["agent_cursor"])),
             ("screen", Value::Null),
             ("shortcuts", json!("Ctrl+Alt+A")),
         ] {
@@ -942,14 +773,9 @@ mod tests {
                 "openOnHover",
                 "absenceInterval",
                 "activeIntegrations",
-                "mainPill",
                 "screen",
                 "autostart",
-                "hooksInstalled",
                 "model",
-                "showPlanInNotch",
-                "planRelayInstalled",
-                "showCodexPlanInNotch",
                 "chatProvider",
                 "chatModels",
                 "ollamaUrl",
@@ -962,16 +788,6 @@ mod tests {
                 "pillColors",
                 "language",
                 "desktopMochi",
-                "phoneLink",
-                "phoneChat",
-                "phoneChatModels",
-                "phoneDetails",
-                "phoneAnswers",
-                "phoneDiffs",
-                "phoneUsage",
-                "phoneServices",
-                "phoneRelay",
-                "phoneRelayUrl",
                 "showClock",
             ]
         );
