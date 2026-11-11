@@ -1,46 +1,32 @@
-# Contributing to Coucou
+# Contributing to Coucou HQ
 
-Thanks for wanting to help Mochi grow up! 🫶
+Thanks for wanting to help Mochi and his team.
 
 ## Getting started
 
-```bash
-brew install xcodegen
-cd NotchBuddy && xcodegen && open NotchBuddy.xcodeproj
+```powershell
+cd orchestrator; npm install; npm start          # the backend (see orchestrator/README.md for the computers)
+cd windows; npm install; npm run tauri dev       # the app
 ```
 
-Never edit `NotchBuddy.xcodeproj` by hand: change `project.yml` and run `xcodegen`.
+Before opening a pull request:
 
-Check resting island dimensions on screens with and without a notch:
-
-```bash
-bash scripts/test-screen-geometry.sh
-bash scripts/test-display-choice.sh
-```
-
-Check auto-close timing and live setting changes:
-
-```bash
-bash scripts/test-auto-close.sh
+```powershell
+cd windows; npx tsc --noEmit; npm test; cargo test
+cd orchestrator; npm run typecheck; npm test
 ```
 
 ## Good first contributions
 
-- A new service integration (a poller + an entry in `PillCatalog.swift` in the `.service` category + a detail card). Look at `StripePoller.swift` for a compact example.
-- A new agent: any agent already gets its own automatic pill by sending `coucou_agent` in its hook payload (see `docs/AGENTS.md`). Add an entry in `PillCatalog.swift` in the `.agent` or `.workspace` category only if you want it to be declarable in Settings → Active pills.
+- A new operation for the agents: add it to `orchestrator/protocol/src/ops.ts`, decide its rule in the policy, run it in the worker, and test it in `orchestrator/tests/`.
+- A new service pill: a poller in `windows/src-tauri/src/integrations.rs`, an entry in `windows/src/core/pills.ts` and a card in `windows/src/views/integrations.ts`.
 - A new emote or sound for Mochi.
 - Bug fixes — please describe how to reproduce.
 
 ## Rules of the house
 
-- Swift 6, SwiftUI + AppKit, **no third-party dependencies** unless there's really no other way.
-- Secrets go in the Keychain, never on disk or in git.
+- No third-party dependencies unless there's really no other way.
+- Secrets go in the Windows Credential Manager, never on disk or in git.
 - No telemetry, no network calls except to services the user configured.
-- Never block Claude Code: if the app doesn't answer, the hook must exit right away.
-- Never write `~/.claude/settings.json` without a backup and the user's confirmation.
-- Keep it light: 0 % CPU when the island is hidden.
-
-## Pull requests
-
-- One topic per PR, with a short GIF or screenshot for anything visual.
-- Build must pass with no new warnings.
+- Nothing risky without the user's click: approvals, new agents, pushes.
+- Every string on screen is translated (`windows/src/i18n/extra.json`).

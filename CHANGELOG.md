@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Coucou HQ
+
+Coucou becomes Coucou HQ: a team of AI agents on their own computers, run from
+Windows. Everything that did not serve that goes.
+
+- **Coucou HQ is the front door** — it opens after Mochi's greeting, from the
+  tray and when you launch Coucou again (Flow → Settings → App → Open Coucou HQ
+  when you open Coucou). `Ctrl+Alt+T` and a finished task's **Open in HQ** open
+  it on the agent's thread
+- **The island follows your agents** — their pills come first; up to four chat
+  or service pills follow. The approval card, the steps and the summaries are
+  the agents'
+- **Removed** — the Mac, iPhone, Android and Linux apps, the relay, Homebrew
+  and Nix; watching your own Claude Code, Codex, Gemini CLI… sessions (the
+  coucou-hook relay and its installers, live diffs, Claude Code's questions,
+  "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
+  recap; the Android phone link; the Mac backend on Lima VMs. All of it stays in
+  the history at the tag `pre-hq-focus`
+- The translations are now Coucou's own (`windows/src/i18n`), without the 600
+  strings nothing used any more
+
+
 ## 0.5.1 — October 18, 2026
 
 - **WhatsApp in one click** *(macOS, GitHub build)* — no more GitHub, zip or Terminal: Settings → Integrations → WhatsApp → **Install WhatsApp**. Coucou downloads GOWA, the open-source gateway, for your Mac (about 15 MB, once), checks it against the SHA-256 GOWA publishes, starts it, and shows the QR code to scan. It starts and stops with Coucou, and **Update** fetches GOWA's latest version. Your own gateway (GOWA by hand, OpenWA, another address) moves under **Advanced**

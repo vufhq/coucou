@@ -200,8 +200,8 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    *"Open the documentation for httpx, find the current installation
    instructions, and save a summary to report.md."*
 
-   Each agent then has a pill in the island that stays, after Claude Code and
-   Cursor, like a ChatGPT dot: its mini Mochi works, asks and finishes with
+   Each agent then has a pill in the island that stays, first in the row,
+   like a ChatGPT dot: its mini Mochi works, asks and finishes with
    its tasks, and dims when its computer is off. Pick it to see how it is and
    how its last task ended; **Chat with …** opens the island's chat talking to
    that agent (agents are also in the chat's model picker). Each message is a

@@ -1,33 +1,30 @@
-# Coucou — guide for AI coding agents
+# Coucou HQ — guide for AI coding agents
 
-Coucou is a native macOS app (`NotchBuddy/`); `windows/` is the Tauri version for Windows and Linux. Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer, chat and drop files from the notch.
+Coucou HQ runs a team of AI agents from a Windows desktop. `orchestrator/` is the backend (Node, SQLite) and the worker that runs in each agent's WSL2 computer; `windows/` is the app (Tauri 2): Coucou HQ, the island at the top of the screen with Mochi and a pill per agent, and the Coucou window (Flow dictation, the Notetaker, settings). Windows is the only platform.
 
 ## Where things are
-- `NotchBuddy/Sources/App/` — Mac-only Swift code. `NotchBuddy/Sources/CoucouKit/` — code shared with the iPhone app (Mochi's BotEngine and outfits, pills, diff, models). `NotchBuddy/Sources/Phone/` — iPhone app (`CoucouPhone` target), with its widgets in `Sources/Widgets/` and the expanded approval notification in `Sources/NotificationContent/`. `NotchBuddy/Resources/sounds/` — the 28 WAV sounds. `NotchBuddy/project.yml` — XcodeGen project (never edit the `.xcodeproj` by hand).
-- `NotchBuddy/Sources/CoucouKit/PillCatalog.swift` — single source of truth for all declared pills (workspace tools, agents, AI providers, services). Every pill ID, color, category and subtitle lives here.
-- `docs/SPEC.md`, `docs/INTEGRATIONS.md` — behaviour, views, states, integrations (in French).
-- `design/prototype/notch-buddy.html` — original prototype, the visual source of truth. `design/captures/` — target screenshots.
-- `windows/` — the Tauri app for Windows and Linux: Rust in `src-tauri/`, TypeScript in `src/`, the `coucou-hook` relay in `hook/`. `windows/README.md` lists what differs from the Mac.
-- `docs/*.html` — the GitHub Pages site (privacy, terms, support, legal notice).
-- `relay/` — the Coucou relay, a stateless Cloudflare Worker that forwards the iPhone Live Activity pushes (it holds the APNs key, which must never ship in an app). See `relay/README.md`.
+- `orchestrator/server/` — API and SSE (`api.ts`), worker gateway, task loop (`runner.ts`), policy, model adapters. `orchestrator/protocol/` — the Zod contracts both sides share; `protocol/src/ops.ts` is the operations allowlist. `orchestrator/worker/` — the worker and `provision/` (provision.ps1, setup.sh, the systemd units).
+- `windows/src/hq/` — Coucou HQ. `windows/src/island/` — the island; `island/hooks.ts` turns the orchestrator's events (sent by `src-tauri/src/orchestrator.rs` on the "hook" channel) into pills and the approval card. `windows/src/core/pills.ts` — the catalog pills (chat providers and services). `windows/src/i18n/` — `strings.json` and `extra.json`, both edited by hand.
+- `windows/src-tauri/src/orchestrator.rs` — Coucou's side of the backend: status, starting it, every `orchestrator_*` command.
+- `design/prototype/notch-buddy.html`, `design/captures/` — references for Mochi and new views.
 
-## Build
+## Build and check
 ```
-cd NotchBuddy && xcodegen && xcodebuild -scheme NotchBuddy -configuration Debug build
+cd windows; npm install; npm run tauri dev
+cd windows; npx tsc --noEmit; npm test; cargo test
+cd orchestrator; npm install; npm run typecheck; npm test
 ```
-To run it day to day on the Mac (signed, iPhone link, permissions kept across builds): `./scripts/dev-install.sh` — it installs the only Coucou in /Applications and removes the copies earlier builds left.
-Windows and Linux: `cd windows && npm install && npm run tauri dev`
+Never run `npm ci` in the orchestrator folder the live backend runs from: it wipes its `node_modules`.
 
 ## Rules
-- Swift 6, SwiftUI + AppKit. No third-party dependencies unless truly unavoidable. The character is drawn in code (`Canvas` + `TimelineView`), no Rive/Lottie/images.
-- Secrets live in the Keychain, never on disk or in git.
+- Mochi is drawn in code (`Canvas` 2D), no images or animation libraries. No third-party dependencies unless truly unavoidable.
+- Secrets live in the Windows Credential Manager (service `fr.louisraille.coucou`), never on disk or in git. Keep that service name: existing keys depend on it.
 - No telemetry. Network calls only to services the user configured.
-- Never block Claude Code: if the app doesn't answer, the hook exits immediately.
-- Never overwrite `~/.claude/settings.json`: dated backup, merge, show the diff, write only after the user confirms.
-- Never send an email or approve a Claude Code or Codex permission without an explicit click.
-- Performance: 0 % CPU when the island is hidden.
-- Keep the bundle identifier `fr.louisraille.NotchBuddy` (Keychain items, preferences and permissions depend on it).
-- Never restyle what already ships (pills, cards, Settings, chat…): existing views stay exactly as they are in `main`, which is the App Store build. Change the look of an existing view only when explicitly asked.
-- Pill IDs are stable contract values (Keychain, UserDefaults, hook routing): never rename an existing pill ID.
-- New views follow the existing app style. `design/prototype/notch-buddy.html` and `design/captures/` are references for new work, not a reason to change existing views.
-- Every release adds its CHANGELOG.md section, a row in the README Versions table, and commits the regenerated Info.plist with the new version.
+- Never approve an agent's request, create or retire an agent, or push to GitHub without an explicit click.
+- Never create, delete or modify a user's VM: the user runs `provision.ps1`.
+- The model never gets host access or credentials; every new operation goes through the policy and the worker's own check.
+- Performance: 0 % CPU when the island is hidden and HQ is closed.
+- Never restyle what already ships; change the look of an existing view only when asked. New views follow the existing style.
+- Pill IDs and shortcut IDs are stable contract values (settings, keys): never rename one.
+- Every user-facing string goes through `t()` / `N_()` and is translated in the nine other languages in `extra.json`; `npm test` fails on a missing or unused string.
+- Every release adds its CHANGELOG.md section.
