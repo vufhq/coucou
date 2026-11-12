@@ -89,8 +89,9 @@ boundary, not each command.
   everything it started. A server started with `&` doesn't hold the command
   and keeps running. The runner may use at most 75 % of the VM's memory and
   512 processes.
-- Output streams live to Coucou; the model gets the exit code and the last
-  64 KB.
+- Output streams live to Coucou; the model gets the exit code and up to
+  20,000 characters of it, the start and the end (the middle of a longer
+  output is cut).
 
 ## Files and links in messages
 
@@ -318,8 +319,17 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 - **Operations** are an allowlist (`protocol/src/ops.ts`): navigate, extract
   text and take a screenshot in the browser; write, list and read files in the
   task's folder; run bash command lines on the computer (`terminal.shell`, see
-  The computer). The older `terminal.run` (one command, no shell, as the
-  worker's user) keeps its rules, so an outdated worker never runs free code.
+  The computer). The older `terminal.run` is retired: it started a program as
+  the worker's own user, outside the shell's sandbox, so the model can no longer
+  propose it, the policy denies it and the worker refuses it.
+- **The browser** runs in Chromium's own sandbox when the computer allows one
+  (the worker's log says when it does not). Every request and WebSocket is
+  checked against the PC and private networks; an answer that still comes from
+  a private address closes the session; and `coucou-worker.service` denies the
+  local network to the worker and its browser, whatever a name resolves to.
+- **Tool output** (pages, command output) reaches the model unchanged, inside a
+  tag whose name carries a code only the backend knows, so a page cannot close
+  its own fence and write "instructions" after it.
 - **Rule levels:** each agent has one, set only by you in HQ (`PUT
   /api/agents/:id/rules`; no model operation can change it). New and existing
   agents are at 2.
@@ -327,7 +337,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   | Level | Asks before |
   |---|---|
   | 1 Ask before everything | every step but reading files and pages |
-  | 2 Ask before risky steps | a site's first visit, `terminal.run` beyond read-only commands |
+  | 2 Ask before risky steps | a site's first visit, a first clone, a push |
   | 3 Act freely within budget | a push past `ORCH_RISKY_PER_DAY` today |
   | 4 Fully trusted | nothing below |
 

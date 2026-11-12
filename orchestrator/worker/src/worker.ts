@@ -10,7 +10,10 @@ import { statfs } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
+  MAX_ERROR_CHARS,
+  MAX_RESULT_CHARS,
   OP_NAMES,
+  clipText,
   parseOperation,
   type Job,
   type JobOutcome,
@@ -25,10 +28,10 @@ import { BrowserError, extractText, navigate, screenshot, type BrowserDriver } f
 import { fetchFile, listFiles, readText, receiveFile, writeArtifact } from "./ops/fs.ts";
 import { GitError, gitClone, gitPush, type GitOptions } from "./ops/git.ts";
 import { agentHome, runShell, type ShellRunner } from "./ops/shell.ts";
-import { CommandError, runCommand } from "./ops/terminal.ts";
+import { CommandError } from "./ops/terminal.ts";
 import { pruneTaskDirs } from "./retention.ts";
 
-export const WORKER_VERSION = "0.6.0";
+export const WORKER_VERSION = "0.6.1";
 /** How many jobs run at once. The backend sends a computer at most ORCH_TASKS_PER_COMPUTER tasks. */
 export const WORKER_SLOTS = 4;
 
@@ -75,6 +78,15 @@ export interface WorkerOptions {
   heartbeatMs?: number;
   claimWaitMs?: number;
   log?: (line: string) => void;
+}
+
+/** The outcome within the protocol's limits, whatever the operation returned. */
+export function fitOutcome(outcome: JobOutcome): JobOutcome {
+  return {
+    ...outcome,
+    ...(outcome.result === undefined ? {} : { result: clipText(outcome.result, MAX_RESULT_CHARS) }),
+    ...(outcome.error ? { error: { ...outcome.error, message: clipText(outcome.error.message, MAX_ERROR_CHARS) } } : {}),
+  };
 }
 
 export class Worker {
@@ -177,14 +189,15 @@ export class Worker {
       outcome = { status: "failed", error: { code: "interrupted", message: "this job was interrupted by a worker restart" } };
     } else {
       await this.o.journal.started(job.id);
-      outcome = await this.execute(job);
+      outcome = fitOutcome(await this.execute(job));
       await this.o.journal.finished(job.id, outcome);
     }
     await this.deliver(job.id, outcome);
     return outcome;
   }
 
-  private async deliver(jobId: string, outcome: JobOutcome): Promise<void> {
+  private async deliver(jobId: string, reported: JobOutcome): Promise<void> {
+    let outcome = reported;
     let backoff = 500;
     while (!this.stopped) {
       try {
@@ -193,6 +206,14 @@ export class Worker {
       } catch (err) {
         // 404: the backend no longer knows the job (its database was reset); nothing to deliver to.
         if (err instanceof BackendError && err.status === 404) return;
+        // Refused as it is (400, 413…): sending it again changes nothing. Say so
+        // once instead, so the task hears of it and this slot is free again.
+        if (err instanceof BackendError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
+          this.o.log(`job ${jobId}: the backend refused the report (${err.message})`);
+          if (outcome !== reported) return;
+          outcome = { status: "failed", error: { code: "failed", message: "the backend refused this operation's result" } };
+          continue;
+        }
         await sleep(backoff);
         backoff = Math.min(backoff * 2, 15_000);
       }
@@ -292,7 +313,8 @@ export class Worker {
       case "fs.receive":
         return receiveFile(ctx, args as OpArgs<"fs.receive">);
       case "terminal.run":
-        return runCommand(ctx, args as OpArgs<"terminal.run">);
+        // Retired: it ran as this worker's own user, outside the shell's sandbox.
+        return Promise.reject(new CommandError("terminal.run is no longer available: use terminal.shell"));
       case "terminal.shell":
         if (!this.o.shell) return Promise.reject(new CommandError("this computer has no shell runner"));
         return runShell(ctx, args as OpArgs<"terminal.shell">, this.o.shell);

@@ -1,7 +1,12 @@
 // The headless browser: Playwright with Chromium. One browser for the worker,
 // one context (cookies, tabs) per task, so tasks never see each other's
 // sessions. Every request is checked on its way out: the host machine, the
-// LAN and non-web schemes are blocked even after a redirect or from a script.
+// LAN and non-web schemes are blocked even after a redirect or from a script,
+// WebSockets included. That check looks a name up itself, and Chromium looks
+// it up again: a name that answers differently the second time is caught by
+// where the answer really came from (a private address closes the session),
+// and, under all of it, by coucou-worker.service's IPAddressDeny. Chromium
+// runs in its own sandbox whenever the computer allows one.
 
 import { lookup } from "node:dns/promises";
 import { access } from "node:fs/promises";
@@ -30,14 +35,16 @@ export interface BrowserDriver {
 
 export class BrowserError extends Error {}
 
-const resolved = new Map<string, boolean>();
+/** A lookup is believed this long: a name's addresses can change. */
+const RESOLVED_FOR_MS = 60_000;
+const resolved = new Map<string, { blocked: boolean; at: number }>();
 
 /** True when a host, or any address it resolves to, is off limits. */
 export async function blockedHost(host: string): Promise<boolean> {
   if (isPrivateHost(host)) return true;
   if (isIP(host)) return false;
   const cached = resolved.get(host);
-  if (cached !== undefined) return cached;
+  if (cached && Date.now() - cached.at < RESOLVED_FOR_MS) return cached.blocked;
   let addrs: { address: string }[];
   try {
     addrs = await lookup(host, { all: true });
@@ -46,7 +53,8 @@ export async function blockedHost(host: string): Promise<boolean> {
     return true;
   }
   const blocked = addrs.length === 0 || addrs.some((a) => isPrivateHost(a.address));
-  resolved.set(host, blocked);
+  if (resolved.size > 2_000) resolved.clear();
+  resolved.set(host, { blocked, at: Date.now() });
   return blocked;
 }
 
@@ -77,10 +85,26 @@ export async function screenshot(ctx: OpContext, args: OpArgs<"browser.screensho
 }
 
 /** The real thing. Loaded lazily, so the worker starts even before Chromium is installed. */
-export function playwrightDriver(): BrowserDriver {
+export function playwrightDriver(log: (line: string) => void = () => {}): BrowserDriver {
   type Pw = typeof import("playwright");
   let browser: Awaited<ReturnType<Pw["chromium"]["launch"]>> | null = null;
-  const pages = new Map<string, { page: import("playwright").Page; used: number }>();
+  /** `refused`: the host whose answer came from a private address; the session is closed. */
+  const pages = new Map<string, { page: import("playwright").Page; used: number; refused: string | null }>();
+
+  /**
+   * Chromium in its own sandbox (Playwright leaves it off unless asked): a page
+   * that breaks the renderer does not get the worker's user, its token and the
+   * GitHub token of its jobs. A computer whose kernel allows no sandbox still
+   * gets a browser, and says so in the worker's log.
+   */
+  const launch = async (pw: Pw) => {
+    try {
+      return await pw.chromium.launch({ headless: true, chromiumSandbox: true });
+    } catch (err) {
+      log(`Chromium could not start in its sandbox (${(err instanceof Error ? err.message : String(err)).split("\n")[0]}); starting it without`);
+      return pw.chromium.launch({ headless: true });
+    }
+  };
 
   const sweep = setInterval(() => {
     for (const [taskId, entry] of pages) {
@@ -97,7 +121,7 @@ export function playwrightDriver(): BrowserDriver {
       let entry = pages.get(taskId);
       if (!entry) {
         const pw: Pw = await import("playwright");
-        browser ??= await pw.chromium.launch({ headless: true });
+        browser ??= await launch(pw);
         const context = await browser.newContext({ acceptDownloads: false, serviceWorkers: "block" });
         await context.route("**/*", async (route) => {
           const url = new URL(route.request().url());
@@ -106,21 +130,66 @@ export function playwrightDriver(): BrowserDriver {
           if (web && (await blockedHost(url.hostname))) return route.abort("blockedbyclient");
           return route.continue();
         });
-        entry = { page: await context.newPage(), used: Date.now() };
+        // context.route does not see WebSockets: the same rule, on their own route.
+        await context.routeWebSocket(/.*/, async (ws) => {
+          let host = "";
+          try {
+            host = new URL(ws.url()).hostname;
+          } catch {
+            // Not a URL: closed below.
+          }
+          if (!host || (await blockedHost(host))) {
+            await ws.close({ code: 1008, reason: "blocked" });
+            return;
+          }
+          ws.connectToServer();
+        });
+        const created = { page: await context.newPage(), used: Date.now(), refused: null as string | null };
+        // Where each answer really came from. A public name that Chromium
+        // resolved to a private address (after our own lookup said otherwise)
+        // ends the session before its page can be read.
+        context.on("response", (response) => {
+          void response.serverAddr().then((addr) => {
+            if (!addr || created.refused || !isPrivateHost(addr.ipAddress)) return;
+            try {
+              created.refused = new URL(response.url()).hostname;
+            } catch {
+              created.refused = addr.ipAddress;
+            }
+            if (pages.get(taskId) === created) pages.delete(taskId);
+            void context.close().catch(() => {});
+          }, () => {});
+        });
+        entry = created;
         pages.set(taskId, entry);
       }
       entry.used = Date.now();
-      const page = entry.page;
+      const held = entry;
+      const page = held.page;
+      const refusal = () => new BrowserError(`${held.refused} answered from a private network address; the page was closed`);
+      /** Runs one call on the page; a session closed for a private answer says so, whatever Chromium threw. */
+      const guarded = async <T>(call: () => Promise<T>): Promise<T> => {
+        if (held.refused) throw refusal();
+        try {
+          const out = await call();
+          if (held.refused) throw refusal();
+          return out;
+        } catch (err) {
+          throw held.refused ? refusal() : err;
+        }
+      };
       return {
-        goto: async (url, timeoutMs) => {
-          await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-        },
+        goto: (url, timeoutMs) =>
+          guarded(async () => {
+            await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+          }),
         url: () => page.url(),
-        title: () => page.title(),
-        text: () => page.innerText("body"),
-        screenshot: async (path) => {
-          await page.screenshot({ path, fullPage: false });
-        },
+        title: () => guarded(() => page.title()),
+        text: () => guarded(() => page.innerText("body")),
+        screenshot: (path) =>
+          guarded(async () => {
+            await page.screenshot({ path, fullPage: false });
+          }),
       };
     },
     async ready() {

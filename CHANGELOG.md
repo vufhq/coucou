@@ -18,6 +18,17 @@ Windows. Everything that did not serve that goes.
   "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
   recap; the Android phone link; the Mac backend on Lima VMs. All of it stays in
   the history at the tag `pre-hq-focus`
+- **Fixed** — a command, page or file whose text ran past 20,000 characters
+  failed its task as "the computer stopped responding" and left the worker
+  stuck on it; results are now cut in the middle, by the worker and, for a
+  computer not updated yet, by the backend
+- **Safer computers** (update each with `provision.ps1 -Name <agent> -Update`) —
+  `terminal.run` is retired: it ran programs as the worker's own user, outside
+  the shell's sandbox. A page or a program can no longer close the fence around
+  its text in the model's prompt. Chromium runs in its own sandbox when the
+  computer allows one, WebSockets follow the same rule as requests, an answer
+  from a private address closes the browser session, and the worker's service
+  is kept off the local network
 - The translations are now Coucou's own (`windows/src/i18n`), without the 600
   strings nothing used any more
 

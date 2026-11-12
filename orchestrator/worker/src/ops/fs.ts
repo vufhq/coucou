@@ -3,12 +3,15 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { MAX_FETCH_BYTES, type OpArgs } from "@coucou-orchestrator/protocol";
+import { MAX_FETCH_BYTES, MAX_RESULT_CHARS, type OpArgs } from "@coucou-orchestrator/protocol";
 import { PathError, inside } from "../paths.ts";
 import type { OpContext, OpResult } from "../worker.ts";
 
 const MAX_LIST = 500;
-const MAX_READ_CHARS = 20_000;
+/** With the "(cut)" line, still within what a job may report. */
+const MAX_READ_CHARS = MAX_RESULT_CHARS - 100;
+/** The listing is JSON: it ends early rather than being cut in the middle. */
+const MAX_LIST_CHARS = MAX_RESULT_CHARS - 100;
 
 export async function writeArtifact(ctx: OpContext, args: OpArgs<"fs.write_artifact">): Promise<OpResult> {
   const path = await inside(ctx.dir, args.path);
@@ -25,12 +28,22 @@ export async function writeArtifact(ctx: OpContext, args: OpArgs<"fs.write_artif
 
 export async function listFiles(ctx: OpContext): Promise<OpResult> {
   const files: { path: string; bytes: number }[] = [];
+  let chars = 2;
   const walk = async (dir: string): Promise<void> => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
-      if (files.length >= MAX_LIST) return;
+      if (files.length >= MAX_LIST || chars >= MAX_LIST_CHARS) return;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) await walk(full);
-      else if (entry.isFile()) files.push({ path: relative(ctx.dir, full).split("\\").join("/"), bytes: (await stat(full)).size });
+      else if (entry.isFile()) {
+        const file = { path: relative(ctx.dir, full).split("\\").join("/"), bytes: (await stat(full)).size };
+        const size = JSON.stringify(file).length + 1;
+        if (chars + size > MAX_LIST_CHARS) {
+          chars = MAX_LIST_CHARS;
+          return;
+        }
+        chars += size;
+        files.push(file);
+      }
     }
   };
   await walk(ctx.dir);

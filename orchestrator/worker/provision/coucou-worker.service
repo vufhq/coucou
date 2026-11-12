@@ -39,6 +39,14 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
+# The worker and its browser reach the internet and the backend on the PC,
+# never the local network: a web page cannot use the browser to get at the
+# router or another machine, whatever a name resolves to. 172.16.0.0/12 is
+# where WSL puts the PC (the default gateway, where the backend listens);
+# 10.255.255.254 is WSL's DNS tunnel. The runner's rule is stricter still
+# (coucou-runner.service): it cannot reach the PC at all.
+IPAddressDeny=10.0.0.0/8 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+IPAddressAllow=localhost 10.255.255.254
 
 [Install]
 WantedBy=multi-user.target

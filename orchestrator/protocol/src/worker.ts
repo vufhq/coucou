@@ -7,15 +7,31 @@ import { WorkerOpName } from "./ops.ts";
 
 export const WORKER_PROTOCOL = "worker/v1";
 
+/** The longest result and error message a job reports; both sides cut to fit (clipText). */
+export const MAX_RESULT_CHARS = 20_000;
+export const MAX_ERROR_CHARS = 2_000;
+
+/**
+ * `text` in at most `max` characters: the start and the end stay (a file's
+ * beginning, a command's last lines, where the error is), the middle goes.
+ */
+export function clipText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const mark = "\n…(cut)…\n";
+  const head = Math.floor((max - mark.length) * 0.4);
+  const tail = max - mark.length - head;
+  return `${text.slice(0, head)}${mark}${text.slice(text.length - tail)}`;
+}
+
 export const JobError = z.object({
   code: z.enum(["invalid", "refused", "timeout", "cancelled", "failed", "interrupted"]),
-  message: z.string().max(2_000),
+  message: z.string().max(MAX_ERROR_CHARS),
 });
 
 export const JobOutcome = z.object({
   status: z.enum(["succeeded", "failed", "cancelled"]),
   /** Short, already-truncated result the model gets to see. */
-  result: z.string().max(20_000).optional(),
+  result: z.string().max(MAX_RESULT_CHARS).optional(),
   error: JobError.optional(),
 });
 export type JobOutcome = z.infer<typeof JobOutcome>;

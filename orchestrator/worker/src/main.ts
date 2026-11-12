@@ -40,7 +40,7 @@ async function token(): Promise<string> {
 const workspace = process.env.ORCH_WORKSPACE ?? "/workspace";
 const base = process.env.ORCH_BACKEND_URL ?? `http://${await defaultGateway()}:47621`;
 const agentId = process.env.ORCH_AGENT_ID ?? "agent-01";
-const browser = playwrightDriver();
+const browser = playwrightDriver((line) => console.log(`coucou-worker: ${line}`));
 
 const worker = new Worker({
   client: new BackendClient(base, await token(), agentId),
