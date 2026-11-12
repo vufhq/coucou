@@ -38,7 +38,7 @@ fn base_dir(var: &str) -> PathBuf {
 }
 
 /// `base`\vufh, or the folder from before the rename while it could not be
-/// moved (adopt_legacy_dirs): the files are never split between the two.
+/// moved (adopt_legacy_dirs): the preferences are never split between the two.
 fn app_dir(base: PathBuf) -> PathBuf {
     let dir = base.join(DIR);
     let legacy = base.join(LEGACY_DIR);
@@ -56,17 +56,32 @@ pub fn config_dir() -> PathBuf {
 
 /// %LOCALAPPDATA%\vufh — where the inbox, the models and the log live.
 pub fn local_dir() -> PathBuf {
-    app_dir(base_dir("LOCALAPPDATA"))
+    base_dir("LOCALAPPDATA").join(DIR)
 }
 
-/// Renames the two folders from before the rename, once, at launch. A folder
-/// still in use (the old app is running) stays where it is and is used there.
+/// What the app kept in %LOCALAPPDATA% under its former name. That folder is
+/// also where the former app is installed (its program, its uninstaller), so
+/// it is never renamed whole: only these move.
+const LEGACY_LOCAL_DATA: &[&str] = &["Models", "Flow", "Notes", "inbox", "recap.json"];
+
+/// Brings over the folders from before the rename, at launch. What is still in
+/// use (the old app is running) stays, and is tried again at the next launch.
 fn adopt_legacy_dirs() {
-    for var in ["APPDATA", "LOCALAPPDATA"] {
-        let base = base_dir(var);
-        let (dir, legacy) = (base.join(DIR), base.join(LEGACY_DIR));
-        if !dir.exists() && legacy.is_dir() {
-            let _ = std::fs::rename(&legacy, &dir);
+    let config = base_dir("APPDATA");
+    let (dir, legacy) = (config.join(DIR), config.join(LEGACY_DIR));
+    if !dir.exists() && legacy.is_dir() {
+        let _ = std::fs::rename(&legacy, &dir);
+    }
+
+    let local = base_dir("LOCALAPPDATA");
+    let (dir, legacy) = (local.join(DIR), local.join(LEGACY_DIR));
+    if !legacy.is_dir() {
+        return;
+    }
+    for name in LEGACY_LOCAL_DATA {
+        let (from, to) = (legacy.join(name), dir.join(name));
+        if from.exists() && !to.exists() && std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::rename(&from, &to);
         }
     }
 }
