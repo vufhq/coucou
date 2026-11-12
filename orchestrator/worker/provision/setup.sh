@@ -162,6 +162,16 @@ PLAYWRIGHT_BROWSERS_PATH="$APP/browsers" npx --no-install playwright install --w
 chmod -R u=rwX,go=rX "$APP"
 rm -f "$APP/.env"
 
+echo "==> The browser's sandbox"
+# Where AppArmor rules the machine (Ubuntu 24.04 outside WSL), Chromium may
+# create its sandbox's namespace only with a profile that says so.
+if [[ -d /etc/apparmor.d ]] && command -v apparmor_parser >/dev/null 2>&1; then
+  install -m 0644 "$APP/worker/provision/coucou-chromium.apparmor" /etc/apparmor.d/coucou-chromium
+  if [[ -d /sys/kernel/security/apparmor ]]; then
+    apparmor_parser -r /etc/apparmor.d/coucou-chromium
+  fi
+fi
+
 echo "==> wsl.conf and the service"
 if [[ $REMOTE == 0 ]]; then
   install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf

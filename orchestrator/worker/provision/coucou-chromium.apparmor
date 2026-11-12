@@ -1,0 +1,17 @@
+# Installed by setup.sh as /etc/apparmor.d/coucou-chromium.
+#
+# Ubuntu 24.04 lets a program create a user namespace only when a profile says
+# so (kernel.apparmor_restrict_unprivileged_userns), and Chromium's sandbox is
+# built on one: without this, the worker's browser starts with no sandbox at
+# all. Ubuntu ships the same profile for the Chrome it knows (/etc/apparmor.d/
+# chrome); this one names the worker's own copy, which only root can write to.
+# It confines nothing else and grants nothing but the namespace.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile coucou-chromium /opt/coucou-worker/browsers/**/{chrome,chrome-headless-shell} flags=(unconfined) {
+  userns,
+
+  include if exists <local/coucou-chromium>
+}
