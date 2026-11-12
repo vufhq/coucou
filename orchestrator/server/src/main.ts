@@ -1,9 +1,9 @@
 // The orchestrator backend, as started by `npm start`. A separate process on
-// purpose: closing Coucou must not stop a running task.
+// purpose: closing vufh must not stop a running task.
 
 import { join } from "node:path";
 import { createBackend } from "./app.ts";
-import { loadConfig } from "./config.ts";
+import { adoptLegacyDataDir, loadConfig } from "./config.ts";
 import { Github, keyringSlot } from "./github.ts";
 import { ClaudeCliAdapter } from "./model/claude-cli.ts";
 import { CursorCliAdapter } from "./model/cursor-cli.ts";
@@ -13,6 +13,7 @@ import { loadTokens } from "./tokens.ts";
 import { isRemoteVm, keepTunnel, type Tunnel } from "./tunnel.ts";
 import { keepWslAlive, wslRunning, type VmProbe } from "./vm.ts";
 
+adoptLegacyDataDir();
 const config = loadConfig();
 
 /** ORCH_LOCAL_URL, kept only when it points at this machine: `local` means local. */
@@ -84,7 +85,7 @@ if (!models.has(config.defaultModelProfile)) {
 
 // The user's GitHub sign-in lives in Credential Manager, beside the tokens.
 const github = new Github({ clientId: config.githubClientId, slot: await keyringSlot() });
-// A remote computer whose connection is down is "not running" to Coucou; one
+// A remote computer whose connection is down is "not running" to vufh; one
 // whose connection holds while its worker stays silent is a worker problem.
 const tunnels = new Map<string, Tunnel>();
 const vmProbe: VmProbe = (vmId) =>

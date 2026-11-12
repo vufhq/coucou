@@ -23,7 +23,7 @@ registerHookHandlers(island);
 
 /** Exactly what orchestrator.rs emits for each backend event. */
 const hook = (name, extra = {}) =>
-  emit("hook", { hook_event_name: name, coucou_agent: "agent-01", session_id: "orch:t-1", ...extra });
+  emit("hook", { hook_event_name: name, vufh_agent: "agent-01", session_id: "orch:t-1", ...extra });
 const task = () => State.tasks.find((t) => t.id === AGENT);
 
 beforeEach(() => {
@@ -75,7 +75,7 @@ test("its approval card comes up, and Allow goes back with the backend's request
 });
 
 test("a request the orchestrator does not own raises no card", () => {
-  emit("hook", { hook_event_name: "PermissionRequest", request_id: "r1", coucou_agent: "agent-01", tool_name: "Bash" });
+  emit("hook", { hook_event_name: "PermissionRequest", request_id: "r1", vufh_agent: "agent-01", tool_name: "Bash" });
   assert.equal(State.pendingApproval, null);
 });
 

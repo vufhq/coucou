@@ -1,4 +1,4 @@
-// Coucou HQ: the side panel on the right, for the selected agent.
+// vufh HQ: the side panel on the right, for the selected agent.
 // - "agent": the shared computer (who uses it, who waits), the agent's goals
 //   (Run now, pause, + New goal), its memory notes and the files its tasks made.
 // - "settings": who the agent is (name, role, instructions, team, colour,

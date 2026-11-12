@@ -1,6 +1,6 @@
-// The versioned event envelope Coucou reads, and the allowlisted event types.
+// The versioned event envelope vufh reads, and the allowlisted event types.
 //
-// `seq` is global and strictly increasing: Coucou remembers the last one it
+// `seq` is global and strictly increasing: vufh remembers the last one it
 // saw and asks for everything after it, which is how a closed and reopened
 // island catches up. `sequence` counts within one task, as the brief asks.
 // Agent-level events (heartbeat, status) belong to no task.

@@ -1,5 +1,5 @@
 // Durable state in one SQLite file (node:sqlite, no native build). The
-// backend owns task state: Coucou and the worker can both disappear and come
+// backend owns task state: vufh and the worker can both disappear and come
 // back, and everything they need to carry on is here.
 
 import { randomUUID } from "node:crypto";
@@ -29,7 +29,7 @@ import {
   type Team,
   type WorkerOpName,
   type WorkerHealth,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS computers (
@@ -250,7 +250,7 @@ export interface UploadRow {
   createdAt: string;
 }
 
-/** A task's attachment as the backend keeps it: what Coucou sees, plus the upload it comes from. */
+/** A task's attachment as the backend keeps it: what vufh sees, plus the upload it comes from. */
 export interface StoredAttachment extends TaskAttachment {
   upload?: string;
   sha256?: string;

@@ -5,7 +5,7 @@
 // already cover them.
 
 import type { ServerResponse } from "node:http";
-import type { AgentEvent } from "@coucou-orchestrator/protocol";
+import type { AgentEvent } from "@vufh-orchestrator/protocol";
 import type { EventLog } from "./events.ts";
 
 const KEEPALIVE_MS = 15_000;

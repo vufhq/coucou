@@ -1,4 +1,4 @@
-// Coucou HQ: what a conversation shows, made from the backend's tasks.
+// vufh HQ: what a conversation shows, made from the backend's tasks.
 // Pure functions, no Tauri: store.ts feeds them, tests/hq.test.mjs checks them.
 //
 // A conversation reads oldest to newest, one block per task:

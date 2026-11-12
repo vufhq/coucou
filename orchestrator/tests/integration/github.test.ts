@@ -10,7 +10,7 @@ import { mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Task } from "@coucou-orchestrator/protocol";
+import type { Task } from "@vufh-orchestrator/protocol";
 import { Github, gitBasicAuth, memorySlot } from "../../server/src/github.ts";
 import { ScriptedModel, type ScriptedAnswer } from "../../server/src/model/scripted.ts";
 import { FakeBrowser, cleanup, key, readEvents, startBackend, startWorker, tempDir, waitFor, type Running } from "./harness.ts";

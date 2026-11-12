@@ -1,7 +1,7 @@
-// coucou-runner: the computer's shell. It runs the agents' bash commands as
+// vufh-runner: the computer's shell. It runs the agents' bash commands as
 // the `runner` user, which is not the worker's user: systemd hides the
 // worker, its token, its journal, Windows and the local network from it (see
-// coucou-runner.service). The computer is the boundary, as in rakazo, so a
+// vufh-runner.service). The computer is the boundary, as in rakazo, so a
 // command here needs no click.
 //
 // The worker is its only client, over a unix socket only the worker's group

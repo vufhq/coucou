@@ -2,14 +2,15 @@
 // the single-PC setup and can be overridden through the environment, which is
 // also how the tests run it in a temporary folder.
 
+import { existsSync, renameSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
-import { AgentId } from "@coucou-orchestrator/protocol";
+import { AgentId } from "@vufh-orchestrator/protocol";
 import { remoteVmId, type Remote } from "./tunnel.ts";
 
 export interface Config {
   dataDir: string;
-  /** Coucou's API: loopback only. */
+  /** vufh's API: loopback only. */
   apiHost: string;
   apiPort: number;
   /** The worker's listener, on the interface the VM can reach. */
@@ -100,13 +101,42 @@ export function parseAgents(raw: string | undefined): Config["agents"] {
   return agents;
 }
 
+const DATA_DIR = "VufhOrchestrator";
+/** The data folder's name before the app was renamed. */
+const LEGACY_DATA_DIR = "CoucouOrchestrator";
+
+function dataBase(env: NodeJS.ProcessEnv): string {
+  return env.LOCALAPPDATA ?? join(env.HOME ?? ".", ".local", "share");
+}
+
+/**
+ * Renames the data folder from before the rename, once, as the backend starts
+ * (main.ts). One still in use stays where it is, and loadConfig uses it there.
+ */
+export function adoptLegacyDataDir(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.ORCH_DATA_DIR) return;
+  const dir = join(dataBase(env), DATA_DIR);
+  const legacy = join(dataBase(env), LEGACY_DATA_DIR);
+  if (existsSync(dir) || !existsSync(legacy)) return;
+  try {
+    renameSync(legacy, dir);
+  } catch {
+    // Another backend holds it open.
+  }
+}
+
+function defaultDataDir(env: NodeJS.ProcessEnv): string {
+  const dir = join(dataBase(env), DATA_DIR);
+  const legacy = join(dataBase(env), LEGACY_DATA_DIR);
+  return !existsSync(dir) && existsSync(legacy) ? legacy : dir;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const base = env.LOCALAPPDATA ?? join(env.HOME ?? ".", ".local", "share");
   const agents = parseAgents(env.ORCH_AGENTS);
   // A worker runs up to 4 operations at once (WORKER_SLOTS), whatever this says.
   const tasksPerComputer = Math.max(1, int(env.ORCH_TASKS_PER_COMPUTER, 2));
   return {
-    dataDir: env.ORCH_DATA_DIR ?? join(base, "CoucouOrchestrator"),
+    dataDir: env.ORCH_DATA_DIR ?? defaultDataDir(env),
     apiHost: "127.0.0.1",
     apiPort: int(env.ORCH_API_PORT, 47620),
     workerHost: env.ORCH_WORKER_HOST ?? wslHostAddress(),

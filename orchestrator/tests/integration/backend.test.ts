@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentEvent, Task } from "@coucou-orchestrator/protocol";
+import type { AgentEvent, Task } from "@vufh-orchestrator/protocol";
 import { ModelError, type ModelAdapter, type ModelInput, type ModelOutput } from "../../server/src/model/adapter.ts";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import type { ShellRunner } from "../../worker/src/ops/shell.ts";

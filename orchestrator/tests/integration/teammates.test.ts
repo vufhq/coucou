@@ -3,7 +3,7 @@
 // answered by whoever asked, and cancellation running down the chain.
 
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, Task } from "@coucou-orchestrator/protocol";
+import type { Agent, Task } from "@vufh-orchestrator/protocol";
 import { ModelError, type ModelAdapter, type ModelInput, type ModelOutput } from "../../server/src/model/adapter.ts";
 import { cleanup, key, startBackend, tempDir, waitFor, type Running } from "./harness.ts";
 

@@ -8,7 +8,7 @@ import { Ease, lerp, type EaseFn } from "../core/anim";
 import { Sound } from "../core/sound";
 import type { BotEmoteName, BotStateName } from "../core/layout";
 import { PUMPKIN_BODY, drawOutfitBehind, drawOutfitFront, makeHead } from "./outfits";
-import { character, tofuInk } from "./character";
+import { isChrome, isTofu, tofuInk } from "./character";
 import { drawTofu, type TofuHooks } from "./tofu";
 import type { Outfit } from "./wardrobe";
 
@@ -374,7 +374,7 @@ export class BotEngine {
     this.anim("roll", [[Math.PI * 2 * turns, durationMs, Ease.inOut]], () => { this.roll = 0; });
   }
 
-  /** Peek wave — the "coucou". Timings from BotEngine.greet(). */
+  /** Peek wave — the hello. Timings from BotEngine.greet(). */
   greet() {
     const t = now();
     const tok = ++this.greetToken;
@@ -787,7 +787,7 @@ export class BotEngine {
       x.rotate(this.roll);
       x.translate(-cx, -cy);
     }
-    if (character() === "tofu") this.drawTofu(x, R, cx, cy);
+    if (isTofu()) this.drawTofu(x, R, cx, cy);
     else this.drawMochi(x, R, rx, ry, cx, cy);
     x.restore();
 
@@ -846,6 +846,8 @@ export class BotEngine {
       outfit: this.outfit, presence: this.outfitPresence, physDx: this.physDx, physDy: this.physDy,
       waveStart: this.waveStart, waveUntil: this.waveUntil, isMini: this.isMini,
       fill: this.bodyColor ? rgba(this.bodyColor) : tofuInk(),
+      chrome: isChrome(),
+      chromeTint: this.bodyColor ?? null,
     };
     const hooks: TofuHooks = {
       eye: (c, shape, w, h, sd, ink) => this.drawEyeShape(c, shape, w, h, sd, ink),

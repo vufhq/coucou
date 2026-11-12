@@ -1,9 +1,9 @@
 // Jobs the backend itself sends the worker (a file listing or a download for
-// Coucou), and waiting for a job's end. Task steps never go through here: the
+// vufh), and waiting for a job's end. Task steps never go through here: the
 // runner owns those.
 
 import { EventEmitter } from "node:events";
-import type { JobOutcome, WorkerOpName } from "@coucou-orchestrator/protocol";
+import type { JobOutcome, WorkerOpName } from "@vufh-orchestrator/protocol";
 import type { Store } from "./store.ts";
 
 export class JobSignals {
@@ -35,7 +35,7 @@ export class JobSignals {
 
 /**
  * The bytes of download jobs, between the worker's upload and the API answer
- * that hands them to Coucou. In memory only, and briefly: they are never
+ * that hands them to vufh. In memory only, and briefly: they are never
  * written to the database or the event log.
  */
 export class Downloads {

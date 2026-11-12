@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Agent, Task } from "@coucou-orchestrator/protocol";
+import type { Agent, Task } from "@vufh-orchestrator/protocol";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import { cleanup, key, startBackend, tempDir, waitFor, type Running } from "./harness.ts";
 

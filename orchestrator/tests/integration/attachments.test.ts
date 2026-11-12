@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Task } from "@coucou-orchestrator/protocol";
+import type { Task } from "@vufh-orchestrator/protocol";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import { safeFileName } from "../../server/src/attachments.ts";
 import type { Worker } from "../../worker/src/worker.ts";

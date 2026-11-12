@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { MAX_FETCH_BYTES, MAX_RESULT_CHARS, type OpArgs } from "@coucou-orchestrator/protocol";
+import { MAX_FETCH_BYTES, MAX_RESULT_CHARS, type OpArgs } from "@vufh-orchestrator/protocol";
 import { PathError, inside } from "../paths.ts";
 import type { OpContext, OpResult } from "../worker.ts";
 

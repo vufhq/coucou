@@ -1,5 +1,5 @@
 // Redaction runs once, on the way into the event log, so nothing below it —
-// the database, the SSE stream, Coucou's timeline, the model's next prompt —
+// the database, the SSE stream, vufh's timeline, the model's next prompt —
 // can carry a secret it picked up from a page or a command.
 
 const REPLACEMENT = "[redacted]";

@@ -27,7 +27,7 @@ import {
   type RuleLevel,
   type Task,
   type WorkerOpName,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { attachmentStep, plannedAttachments, type AttachmentError, type Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
@@ -144,9 +144,9 @@ const RULE_LEVEL_LINES: Record<RuleLevel, string> = {
   4: "Your rule level is 4 of 4, fully trusted: most steps run without approval.",
 };
 const RULE_LEVEL_OWNER =
-  "Creating or retiring agents always waits for approval. Only the user sets rule levels, in Coucou HQ: never try to change one, and if asked to, tell the user to do it there.";
+  "Creating or retiring agents always waits for approval. Only the user sets rule levels, in vufh HQ: never try to change one, and if asked to, tell the user to do it there.";
 
-/** Only for an agent the user let use their GitHub account, while Coucou is signed in. */
+/** Only for an agent the user let use their GitHub account, while vufh is signed in. */
 const GITHUB_OPERATIONS = `
 
 The user lets you use their GitHub account, through these operations only (the shell never has it):

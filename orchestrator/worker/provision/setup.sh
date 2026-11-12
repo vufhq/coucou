@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Sets up an agent's computer from inside it, as root:
-# `setup.sh agent-02 'D:\coucou-vms\shared'` in a WSL distro, or
+# `setup.sh agent-02 'D:\vufh-vms\shared'` in a WSL distro, or
 # `setup.sh agent-03 remote` on a rented Ubuntu machine (provision.ps1
 # -RemoteHost). provision.ps1 runs it after copying the worker to
-# /opt/coucou-worker; running it again updates in place.
+# /opt/vufh-worker; running it again updates in place.
 #
 #   - patched Ubuntu, an unprivileged `agent` user (no sudo), /workspace
 #   - the computer: a second unprivileged `runner` user that runs the agents
 #     shell commands in /computer, with python3, uv, git and a C compiler
 #   - /computer: the Windows folder every computer shares, mounted by
-#     coucou-computer.service (only that folder; no Windows drive)
+#     vufh-computer.service (only that folder; no Windows drive)
 #   - Node.js from nodejs.org, checked against its published SHA-256
 #   - the worker's dependencies and Chromium for Playwright, owned by root
 #   - /etc/wsl.conf (no Windows drives, no Windows programs) and the systemd unit
@@ -23,9 +23,9 @@ set -euo pipefail
 
 NODE_VERSION="24.18.0"
 UV_VERSION="0.9.5"
-APP=/opt/coucou-worker
+APP=/opt/vufh-worker
 AGENT_ID="${1:-agent-01}"
-COMPUTER_SHARE="${2:-D:\\coucou-vms\\shared}"
+COMPUTER_SHARE="${2:-D:\\vufh-vms\\shared}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "setup.sh must run as root" >&2
@@ -53,6 +53,40 @@ if [[ $REMOTE == 1 ]]; then
     echo "setup.sh: a remote computer must run Ubuntu 24.04 (this is ${PRETTY_NAME:-unknown})" >&2
     exit 1
   fi
+fi
+
+# A computer set up when the app had its former name: its units stop and go,
+# and what it kept moves to the new names. Nothing here runs on a fresh one.
+OLD=coucou
+if [[ -e /etc/systemd/system/$OLD-worker.service || -d /etc/$OLD-worker || -d /opt/$OLD-worker ]]; then
+  echo "==> Names from before the rename"
+  if [[ -d /run/systemd/system ]]; then
+    systemctl disable --now "$OLD-worker.service" "$OLD-runner.socket" "$OLD-runner.service" "$OLD-computer.service" 2>/dev/null || true
+  fi
+  rm -f /etc/systemd/system/$OLD-worker.service /etc/systemd/system/$OLD-runner.service \
+    /etc/systemd/system/$OLD-runner.socket /etc/systemd/system/$OLD-computer.service \
+    /etc/systemd/system/multi-user.target.wants/$OLD-worker.service \
+    /etc/systemd/system/multi-user.target.wants/$OLD-computer.service \
+    /etc/systemd/system/sockets.target.wants/$OLD-runner.socket
+  rm -rf "/etc/systemd/system/$OLD-worker.service.d"
+  # The worker's token and settings, its journal and its private git folder.
+  if [[ -d /etc/$OLD-worker && ! -e /etc/vufh-worker ]]; then
+    mv "/etc/$OLD-worker" /etc/vufh-worker
+  fi
+  if [[ -d /workspace/.$OLD && ! -e /workspace/.vufh ]]; then
+    mv "/workspace/.$OLD" /workspace/.vufh
+  fi
+  # Chromium is a long download: it moves too.
+  if [[ -d /opt/$OLD-worker/browsers && ! -e "$APP/browsers" ]]; then
+    mv "/opt/$OLD-worker/browsers" "$APP/browsers"
+  fi
+  rm -rf "/opt/$OLD-worker" "/etc/$OLD-worker" "/workspace/.$OLD"
+  if [[ -e /etc/apparmor.d/$OLD-chromium ]]; then
+    apparmor_parser -R "/etc/apparmor.d/$OLD-chromium" 2>/dev/null || true
+    rm -f "/etc/apparmor.d/$OLD-chromium"
+  fi
+  # A remote computer's SSH settings are written again below, under the new names.
+  rm -f "/etc/ssh/$OLD-tunnel-keys" "/etc/ssh/sshd_config.d/60-$OLD-tunnel.conf"
 fi
 
 # Rented machines are often ARM (Oracle's free ones, for a start).
@@ -110,7 +144,7 @@ fi
 for group in sudo admin wheel; do
   gpasswd -d agent "$group" >/dev/null 2>&1 || true
 done
-install -d -o agent -g agent -m 0750 /workspace /workspace/.coucou /workspace/.coucou/home
+install -d -o agent -g agent -m 0750 /workspace /workspace/.vufh /workspace/.vufh/home
 
 echo "==> The computer: the runner user and /computer"
 # The runner runs what the agents write. It shares the group `computer` with
@@ -126,9 +160,9 @@ done
 usermod -aG computer agent
 
 echo "==> /computer: the folder every computer shares"
-install -d -m 0700 /etc/coucou-worker
-printf 'COMPUTER_SHARE=%q\n' "$COMPUTER_SHARE" > /etc/coucou-worker/computer.env
-chmod 0600 /etc/coucou-worker/computer.env
+install -d -m 0700 /etc/vufh-worker
+printf 'COMPUTER_SHARE=%q\n' "$COMPUTER_SHARE" > /etc/vufh-worker/computer.env
+chmod 0600 /etc/vufh-worker/computer.env
 if [[ $REMOTE == 1 ]]; then
   # Its own disk: mount-computer.sh only makes the folders.
   bash "$APP/worker/provision/mount-computer.sh"
@@ -156,7 +190,7 @@ fi
 echo "==> Worker dependencies and Chromium"
 cd "$APP"
 chown -R root:root "$APP"
-npm ci --omit=dev --workspace=@coucou-orchestrator/worker --no-audit --no-fund
+npm ci --omit=dev --workspace=@vufh-orchestrator/worker --no-audit --no-fund
 PLAYWRIGHT_BROWSERS_PATH="$APP/browsers" npx --no-install playwright install --with-deps chromium
 # Readable by everyone, writable by root only (the copy from Windows arrives world-writable).
 chmod -R u=rwX,go=rX "$APP"
@@ -166,9 +200,9 @@ echo "==> The browser's sandbox"
 # Where AppArmor rules the machine (Ubuntu 24.04 outside WSL), Chromium may
 # create its sandbox's namespace only with a profile that says so.
 if [[ -d /etc/apparmor.d ]] && command -v apparmor_parser >/dev/null 2>&1; then
-  install -m 0644 "$APP/worker/provision/coucou-chromium.apparmor" /etc/apparmor.d/coucou-chromium
+  install -m 0644 "$APP/worker/provision/vufh-chromium.apparmor" /etc/apparmor.d/vufh-chromium
   if [[ -d /sys/kernel/security/apparmor ]]; then
-    apparmor_parser -r /etc/apparmor.d/coucou-chromium
+    apparmor_parser -r /etc/apparmor.d/vufh-chromium
   fi
 fi
 
@@ -176,31 +210,31 @@ echo "==> wsl.conf and the service"
 if [[ $REMOTE == 0 ]]; then
   install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
 fi
-install -m 0644 "$APP/worker/provision/coucou-worker.service" /etc/systemd/system/coucou-worker.service
-install -m 0644 "$APP/worker/provision/coucou-runner.service" /etc/systemd/system/coucou-runner.service
-install -m 0644 "$APP/worker/provision/coucou-runner.socket" /etc/systemd/system/coucou-runner.socket
-install -m 0644 "$APP/worker/provision/coucou-computer.service" /etc/systemd/system/coucou-computer.service
-install -d -m 0700 /etc/coucou-worker
-printf 'ORCH_AGENT_ID=%s\n' "$AGENT_ID" > /etc/coucou-worker/agent.env
-chmod 0600 /etc/coucou-worker/agent.env
+install -m 0644 "$APP/worker/provision/vufh-worker.service" /etc/systemd/system/vufh-worker.service
+install -m 0644 "$APP/worker/provision/vufh-runner.service" /etc/systemd/system/vufh-runner.service
+install -m 0644 "$APP/worker/provision/vufh-runner.socket" /etc/systemd/system/vufh-runner.socket
+install -m 0644 "$APP/worker/provision/vufh-computer.service" /etc/systemd/system/vufh-computer.service
+install -d -m 0700 /etc/vufh-worker
+printf 'ORCH_AGENT_ID=%s\n' "$AGENT_ID" > /etc/vufh-worker/agent.env
+chmod 0600 /etc/vufh-worker/agent.env
 # Enabled by hand: on the very first run systemd may not be PID 1 yet.
 install -d /etc/systemd/system/multi-user.target.wants
-ln -sf /etc/systemd/system/coucou-computer.service /etc/systemd/system/multi-user.target.wants/coucou-computer.service
-ln -sf /etc/systemd/system/coucou-worker.service /etc/systemd/system/multi-user.target.wants/coucou-worker.service
+ln -sf /etc/systemd/system/vufh-computer.service /etc/systemd/system/multi-user.target.wants/vufh-computer.service
+ln -sf /etc/systemd/system/vufh-worker.service /etc/systemd/system/multi-user.target.wants/vufh-worker.service
 install -d /etc/systemd/system/sockets.target.wants
-ln -sf /etc/systemd/system/coucou-runner.socket /etc/systemd/system/sockets.target.wants/coucou-runner.socket
+ln -sf /etc/systemd/system/vufh-runner.socket /etc/systemd/system/sockets.target.wants/vufh-runner.socket
 
 if [[ $REMOTE == 1 ]]; then
   echo "==> The backend's way in"
   # The worker talks to the backend through a socket the backend's SSH
-  # connection opens in /workspace/.coucou: the worker's own folder, which the
+  # connection opens in /workspace/.vufh: the worker's own folder, which the
   # runner (what the agents run) cannot enter. Nothing listens on a port, so
   # no command an agent runs can reach the backend. The WSL gateway's range is
   # closed too: here it is somebody else's network.
-  install -d /etc/systemd/system/coucou-worker.service.d
-  cat > /etc/systemd/system/coucou-worker.service.d/remote.conf <<'EOF'
+  install -d /etc/systemd/system/vufh-worker.service.d
+  cat > /etc/systemd/system/vufh-worker.service.d/remote.conf <<'EOF'
 [Service]
-Environment=ORCH_BACKEND_SOCKET=/workspace/.coucou/backend.sock
+Environment=ORCH_BACKEND_SOCKET=/workspace/.vufh/backend.sock
 IPAddressDeny=172.16.0.0/12
 EOF
 
@@ -217,16 +251,16 @@ EOF
     echo "setup.sh: $admin has no SSH keys in $admin_keys; the backend would have no way in" >&2
     exit 1
   fi
-  install -m 0644 -o root -g root "$admin_keys" /etc/ssh/coucou-tunnel-keys
+  install -m 0644 -o root -g root "$admin_keys" /etc/ssh/vufh-tunnel-keys
   if ! grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
     echo "setup.sh: /etc/ssh/sshd_config does not include /etc/ssh/sshd_config.d/*.conf" >&2
     exit 1
   fi
-  tunnel_conf=/etc/ssh/sshd_config.d/60-coucou-tunnel.conf
+  tunnel_conf=/etc/ssh/sshd_config.d/60-vufh-tunnel.conf
   cat > "$tunnel_conf" <<'EOF'
-# Written by Coucou's setup.sh: the backend's connection to the worker.
+# Written by vufh's setup.sh: the backend's connection to the worker.
 Match User agent
-    AuthorizedKeysFile /etc/ssh/coucou-tunnel-keys
+    AuthorizedKeysFile /etc/ssh/vufh-tunnel-keys
     ForceCommand /usr/sbin/nologin
     PermitTTY no
     X11Forwarding no
@@ -241,12 +275,12 @@ EOF
   # Never leave an SSH server that would not start again: this machine has no other door.
   if ! sshd -t; then
     rm -f "$tunnel_conf"
-    echo "setup.sh: the SSH server refused Coucou's settings; they were removed and nothing else changed" >&2
+    echo "setup.sh: the SSH server refused vufh's settings; they were removed and nothing else changed" >&2
     exit 1
   fi
   systemctl reload ssh 2>/dev/null || systemctl reload sshd
 else
-  rm -rf /etc/systemd/system/coucou-worker.service.d/remote.conf
+  rm -rf /etc/systemd/system/vufh-worker.service.d/remote.conf
 fi
 
 if [[ -d /run/systemd/system ]]; then

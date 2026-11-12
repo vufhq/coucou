@@ -1,0 +1,12 @@
+[Unit]
+Description=vufh computer: the disk every computer shares, at /computer
+After=local-fs.target
+Before=vufh-worker.service vufh-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/vufh-worker/worker/provision/mount-computer.sh
+
+[Install]
+WantedBy=multi-user.target

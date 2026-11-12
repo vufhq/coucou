@@ -11,7 +11,7 @@
 # Also writes /etc/resolv.conf (wsl.conf stops WSL from generating it: WSL
 # links it into /mnt/wsl, which the worker and the runner cannot see, so
 # neither could look up a name). 10.255.255.254 is WSL's DNS tunnel, the one
-# resolver coucou-runner.service lets the runner reach.
+# resolver vufh-runner.service lets the runner reach.
 #
 # On a remote computer (COMPUTER_SHARE=remote) there is no Windows folder:
 # /computer is a folder on the machine's own disk, with the same owners, and
@@ -19,8 +19,8 @@
 
 set -euo pipefail
 
-# COMPUTER_SHARE='D:\coucou-vms\shared' or 'remote', written by setup.sh.
-source /etc/coucou-worker/computer.env
+# COMPUTER_SHARE='D:\vufh-vms\shared' or 'remote', written by setup.sh.
+source /etc/vufh-worker/computer.env
 
 if [[ "$COMPUTER_SHARE" == "remote" ]]; then
   # Set-group-id folders: what the worker creates stays writable by the runner.

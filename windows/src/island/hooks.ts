@@ -3,7 +3,7 @@
 // src-tauri/src/orchestrator.rs turns the backend's task events into events on
 // the island's "hook" channel, named and shaped like Claude Code's hook events
 // (UserPromptSubmit, PreToolUse, PermissionRequest, Stop…) and tagged with the
-// agent in `coucou_agent`. This file moves the agent's pill accordingly and
+// agent in `vufh_agent`. This file moves the agent's pill accordingly and
 // puts its approval requests on the island's card. Anything untagged is ignored.
 
 import { onEvent } from "../core/bridge";
@@ -59,7 +59,7 @@ interface HookPayload {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   /** The orchestrator agent's id. */
-  coucou_agent?: string;
+  vufh_agent?: string;
 }
 
 /** Ticker labels for the tool names orchestrator.rs gives the island. */
@@ -100,7 +100,7 @@ function handleHook(island: Island, payload: HookPayload) {
   // Paused: nothing shows. An approval stays pending in the backend, where HQ
   // can still answer it.
   if (State.paused) return;
-  const agent = validateAgent(payload.coucou_agent);
+  const agent = validateAgent(payload.vufh_agent);
   if (!agent) return;
 
   const name = payload.hook_event_name ?? "";

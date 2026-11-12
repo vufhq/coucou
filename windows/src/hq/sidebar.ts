@@ -1,4 +1,4 @@
-// Coucou HQ: the sidebar. Search and + at the top, the Activity entry, the
+// vufh HQ: the sidebar. Search and + at the top, the Activity entry, the
 // pinned faces (Mochi first, with his star), then "Needs you" and one
 // collapsible section per team, each row with its last time, and at the bottom
 // the settings and "Connect apps". It only reads the store and asks it to

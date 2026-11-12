@@ -85,8 +85,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
-          name: Coucou-Windows-setup
-          path: windows/release/Coucou-Windows-${{ steps.pack.outputs.version }}-setup.exe
+          name: vufh-Windows-setup
+          path: windows/release/vufh-Windows-${{ steps.pack.outputs.version }}-setup.exe
           retention-days: 3
 
       # MSI installer generated via WiX toolset. Bypasses NSIS extractor false-positives
@@ -94,8 +94,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
-          name: Coucou-Windows-msi
-          path: windows/release/Coucou-Windows-${{ steps.pack.outputs.version }}.msi
+          name: vufh-Windows-msi
+          path: windows/release/vufh-Windows-${{ steps.pack.outputs.version }}.msi
           retention-days: 3
 
       # The unsigned NSIS installer is what Defender false-positives on, so the
@@ -103,8 +103,8 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
-          name: Coucou-Windows-portable
-          path: windows/target/release/coucou.exe
+          name: vufh-Windows-portable
+          path: windows/target/release/vufh.exe
           retention-days: 3
 
       - name: Publish the release
@@ -115,9 +115,9 @@ jobs:
         run: |
           $v = "${{ steps.pack.outputs.version }}"
           $notes = @"
-          Coucou for Windows $v — Mochi at the top of your screen.
+          vufh for Windows $v — Mochi at the top of your screen.
 
-          Download ``Coucou-Windows-$v.msi`` (Windows Installer) or ``Coucou-Windows-$v-setup.exe`` and run it. The installer is not
+          Download ``vufh-Windows-$v.msi`` (Windows Installer) or ``vufh-Windows-$v-setup.exe`` and run it. The installer is not
           code-signed yet, so Windows SmartScreen shows a warning: click
           **More info → Run anyway**.
           "@
@@ -126,9 +126,9 @@ jobs:
           # button points at /releases/latest. A Windows tag would silently send
           # Mac users to the .exe. The macOS `v*` releases own that slot.
           gh release create "${{ github.ref_name }}" `
-            "release/Coucou-Windows-$v-setup.exe" `
-            "release/Coucou-Windows-$v.msi" `
-            --title "Coucou for Windows $v" `
+            "release/vufh-Windows-$v-setup.exe" `
+            "release/vufh-Windows-$v.msi" `
+            --title "vufh for Windows $v" `
             --notes $notes `
             --latest=false
 
@@ -146,13 +146,13 @@ jobs:
             # from it gets an old tree.
             git tag -f windows-latest "${{ github.sha }}"
             git push -f origin windows-latest
-            gh release edit windows-latest --title "Coucou for Windows (latest)" --notes "Always the newest Windows build — currently $v."
-            gh release upload windows-latest "release/Coucou-Windows-setup.exe" "release/Coucou-Windows.msi" --clobber
+            gh release edit windows-latest --title "vufh for Windows (latest)" --notes "Always the newest Windows build — currently $v."
+            gh release upload windows-latest "release/vufh-Windows-setup.exe" "release/vufh-Windows.msi" --clobber
           } else {
             gh release create windows-latest `
-              "release/Coucou-Windows-setup.exe" `
-              "release/Coucou-Windows.msi" `
-              --title "Coucou for Windows (latest)" `
+              "release/vufh-Windows-setup.exe" `
+              "release/vufh-Windows.msi" `
+              --title "vufh for Windows (latest)" `
               --notes "Always the newest Windows build — currently $v." `
               --latest=false
           }

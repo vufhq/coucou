@@ -11,7 +11,7 @@
 // dropped File objects back with `chrome.webview.postMessageWithAdditionalObjects`;
 // here they turn back into real paths and reach the island as a `file-drag` drop.
 //
-// Coucou HQ takes files the same way (dropped on it, or picked with the
+// vufh HQ takes files the same way (dropped on it, or picked with the
 // composer's file chooser, whose File objects come back here too).
 
 use tauri::{AppHandle, Emitter, Manager};

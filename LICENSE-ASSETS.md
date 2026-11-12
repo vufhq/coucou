@@ -1,3 +1,11 @@
+# Name, character and artwork
+
+> vufh HQ is a fork of Coucou. It no longer uses the name “Coucou” or Coucou's
+> icon. The Mochi character and the sounds in `windows/sounds/` are still
+> Coucou's, and so are the images in `design/`: the notice below, from Coucou's
+> author, keeps applying to them. Some of the paths it names (the Mac and
+> Android apps) are no longer in this repository.
+
 # Coucou — name, character and artwork
 
 Copyright (c) 2026 Louis Raillé. All rights reserved, except as stated below.

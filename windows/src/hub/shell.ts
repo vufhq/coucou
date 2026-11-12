@@ -1,4 +1,4 @@
-// The Coucou window: a sidebar with Flow (dictation, the Notetaker, the
+// The vufh window: a sidebar with Flow (dictation, the Notetaker, the
 // statistics, the dictionary, the snippets, the styles and their settings)
 // and Notch (every setting of the island), and the page on the right, under
 // its coloured band. Port of FlowHub.swift.
@@ -39,7 +39,7 @@ export const NOTCH_PAGES: PageDef[] = [
   { id: "pills", icon: "grid", title: () => t("Active pills"), subtitle: () => t("The pills shown in the island, their order and their colours.") },
   { id: "tasks", icon: "check", title: () => t("Tasks") },
   { id: "chat", icon: "chat", title: () => t("Chat"), subtitle: () => t("The AI of the island's chat, with your own keys.") },
-  { id: "voice", icon: "wave", title: () => "OK Coucou" },
+  { id: "voice", icon: "wave", title: () => "OK Tofu" },
   { id: "integrations", icon: "puzzle", title: () => t("Integrations"), subtitle: () => t("Stripe, GitHub, Vercel, n8n, Notion and the rest.") },
   { id: "shortcuts", icon: "keyboard", title: () => t("Shortcuts"), subtitle: () => t("The keys that open the island and its actions.") },
 ];
@@ -162,7 +162,7 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
   // ── The sidebar ──
   const side = h("nav", { class: "hub-side" });
   const logo = h("canvas", {});
-  side.append(h("div", { class: "hub-brand" }, logo, h("span", { text: "Coucou" })));
+  side.append(h("div", { class: "hub-brand" }, logo, h("span", { text: "vufh" })));
   liveMochi(logo as HTMLCanvasElement);
   const group = (title: string, pages: PageDef[]) => {
     side.append(h("div", { class: "hub-group", text: title }));
@@ -175,7 +175,7 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
   };
   group("Flow", FLOW_PAGES);
   group(t("Notch"), NOTCH_PAGES);
-  side.append(h("div", { class: "spacer" }), statusLine, h("div", { class: "hub-version", text: `Coucou ${opts.version}` }));
+  side.append(h("div", { class: "spacer" }), statusLine, h("div", { class: "hub-version", text: `vufh ${opts.version}` }));
 
   clear(root);
   root.append(side, h("main", { class: "hub-panel" }, scroll));

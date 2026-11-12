@@ -5,7 +5,7 @@
 // events are identical.
 
 import { EventEmitter } from "node:events";
-import { EVENT_PAYLOADS, EVENT_VERSION, type AgentEvent, type EventPayload, type EventType } from "@coucou-orchestrator/protocol";
+import { EVENT_PAYLOADS, EVENT_VERSION, type AgentEvent, type EventPayload, type EventType } from "@vufh-orchestrator/protocol";
 import { redact } from "./redact.ts";
 import type { EventRow, Store } from "./store.ts";
 
@@ -29,7 +29,7 @@ export class EventLog {
 
   constructor(store: Store) {
     this.store = store;
-    // One listener per open SSE stream; Coucou plus a few tabs at most.
+    // One listener per open SSE stream; vufh plus a few tabs at most.
     this.emitter.setMaxListeners(100);
   }
 

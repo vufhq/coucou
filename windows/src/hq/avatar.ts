@@ -1,4 +1,4 @@
-// Coucou HQ: an agent's face, a mini Mochi in its colour and outfit on a
+// vufh HQ: an agent's face, a mini Mochi in its colour and outfit on a
 // round tinted disc. The sidebar and the conversation both use it. Each one is
 // a live canvas ticked by main.ts's loop; when the element leaves the
 // document, pruneMiniBots() forgets it, so callers simply replace it.

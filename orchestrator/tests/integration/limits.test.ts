@@ -3,7 +3,7 @@
 // inside its fence in the model's prompt.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_RESULT_CHARS, clipText, type Task } from "@coucou-orchestrator/protocol";
+import { MAX_RESULT_CHARS, clipText, type Task } from "@vufh-orchestrator/protocol";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import { fitOutcome } from "../../worker/src/worker.ts";
 import { FakeBrowser, WORKER_TOKEN, cleanup, key, startBackend, startWorker, tempDir, waitFor, type Running } from "./harness.ts";

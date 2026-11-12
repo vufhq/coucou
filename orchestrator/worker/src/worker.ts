@@ -20,7 +20,7 @@ import {
   type OpArgs,
   type WorkerEvent,
   type WorkerHealth,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 import { BackendError, type BackendClient } from "./client.ts";
 import type { Journal } from "./journal.ts";
 import { PathError, ensureTaskDir } from "./paths.ts";
@@ -290,7 +290,7 @@ export class Worker {
   /** `githubToken` came with this job (git.* only) and goes no further than git's environment. */
   /** Private clones go in the worker's own workspace, out of the runner's reach. */
   private gitOptions(): GitOptions {
-    return { privateDir: join(this.o.workspace, ".coucou", "git"), ...this.o.git };
+    return { privateDir: join(this.o.workspace, ".vufh", "git"), ...this.o.git };
   }
 
   private dispatch(ctx: OpContext, op: string, args: Record<string, unknown>, githubToken: string | null): Promise<OpResult> {

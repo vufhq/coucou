@@ -1,4 +1,4 @@
-// Coucou HQ: the window where the user runs Mochi and his team.
+// vufh HQ: the window where the user runs Mochi and his team.
 // The shared shapes between the store (store.ts, model.ts), the sidebar
 // (sidebar.ts, avatar.ts, activity.ts), the conversation (conversation.ts,
 // thread.ts, composer.ts, palette.ts) and the side panel (panel.ts). Each part

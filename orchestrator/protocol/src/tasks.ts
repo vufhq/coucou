@@ -1,8 +1,8 @@
-// Tasks: what Coucou submits and what the backend keeps about each one.
+// Tasks: what vufh submits and what the backend keeps about each one.
 
 import { z } from "zod";
 
-/** Same rule as Coucou's `coucou_agent` tag: the pill becomes `agent_<id>`. */
+/** Same rule as vufh's `vufh_agent` tag: the pill becomes `agent_<id>`. */
 export const AgentId = z.string().regex(/^[a-z0-9-]{1,24}$/).refine((id) => id !== "claude", "reserved");
 export type AgentId = z.infer<typeof AgentId>;
 
@@ -64,7 +64,7 @@ export const CreateTaskRequest = z.object({
   modelProfileId: z.string().min(1).max(64).optional(),
   budget: Budget.partial().optional(),
   /**
-   * The conversation this task comes from (Coucou's chat with the agent), so
+   * The conversation this task comes from (vufh's chat with the agent), so
    * a follow-up like "now make it shorter" makes sense. Background for the
    * model, never instructions.
    */
@@ -203,7 +203,7 @@ export const Agent = z.object({
     tasksToday: z.number().int(),
     stepsToday: z.number().int(),
   }),
-  /** The colour the user gave it (#RRGGBB), or null for Coucou's default. */
+  /** The colour the user gave it (#RRGGBB), or null for vufh's default. */
   color: z.string().nullable(),
   modelProfileId: z.string(),
   lastSeenAt: z.string().nullable(),
@@ -245,7 +245,7 @@ export const Computer = z.object({
 export type Computer = z.infer<typeof Computer>;
 
 /**
- * What is wrong with an agent's computer, if anything, as a code Coucou
+ * What is wrong with an agent's computer, if anything, as a code vufh
  * words in the user's language:
  * - vm_stopped: the WSL distro is not running
  * - worker_down: the distro runs but its worker does not answer

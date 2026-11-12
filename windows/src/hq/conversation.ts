@@ -1,4 +1,4 @@
-// Coucou HQ: the middle pane. A header with the agent on the left and its
+// vufh HQ: the middle pane. A header with the agent on the left and its
 // computer and settings buttons on the right (they open the side panel), the
 // thread, and the composer at the bottom. Everything is redrawn from the store
 // on each change, keeping what did not change.

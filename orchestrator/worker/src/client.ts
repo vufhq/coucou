@@ -14,7 +14,7 @@ import {
   type JobOutcome,
   type WorkerEvent,
   type WorkerHealth,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 
 export class BackendError extends Error {
   readonly status: number;

@@ -1,4 +1,4 @@
-# Contributing to Coucou HQ
+# Contributing to vufh HQ
 
 Thanks for wanting to help Mochi and his team.
 

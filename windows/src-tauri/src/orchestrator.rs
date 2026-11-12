@@ -1,4 +1,4 @@
-// Coucou as the control surface of the orchestrator backend (orchestrator/ at
+// vufh as the control surface of the orchestrator backend (orchestrator/ at
 // the repository root): tasks run there and in the agent's own Linux VM, never
 // here. See orchestrator/README.md.
 //
@@ -9,12 +9,12 @@
 // Heartbeats and tool output stay out of the island: a hidden island still
 // costs nothing. The Tasks page gets every event as `orchestrator-event`.
 //
-// When nothing answers, Coucou starts the backend itself (node, from the
+// When nothing answers, vufh starts the backend itself (node, from the
 // orchestrator folder: the one picked on the Tasks page, else the repository a
 // dev build sits in) and leaves it running when it quits.
 //
 // The access token is the backend's own: it writes it to the Credential
-// Manager on its first start, under Coucou's service name, and only Rust reads
+// Manager on its first start, under vufh's service name, and only Rust reads
 // it. The backend's address must be this machine, so the token cannot be sent
 // anywhere else.
 
@@ -74,7 +74,7 @@ pub struct Orchestrator {
     prefs: Mutex<Prefs>,
     status: Mutex<Status>,
     wake: Notify,
-    /// When Coucou last started the backend.
+    /// When vufh last started the backend.
     started: Mutex<Option<Instant>>,
 }
 
@@ -136,7 +136,7 @@ fn detail(body: &[u8]) -> String {
 }
 
 fn token() -> Result<String, String> {
-    secrets::get_internal(TOKEN_KEY).ok_or_else(|| t("Start the orchestrator backend once: it creates the key Coucou needs."))
+    secrets::get_internal(TOKEN_KEY).ok_or_else(|| t("Start the orchestrator backend once: it creates the key vufh needs."))
 }
 
 async fn request(app: &AppHandle, method: Method, path: &str, body: Option<Value>) -> Result<Vec<u8>, String> {
@@ -213,7 +213,7 @@ pub fn translate(event: &Value) -> Vec<(&'static str, Value)> {
     let hook = |name: &str, extra: Value| {
         let mut payload = json!({
             "hook_event_name": name,
-            "coucou_agent": agent,
+            "vufh_agent": agent,
             "session_id": format!("{REQUEST_PREFIX}{task}"),
         });
         if let (Some(map), Value::Object(more)) = (payload.as_object_mut(), extra) {
@@ -484,7 +484,7 @@ fn is_backend_dir(dir: &Path) -> bool {
     dir.join("package.json").is_file() && dir.join("server").join("src").join("main.ts").is_file()
 }
 
-/// Where Coucou starts the backend from: the folder the user picked, else the
+/// Where vufh starts the backend from: the folder the user picked, else the
 /// `orchestrator` folder of the repository this build sits in (a dev build).
 /// None for an installed build with no folder picked.
 fn backend_dir(prefs: &Prefs) -> Option<PathBuf> {
@@ -498,7 +498,7 @@ fn backend_dir(prefs: &Prefs) -> Option<PathBuf> {
 }
 
 /// Starts the backend when nothing answers at its address, at most once a
-/// minute. It keeps running when Coucou quits, so goals and tasks go on.
+/// minute. It keeps running when vufh quits, so goals and tasks go on.
 async fn ensure_backend(app: &AppHandle, prefs: &Prefs) {
     if !prefs.start_backend {
         return;
@@ -526,7 +526,7 @@ async fn ensure_backend(app: &AppHandle, prefs: &Prefs) {
 }
 
 /// `npm start` without npm: node runs the backend with the folder's .env, its
-/// output in Coucou's local folder.
+/// output in vufh's local folder.
 fn spawn_backend(dir: &Path) -> Result<(), String> {
     let node = platform::find_on_path("node").ok_or("node is not on PATH")?;
     let logs = platform::local_dir();
@@ -734,14 +734,14 @@ pub async fn orchestrator_submit(
 /// The largest file a message can carry: the backend's own limit.
 const MAX_ATTACHMENT: u64 = 20 * 1024 * 1024;
 
-/// Hands the backend a file the user dropped on (or picked in) Coucou HQ's
+/// Hands the backend a file the user dropped on (or picked in) vufh HQ's
 /// composer; it keeps it for the next message, whose task copies it to the
 /// agent's computer. Only a path a real drop or pick just delivered is read
 /// (files.rs), so the page cannot send a file of its own choosing.
 #[tauri::command]
 pub async fn orchestrator_attach(app: AppHandle, path: String) -> Result<Value, String> {
     if !crate::files::take_dropped(&path) {
-        return Err(t("Only files dropped on or chosen in Coucou HQ can be attached."));
+        return Err(t("Only files dropped on or chosen in vufh HQ can be attached."));
     }
     let source = Path::new(&path);
     let meta = std::fs::metadata(source)
@@ -942,7 +942,7 @@ fn tasks_query(
     Ok(format!("/api/tasks?{}", query.join("&")))
 }
 
-/// Tasks filtered by agent, source and parent (Coucou HQ's threads).
+/// Tasks filtered by agent, source and parent (vufh HQ's threads).
 #[tauri::command]
 pub async fn orchestrator_list_tasks(
     app: AppHandle,
@@ -1069,7 +1069,7 @@ pub async fn orchestrator_files(app: AppHandle, agent_id: String, task_id: Strin
     api(&app, Method::GET, &path, None).await
 }
 
-/// Saves one of a task's files to Downloads\Coucou\<task> and returns where it went.
+/// Saves one of a task's files to Downloads\vufh\<task> and returns where it went.
 #[tauri::command]
 pub async fn orchestrator_save_file(app: AppHandle, agent_id: String, task_id: String, path: String) -> Result<String, String> {
     let valid = !path.is_empty()
@@ -1080,7 +1080,7 @@ pub async fn orchestrator_save_file(app: AppHandle, agent_id: String, task_id: S
     }
     let route = format!("/api/agents/{}/files/{}/{}", segment(&agent_id)?, segment(&task_id)?, path);
     let bytes = request(&app, Method::GET, &route, None).await?;
-    let dir = platform::home_dir().join("Downloads").join("Coucou").join(&task_id[..8.min(task_id.len())]);
+    let dir = platform::home_dir().join("Downloads").join("vufh").join(&task_id[..8.min(task_id.len())]);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let name = path.rsplit('/').next().unwrap_or("file");
     let target = dir.join(name);
@@ -1102,7 +1102,7 @@ mod tests {
         assert!(prefs.start_backend);
         assert_eq!(prefs.backend_dir, "");
 
-        let dir = std::env::temp_dir().join(format!("coucou-orch-dir-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("vufh-orch-dir-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("server").join("src")).unwrap();
         let picked = Prefs { backend_dir: dir.display().to_string(), ..Prefs::default() };
         assert_eq!(backend_dir(&picked), None);
@@ -1134,7 +1134,7 @@ mod tests {
         assert_eq!(started.len(), 1);
         assert_eq!(started[0].0, "hook");
         assert_eq!(started[0].1["hook_event_name"], "UserPromptSubmit");
-        assert_eq!(started[0].1["coucou_agent"], "agent-01");
+        assert_eq!(started[0].1["vufh_agent"], "agent-01");
         assert_eq!(started[0].1["session_id"], "orch:t-1");
         assert_eq!(started[0].1["prompt"], "Summarise the docs");
 
@@ -1173,8 +1173,8 @@ mod tests {
         };
         let one = of("agent-01", "task.started", json!({ "prompt": "a", "modelProfileId": "claude-cli" }));
         let two = of("agent-02", "task.started", json!({ "prompt": "b", "modelProfileId": "claude-cli" }));
-        assert_eq!(one[0].1["coucou_agent"], "agent-01");
-        assert_eq!(two[0].1["coucou_agent"], "agent-02");
+        assert_eq!(one[0].1["vufh_agent"], "agent-01");
+        assert_eq!(two[0].1["vufh_agent"], "agent-02");
         assert_ne!(one[0].1["session_id"], two[0].1["session_id"]);
         let asked = of("agent-02", "approval.requested", json!({ "approvalId": "a-1", "op": "fs.write_artifact", "target": "x", "reason": "overwrite" }));
         assert_eq!(asked[0].1["request_id"], "orch:agent-02:a-1");

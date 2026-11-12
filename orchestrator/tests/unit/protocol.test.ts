@@ -8,7 +8,7 @@ import {
   isPrivateHost,
   parseDecision,
   parseOperation,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 
 describe("operations", () => {
   it("accepts a well-formed operation and drops nothing it needs", () => {

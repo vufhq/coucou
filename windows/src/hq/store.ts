@@ -1,4 +1,4 @@
-// Coucou HQ: what the window knows about Mochi and his team, kept up to date
+// vufh HQ: what the window knows about Mochi and his team, kept up to date
 // from the backend. The sidebar and the conversation read it through HqStore
 // (types.ts) and never call the backend themselves for what is listed here.
 //
@@ -105,7 +105,7 @@ export function createHqStore(): HqStore {
   async function offlineText(): Promise<string> {
     const s = await OrchestratorBridge.status().catch(() => null);
     if (s && !s.prefs.enabled) return t("The orchestrator is turned off. Turn it on in Tasks.");
-    if (s?.status.state === "noToken") return t("Start the orchestrator backend once: it creates the key Coucou needs.");
+    if (s?.status.state === "noToken") return t("Start the orchestrator backend once: it creates the key vufh needs.");
     return s?.status.error ?? t("The backend stopped answering.");
   }
 

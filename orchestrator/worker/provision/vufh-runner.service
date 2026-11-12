@@ -1,7 +1,7 @@
 [Unit]
-Description=Coucou computer: runs the agents' shell commands
-Requires=coucou-runner.socket coucou-computer.service
-After=coucou-runner.socket coucou-computer.service
+Description=vufh computer: runs the agents' shell commands
+Requires=vufh-runner.socket vufh-computer.service
+After=vufh-runner.socket vufh-computer.service
 
 [Service]
 # Not the worker's user: what the agents run never sees the worker, its
@@ -9,7 +9,7 @@ After=coucou-runner.socket coucou-computer.service
 # folders, each agent's own folder, and a shared one.
 User=runner
 Group=computer
-WorkingDirectory=/opt/coucou-worker
+WorkingDirectory=/opt/vufh-worker
 Environment=ORCH_COMPUTER=/computer
 ExecStart=/usr/local/bin/node worker/src/runner/main.ts
 Restart=always
@@ -24,7 +24,7 @@ PrivateTmp=yes
 PrivateDevices=yes
 # The worker's processes are invisible, and its files, token and settings unreachable.
 ProtectProc=invisible
-InaccessiblePaths=-/workspace -/etc/coucou-worker -/run/credentials -/run/coucou-runner.sock
+InaccessiblePaths=-/workspace -/etc/vufh-worker -/run/credentials -/run/vufh-runner.sock
 # Folders WSL shares between every distro on the PC: other agents, and the
 # sockets of Podman, Docker or WSLg.
 InaccessiblePaths=-/mnt/wsl -/mnt/wslg -/tmp/.X11-unix

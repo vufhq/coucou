@@ -1,6 +1,6 @@
-// The access tokens: one Coucou presents, and one per agent that its worker
-// presents. They live in the Windows Credential Manager under Coucou's own
-// service name, so Coucou's Rust side (secrets.rs, same keyring entry format)
+// The access tokens: one vufh presents, and one per agent that its worker
+// presents. They live in the Windows Credential Manager under vufh's own
+// service name, so vufh's Rust side (secrets.rs, same keyring entry format)
 // reads the API one, and none ever touches the disk. Created on first use.
 //
 // Each agent has its own worker token, and the backend knows which agent is
@@ -11,8 +11,8 @@
 // for machines without a credential store.
 
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { keyringEntry } from "./keyring.ts";
 
-const SERVICE = "fr.louisraille.coucou";
 export const API_TOKEN_KEY = "orchestrator-token";
 export const WORKER_TOKEN_KEY = "orchestrator-worker-token";
 
@@ -32,12 +32,11 @@ function fresh(): string {
 }
 
 async function fromKeyring(key: string): Promise<string> {
-  const { Entry } = await import("@napi-rs/keyring");
-  const entry = new Entry(SERVICE, key);
-  const existing = entry.getPassword();
+  const entry = await keyringEntry(key);
+  const existing = entry.read();
   if (existing) return existing;
   const token = fresh();
-  entry.setPassword(token);
+  entry.write(token);
   return token;
 }
 

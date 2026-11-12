@@ -16,7 +16,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
   try {
     return await invoke<T>(cmd, args);
   } catch (err) {
-    console.error(`[coucou] ${cmd} failed`, err);
+    console.error(`[vufh] ${cmd} failed`, err);
     return null;
   }
 }
@@ -69,15 +69,15 @@ export const Bridge = {
   quit: () => call<void>("quit_app"),
 
   openSettingsWindow: () => call<void>("open_settings_window"),
-  /** Opens the Coucou window on one page: "tasks", or "tasks?agent=agent-02". */
+  /** Opens the vufh window on one page: "tasks", or "tasks?agent=agent-02". */
   openHubPage: (page: string) => call<void>("open_settings_window", { page }),
-  /** Shows Coucou HQ, on that agent's thread when given. */
+  /** Shows vufh HQ, on that agent's thread when given. */
   showHq: (agentId?: string | null) => call<void>("show_hq", { agentId: agentId ?? null }),
   openHqAtLaunch: () => call<boolean>("open_hq_at_launch"),
-  /** Whether Coucou HQ is on screen; false outside Tauri. Asked once at load, then `hq-visible`. */
+  /** Whether vufh HQ is on screen; false outside Tauri. Asked once at load, then `hq-visible`. */
   hqShown: async (): Promise<boolean> => (await call<boolean>("hq_shown")) ?? false,
 
-  /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
+  /** Writes to %LOCALAPPDATA%\vufh\vufh.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
   /** Allow or Deny on the island's card, for an orchestrator agent's request. */
@@ -190,7 +190,7 @@ export async function emitToWindow(label: string, event: string, payload?: unkno
   try {
     await emitTo(label, event, payload);
   } catch (err) {
-    console.error(`[coucou] emit ${event} failed`, err);
+    console.error(`[vufh] emit ${event} failed`, err);
   }
 }
 
@@ -226,7 +226,7 @@ export interface DroppedFile {
 
 /** Same as `call`, but surfaces the error so the UI can show what went wrong. */
 async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!IS_TAURI) throw new Error("not running inside Coucou");
+  if (!IS_TAURI) throw new Error("not running inside vufh");
   return invoke<T>(cmd, args);
 }
 
@@ -290,7 +290,7 @@ export async function onDragDrop(handler: (e: DragDropPayload) => void) {
       handler({ type: "drop", paths: [] });
       return;
     }
-    webview.postMessageWithAdditionalObjects("coucou-file-drop", files);
+    webview.postMessageWithAdditionalObjects("vufh-file-drop", files);
   };
 
   window.addEventListener("dragenter", onEnter);
@@ -315,7 +315,7 @@ export async function onDragDrop(handler: (e: DragDropPayload) => void) {
 export function sendPickedFiles(files: FileList): boolean {
   const webview = (window as unknown as { chrome?: { webview?: WebView2Bridge } }).chrome?.webview;
   if (!IS_TAURI || !webview) return false;
-  if (files.length > 0) webview.postMessageWithAdditionalObjects("coucou-file-drop", files);
+  if (files.length > 0) webview.postMessageWithAdditionalObjects("vufh-file-drop", files);
   return true;
 }
 

@@ -12,7 +12,7 @@
   Run it again with -Update to copy a newer worker in and restart it; the
   distro, its disk and /workspace are kept.
 
-  Every computer mounts one Windows folder, -SharedDir (D:\coucou-vms\shared
+  Every computer mounts one Windows folder, -SharedDir (D:\vufh-vms\shared
   unless you say otherwise), at /computer: the agents' own folders and the
   task folders live there, so any computer can run any agent. Give every
   computer the same -SharedDir.
@@ -33,16 +33,16 @@
     1. wsl --install Ubuntu-24.04 --name <Name> --location <Location>   (first run only)
     2. creates -SharedDir if needed, gives you full control of it and makes it
        case-sensitive like a Linux folder (only while it is still empty)
-    3. copies this folder's code into /opt/coucou-worker (a tar stream)
+    3. copies this folder's code into /opt/vufh-worker (a tar stream)
     4. runs worker/provision/setup.sh <Name> <SharedDir> inside the distro as root; it mounts
        -SharedDir at /computer, and moves what this computer had in /computer onto it
-    5. pipes that agent's own worker token into /etc/coucou-worker/worker-token (never written on Windows)
+    5. pipes that agent's own worker token into /etc/vufh-worker/worker-token (never written on Windows)
     6. restarts the distro so /etc/wsl.conf applies (no Windows drive but -SharedDir, no Windows programs)
 #>
 param(
   [string]$Name = "agent-01",
   [string]$Location = "",
-  [string]$SharedDir = "D:\coucou-vms\shared",
+  [string]$SharedDir = "",
   [string]$RemoteHost = "",
   [string]$RemoteUser = "ubuntu",
   [int]$RemotePort = 22,
@@ -87,35 +87,35 @@ if ($RemoteHost) {
   function Invoke-Remote([string]$command) { & ssh.exe @ssh $target $command }
 
   Invoke-Checked "Reaching $target (it must let $RemoteUser use sudo without a password)" { Invoke-Remote "sudo -n true" }
-  Invoke-Remote "test -d /opt/coucou-worker/worker"
+  Invoke-Remote "test -d /opt/vufh-worker/worker"
   $installed = $LASTEXITCODE -eq 0
   if ($installed -and -not $Update) { throw "$RemoteHost already has a worker. Use -Update to refresh it." }
   if (-not $installed -and $Update) { throw "$RemoteHost has no worker yet; run without -Update first." }
 
   Invoke-Checked "Copying the worker to $RemoteHost" {
-    Invoke-Remote "sudo rm -rf /opt/coucou-worker.new && sudo mkdir -p /opt/coucou-worker.new /opt/coucou-worker"
+    Invoke-Remote "sudo rm -rf /opt/vufh-worker.new && sudo mkdir -p /opt/vufh-worker.new /opt/vufh-worker"
     if ($LASTEXITCODE -ne 0) { return }
     # Through cmd.exe: Windows PowerShell would turn the tar stream into text.
     $sshLine = ($ssh | ForEach-Object { if ($_ -match '[ ]') { "`"$_`"" } else { $_ } }) -join " "
-    cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=.env --exclude=tests -cf - . | ssh.exe $sshLine $target sudo tar -C /opt/coucou-worker.new -xf -"
+    cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=.env --exclude=tests -cf - . | ssh.exe $sshLine $target sudo tar -C /opt/vufh-worker.new -xf -"
     if ($LASTEXITCODE -ne 0) { return }
-    Invoke-Remote "sudo cp -a /opt/coucou-worker.new/. /opt/coucou-worker/ && sudo rm -rf /opt/coucou-worker.new"
+    Invoke-Remote "sudo cp -a /opt/vufh-worker.new/. /opt/vufh-worker/ && sudo rm -rf /opt/vufh-worker.new"
   }
 
   Invoke-Checked "Setting up $Name on $RemoteHost (this takes a few minutes the first time)" {
-    Invoke-Remote "sudo bash /opt/coucou-worker/worker/provision/setup.sh $Name remote"
+    Invoke-Remote "sudo bash /opt/vufh-worker/worker/provision/setup.sh $Name remote"
   }
 
   Invoke-Checked "Handing the worker its token" {
     Push-Location $root
     try {
       node server/src/print-token.ts $Name |
-        & ssh.exe @ssh $target "sudo sh -c 'umask 077 && mkdir -p /etc/coucou-worker && cat > /etc/coucou-worker/worker-token'"
+        & ssh.exe @ssh $target "sudo sh -c 'umask 077 && mkdir -p /etc/vufh-worker && cat > /etc/vufh-worker/worker-token'"
     } finally { Pop-Location }
   }
 
   Invoke-Checked "Starting the worker" {
-    Invoke-Remote "sudo systemctl restart coucou-computer.service coucou-runner.socket coucou-worker.service"
+    Invoke-Remote "sudo systemctl restart vufh-computer.service vufh-runner.socket vufh-worker.service"
   }
 
   $entry = if ($RemotePort -eq 22) { "$Name@$RemoteHost" } else { "$Name@${RemoteHost}:$RemotePort" }
@@ -124,15 +124,19 @@ if ($RemoteHost) {
   Write-Host "List it in ORCH_AGENTS in $root\.env as $entry (for example ORCH_AGENTS=agent-01,$entry),"
   if ($IdentityFile) { Write-Host "add ORCH_SSH_KEY=$IdentityFile on its own line," }
   Write-Host "then restart the backend. It opens the connection itself and keeps it open; that key must work without a passphrase prompt."
-  Write-Host "Worker log: ssh $target sudo journalctl -u coucou-worker -n 50"
-  Write-Host "Shell log:  ssh $target sudo journalctl -u coucou-runner -n 50"
+  Write-Host "Worker log: ssh $target sudo journalctl -u vufh-worker -n 50"
+  Write-Host "Shell log:  ssh $target sudo journalctl -u vufh-runner -n 50"
   return
 }
 
-if (-not $Location) { $Location = "D:\coucou-vms\$Name" }
+# Computers made before the app was renamed live in D:\coucou-vms, shared
+# folder included: they stay there, and new ones join them.
+$vmRoot = if ((Test-Path "D:\coucou-vms") -and -not (Test-Path "D:\vufh-vms")) { "D:\coucou-vms" } else { "D:\vufh-vms" }
+if (-not $Location) { $Location = "$vmRoot\$Name" }
+if (-not $SharedDir) { $SharedDir = "$vmRoot\shared" }
 # setup.sh checks the same rule: a plain Windows path, nothing a shell could read as more.
 if ($SharedDir -notmatch '^[A-Za-z]:\\[-A-Za-z0-9 ._\\]+$') {
-  throw "-SharedDir must be a plain Windows folder path (letters, digits, space, . _ - and \), e.g. D:\coucou-vms\shared."
+  throw "-SharedDir must be a plain Windows folder path (letters, digits, space, . _ - and \), e.g. D:\vufh-vms\shared."
 }
 $SharedDir = $SharedDir.TrimEnd('\')
 
@@ -163,24 +167,24 @@ if ($caseInfo -notmatch 'enabled') {
 
 Invoke-Checked "Copying the worker into $Name" {
   # Through cmd.exe: Windows PowerShell would turn the tar stream into text.
-  $unpack = "rm -rf /opt/coucou-worker.new && mkdir -p /opt/coucou-worker.new && tar -C /opt/coucou-worker.new -xf - && mkdir -p /opt/coucou-worker && cp -a /opt/coucou-worker.new/. /opt/coucou-worker/ && rm -rf /opt/coucou-worker.new"
+  $unpack = "rm -rf /opt/vufh-worker.new && mkdir -p /opt/vufh-worker.new && tar -C /opt/vufh-worker.new -xf - && mkdir -p /opt/vufh-worker && cp -a /opt/vufh-worker.new/. /opt/vufh-worker/ && rm -rf /opt/vufh-worker.new"
   cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=.env --exclude=tests -cf - . | wsl.exe -d $Name -u root --exec sh -c `"$unpack`""
 }
 
 Invoke-Checked "Setting up $Name (this takes a few minutes the first time)" {
-  wsl.exe -d $Name -u root --exec bash /opt/coucou-worker/worker/provision/setup.sh $Name $SharedDir
+  wsl.exe -d $Name -u root --exec bash /opt/vufh-worker/worker/provision/setup.sh $Name $SharedDir
 }
 
 Invoke-Checked "Handing the worker its token" {
   Push-Location $root
   try {
     node server/src/print-token.ts $Name |
-      wsl.exe -d $Name -u root --exec sh -c "umask 077 && mkdir -p /etc/coucou-worker && cat > /etc/coucou-worker/worker-token"
+      wsl.exe -d $Name -u root --exec sh -c "umask 077 && mkdir -p /etc/vufh-worker && cat > /etc/vufh-worker/worker-token"
   } finally { Pop-Location }
 }
 
 Invoke-Checked "Restarting $Name" { wsl.exe --terminate $Name }
-Invoke-Checked "Starting the worker" { wsl.exe -d $Name -u root --exec systemctl restart coucou-computer.service coucou-runner.socket coucou-worker.service }
+Invoke-Checked "Starting the worker" { wsl.exe -d $Name -u root --exec systemctl restart vufh-computer.service vufh-runner.socket vufh-worker.service }
 
 Write-Host ""
 Write-Host "$Name is ready."
@@ -188,5 +192,5 @@ if ($Name -ne "agent-01") {
   Write-Host "Add it to ORCH_AGENTS in $root\.env (for example ORCH_AGENTS=agent-01,$Name), then restart the backend."
 }
 Write-Host "Start the backend with: npm start   (in $root)"
-Write-Host "Worker log: wsl -d $Name -u root --exec journalctl -u coucou-worker -n 50"
-Write-Host "Shell log:  wsl -d $Name -u root --exec journalctl -u coucou-runner -n 50"
+Write-Host "Worker log: wsl -d $Name -u root --exec journalctl -u vufh-worker -n 50"
+Write-Host "Shell log:  wsl -d $Name -u root --exec journalctl -u vufh-runner -n 50"

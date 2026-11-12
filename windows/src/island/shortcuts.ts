@@ -89,7 +89,7 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
       break;
     }
 
-    // Coucou HQ, on the focused agent's thread. The id is the old "Open the
+    // vufh HQ, on the focused agent's thread. The id is the old "Open the
     // terminal" one, kept so the key the user set keeps working.
     case "jumpToTerminal": {
       void Bridge.showHq(State.focusTask?.orchestrator?.agentId ?? null);

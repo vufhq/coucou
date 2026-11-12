@@ -1,4 +1,4 @@
-// The Coucou window (settings.html): Flow dictation, the Notetaker and, under
+// The vufh window (settings.html): Flow dictation, the Notetaker and, under
 // Notch, every setting of the island — the place where anything that writes to
 // disk is confirmed. The window's frame and the Flow pages live in ../hub; the
 // island's settings are drawn here, one Notch page at a time.
@@ -704,8 +704,9 @@ function generalSection(): HTMLElement {
 function characterRows(): HTMLElement[] {
   const select = h("select", {}) as HTMLSelectElement;
   select.append(
-    h("option", { value: "mochi", text: "Mochi" }),
+    h("option", { value: "chrome", text: t("Tofu, in chrome") }),
     h("option", { value: "tofu", text: "Tofu" }),
+    h("option", { value: "mochi", text: "Mochi" }),
   );
   select.value = parseCharacter(settings.character);
 
@@ -747,13 +748,13 @@ function characterRows(): HTMLElement[] {
   return [
     h("div", { class: "row" }, h("label", { text: t("Character") }), select),
     colorRow,
-    h("div", { class: "hint", text: t("Tofu is a flat pebble with Mochi's moves and outfits. It shows in the island, on the desktop and in Coucou HQ.") }),
+    h("div", { class: "hint", text: t("Tofu is a pebble with Mochi's moves and outfits, in liquid chrome or in one flat colour. It shows in the island, on the desktop and in vufh HQ.") }),
   ];
 }
 
 /**
  * Settings → General → Language, as on the Mac: "System" follows the
- * system's language when Coucou has it (else English), or one of the ten.
+ * system's language when vufh has it (else English), or one of the ten.
  * Both windows and the tray switch in place, without a restart.
  */
 function languageRow(): HTMLElement {
@@ -999,7 +1000,7 @@ function applyLanguage() {
 
 function applyDirection() {
   document.documentElement.dir = isRtl() ? "rtl" : "ltr";
-  document.title = "Coucou";
+  document.title = "vufh";
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -1014,7 +1015,7 @@ async function main() {
   applyCharacter(settings);
   applyDirection();
   // The window is borderless (lib.rs): its title bar is drawn here.
-  mountTitleBar({ title: "Coucou" });
+  mountTitleBar({ title: "vufh" });
   hub = await startHub(windowRoot, {
     version,
     flowPages: FLOW_PAGE_RENDERERS,

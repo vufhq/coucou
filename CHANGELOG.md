@@ -1,13 +1,22 @@
 # Changelog
 
-## Unreleased — Coucou HQ
+## Unreleased — vufh HQ
 
-Coucou becomes Coucou HQ: a team of AI agents on their own computers, run from
+Coucou becomes vufh HQ: a team of AI agents on their own computers, run from
 Windows. Everything that did not serve that goes.
 
-- **Coucou HQ is the front door** — it opens after Mochi's greeting, from the
-  tray and when you launch Coucou again (Flow → Settings → App → Open Coucou HQ
-  when you open Coucou). `Ctrl+Alt+T` and a finished task's **Open in HQ** open
+- **A new name, icon and face** — the app is vufh, its window vufh HQ, and
+  Tofu in liquid chrome is who you see (Settings → General → Character; Mochi
+  and the flat Tofu are still there). The wake phrase is « OK Tofu ». Your
+  keys, settings, models and tasks follow: the folders in `%APPDATA%` and
+  `%LOCALAPPDATA%` are renamed on first launch, and the keys are read from
+  where they were. Run `provision.ps1 -Update` once per computer: the worker's
+  services and folders there take the new name too. The gateway variable is
+  now `VUFH_ANTHROPIC_BASE_URL`
+
+- **vufh HQ is the front door** — it opens after Mochi's greeting, from the
+  tray and when you launch vufh again (Flow → Settings → App → Open vufh HQ
+  when you open vufh). `Ctrl+Alt+T` and a finished task's **Open in HQ** open
   it on the agent's thread
 - **The island follows your agents** — their pills come first; up to four chat
   or service pills follow. The approval card, the steps and the summaries are
@@ -35,7 +44,7 @@ Windows. Everything that did not serve that goes.
   computer allows one, WebSockets follow the same rule as requests, an answer
   from a private address closes the browser session, and the worker's service
   is kept off the local network
-- The translations are now Coucou's own (`windows/src/i18n`), without the 600
+- The translations are now vufh's own (`windows/src/i18n`), without the 600
   strings nothing used any more
 
 

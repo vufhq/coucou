@@ -167,7 +167,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
           : s.status.state === "connecting"
             ? t("Connecting…")
             : s.status.state === "noToken"
-              ? t("Start the orchestrator backend once: it creates the key Coucou needs.")
+              ? t("Start the orchestrator backend once: it creates the key vufh needs.")
               : (s.status.error ?? t("The backend stopped answering."));
     const sw = toggle(enabled, (on) => {
       void OrchestratorBridge.setPrefs(on, s?.prefs.url ?? "").then(() => reload(true), (err) => {
@@ -196,7 +196,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     } else if (gh.connected) {
       detail = t("Signed in as {login}. Agents use it only when you allow them in HQ.", { login: gh.login ?? "?" });
       action = button(t("Disconnect"), () => {
-        if (!window.confirm(t("Disconnect GitHub? To revoke Coucou's access too, remove it in GitHub's settings."))) return;
+        if (!window.confirm(t("Disconnect GitHub? To revoke vufh's access too, remove it in GitHub's settings."))) return;
         void OrchestratorBridge.githubDisconnect().then(() => reload(), fail);
       }, "danger", true);
     } else if (gh.pending) {
@@ -218,7 +218,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
     githubPoll = gh.pending && page.isConnected ? setTimeout(() => void reload(), 3_000) : null;
   }
 
-  /** Whether Coucou starts the backend when it is not running, and from which folder. */
+  /** Whether vufh starts the backend when it is not running, and from which folder. */
   function drawStartBackend(s: OrchStatus) {
     const save = (backend: { startBackend?: boolean; backendDir?: string }) => {
       void OrchestratorBridge.setPrefs(s.prefs.enabled, s.prefs.url, backend).then(() => {
@@ -241,7 +241,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
       ? t("Starts it from {folder} when it is not running.", { folder: s.backendDir })
       : t("Pick the orchestrator folder to start the backend from.");
     connection.append(card(
-      row(t("Start the backend with Coucou"), where, sw),
+      row(t("Start the backend with vufh"), where, sw),
       s.prefs.startBackend ? folder : null,
     ));
   }

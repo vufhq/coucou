@@ -1,4 +1,4 @@
-import type { Schedule } from "@coucou-orchestrator/protocol";
+import type { Schedule } from "@vufh-orchestrator/protocol";
 import type { EventLog } from "./events.ts";
 import type { Runner } from "./runner.ts";
 import type { Store } from "./store.ts";

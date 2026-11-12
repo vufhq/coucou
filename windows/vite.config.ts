@@ -13,7 +13,7 @@ export const SOUNDS_DIR = resolve(__dirname, "sounds");
 function sharedSounds(): Plugin {
   const prefix = "/sounds/";
   return {
-    name: "coucou-shared-sounds",
+    name: "vufh-shared-sounds",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith(prefix)) return next();
