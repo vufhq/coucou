@@ -196,6 +196,33 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    wsl --unregister agent-02
    ```
 
+   **A computer that is not on this PC (optional).** Rent an Ubuntu 24.04
+   machine (x86 or ARM) that you can reach with `ssh` as a user with sudo, then:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-03 -RemoteHost 203.0.113.7 -IdentityFile $HOME\.ssh\cloud.key
+   ```
+
+   `-RemoteUser` (default `ubuntu`) and `-RemotePort` (22) say how to reach it;
+   leave `-IdentityFile` out when `ssh` already finds your key. The script
+   copies the worker there, runs the same `setup.sh` and hands it its token. It
+   creates and deletes no machine: renting it and removing it stay yours. Then
+   list it with its address, and the key if you gave one, and restart the backend:
+
+   ```
+   ORCH_AGENTS=agent-01,agent-03@203.0.113.7
+   ORCH_SSH_KEY=C:\Users\you\.ssh\cloud.key
+   ```
+
+   The backend opens one SSH connection out to it and keeps it open; the
+   worker's calls come back through it, so nothing on your PC or router is
+   opened to the internet. The key must work without a passphrase prompt (no
+   passphrase, or held by your SSH agent). Your PC still has to be on: the
+   backend and the models stay here. A remote computer has its own disk, not
+   the shared folder, so move the agents that should work there onto it in
+   Coucou HQ; their tasks then run only there. `-Update` refreshes it like any
+   other computer.
+
 3. **In Coucou**, open **Tasks** in the sidebar and switch on
    **Orchestrator backend**. Then give agent-01 a task, for example:
    *"Open the documentation for httpx, find the current installation
@@ -308,7 +335,8 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
 | `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
 | `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distros running |
-| `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name`. Any of them runs any agent's task; agents whose own computer was dropped from the list move to the first at startup |
+| `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name`, or `name@host` (`name@host:port`) for one made with `-RemoteHost`. Any WSL one runs any agent's task; a remote one runs the tasks of the agents placed on it. Agents whose own computer was dropped from the list move to the first at startup |
+| `ORCH_SSH_KEY` | unset | The private key the backend uses to reach remote computers, when `ssh` would not find it by itself |
 | `ORCH_TASKS_PER_COMPUTER` | `2` | How many tasks one computer works on at once (its worker runs up to 4 operations at once) |
 | `ORCH_MAX_PARALLEL` | computers × `ORCH_TASKS_PER_COMPUTER` | How many tasks may be worked on at the same time, all computers together. The others wait their turn |
 | `ORCH_GITHUB_CLIENT_ID` | unset | Client ID of your own GitHub App (device flow on, expiring tokens, Contents read/write, no secret). Without it GitHub stays off |
@@ -327,6 +355,16 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   checked against the PC and private networks; an answer that still comes from
   a private address closes the session; and `coucou-worker.service` denies the
   local network to the worker and its browser, whatever a name resolves to.
+- **A remote computer** is reached by one SSH connection the backend opens
+  (`server/src/tunnel.ts`), as that machine's `agent` user, which its SSH
+  server lets do one thing: open the socket the worker calls the backend
+  through (no shell, no command, nothing forwarded out of the machine). The socket is in the
+  worker's own folder, which the runner cannot enter, so no command an agent
+  runs can reach the backend, and the backend runs nothing on the machine. Its
+  key is checked against the one `provision.ps1` first saw. The keys allowed
+  are those of the user who ran `setup.sh`, copied to a file only root can
+  change. The cloud's metadata address and private ranges are closed to the
+  worker and the runner.
 - **Tool output** (pages, command output) reaches the model unchanged, inside a
   tag whose name carries a code only the backend knows, so a page cannot close
   its own fence and write "instructions" after it.
@@ -437,6 +475,11 @@ npm run typecheck
   installs and builds. A task that moves to another computer loses its browser
   session and any server it started.
 - All agents share WSL's memory (half the PC's by default) and your plan's limits.
+- A remote computer works only while the PC and its backend are on. Its
+  `/computer` is its own: `/computer/shared` and the files handed over with a
+  request are not the ones the PC's computers see, and an agent moved to or
+  from it starts with an empty folder there. It needs Ubuntu 24.04, an IPv4
+  address or a host name, and a key `ssh` can use without asking.
 - Shell commands need worker 0.3 and its runner: run `provision.ps1 -Update`
   once. An older worker answers that it doesn't know the operation.
 - Packages installed outside `/computer` don't exist (no apt); ask for them in

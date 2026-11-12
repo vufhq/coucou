@@ -453,6 +453,19 @@ export class Store {
     return this.configured ? this.configured.includes(id) : this.computer(id) !== null;
   }
 
+  /**
+   * The computers that share a disk with this one. Every WSL computer mounts
+   * the same Windows folder at /computer, so any of them finds an agent's
+   * folder; a remote one (`ssh:…`) has its own disk and stands alone.
+   */
+  sameDisk(computerId: string | null | undefined): ComputerRow[] {
+    const all = this.computers();
+    const home = all.find((c) => c.id === computerId);
+    if (!home) return all;
+    const disk = (vmId: string) => (vmId.startsWith("ssh:") ? vmId : "shared");
+    return all.filter((c) => disk(c.vmId) === disk(home.vmId));
+  }
+
   /** Where new agents go: the first configured computer. */
   defaultComputerId(): string | null {
     return this.configured?.[0] ?? this.computers()[0]?.id ?? null;
@@ -549,8 +562,8 @@ export class Store {
   private agentFromRow(row: Row): Agent {
     const id = String(row.id);
     const computer = this.computer(String(row.computer_id ?? id));
-    // Any computer in the pool can run the agent: it is reachable while one is.
-    const online = this.computers().some((c) => c.status === "ready" || c.status === "busy");
+    // Any computer on the agent's disk can run it: it is reachable while one is.
+    const online = this.sameDisk(computer?.id).some((c) => c.status === "ready" || c.status === "busy");
     const computerStatus = online ? "ready" : (computer?.status ?? "offline");
     const status: Agent["status"] =
       computerStatus === "offline" || computerStatus === "starting" || computerStatus === "error"

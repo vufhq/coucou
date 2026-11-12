@@ -12,14 +12,24 @@
 # links it into /mnt/wsl, which the worker and the runner cannot see, so
 # neither could look up a name). 10.255.255.254 is WSL's DNS tunnel, the one
 # resolver coucou-runner.service lets the runner reach.
+#
+# On a remote computer (COMPUTER_SHARE=remote) there is no Windows folder:
+# /computer is a folder on the machine's own disk, with the same owners, and
+# its name lookups are left as the machine has them.
 
 set -euo pipefail
 
+# COMPUTER_SHARE='D:\coucou-vms\shared' or 'remote', written by setup.sh.
+source /etc/coucou-worker/computer.env
+
+if [[ "$COMPUTER_SHARE" == "remote" ]]; then
+  # Set-group-id folders: what the worker creates stays writable by the runner.
+  install -d -o runner -g computer -m 2770 /computer /computer/tasks /computer/agents /computer/shared
+  exit 0
+fi
+
 rm -f /etc/resolv.conf
 printf 'nameserver 10.255.255.254\n' > /etc/resolv.conf
-
-# COMPUTER_SHARE='D:\coucou-vms\shared', written by setup.sh.
-source /etc/coucou-worker/computer.env
 
 if mountpoint -q /computer; then
   exit 0

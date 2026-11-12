@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Sets up an agent's distro from inside it, as root:
-# `setup.sh agent-02 'D:\coucou-vms\shared'`.
-# provision.ps1 runs it after copying the worker to /opt/coucou-worker;
-# running it again updates in place.
+# Sets up an agent's computer from inside it, as root:
+# `setup.sh agent-02 'D:\coucou-vms\shared'` in a WSL distro, or
+# `setup.sh agent-03 remote` on a rented Ubuntu machine (provision.ps1
+# -RemoteHost). provision.ps1 runs it after copying the worker to
+# /opt/coucou-worker; running it again updates in place.
 #
 #   - patched Ubuntu, an unprivileged `agent` user (no sudo), /workspace
 #   - the computer: a second unprivileged `runner` user that runs the agents
@@ -12,12 +13,16 @@
 #   - Node.js from nodejs.org, checked against its published SHA-256
 #   - the worker's dependencies and Chromium for Playwright, owned by root
 #   - /etc/wsl.conf (no Windows drives, no Windows programs) and the systemd unit
+#
+# On a remote machine there is no Windows folder and no wsl.conf: /computer is
+# a folder on its own disk, and the backend reaches the worker through an SSH
+# login that can do one thing, open the worker's socket (see "The backend's
+# way in" below).
 
 set -euo pipefail
 
 NODE_VERSION="24.18.0"
 UV_VERSION="0.9.5"
-UV_SHA256="2cf10babba653310606f8b49876cfb679928669e7ddaa1fb41fb00ce73e64f66"
 APP=/opt/coucou-worker
 AGENT_ID="${1:-agent-01}"
 COMPUTER_SHARE="${2:-D:\\coucou-vms\\shared}"
@@ -31,12 +36,42 @@ if [[ ! "$AGENT_ID" =~ ^[a-z0-9-]{1,24}$ || "$AGENT_ID" == "claude" ]]; then
   echo "setup.sh: invalid agent id: $AGENT_ID" >&2
   exit 1
 fi
-# A Windows folder path, nothing a shell could read as more.
+# A Windows folder path, nothing a shell could read as more; or `remote`.
+REMOTE=0
 share_rule='^[A-Za-z]:[\][-A-Za-z0-9 ._\]+$'
-if [[ ! "$COMPUTER_SHARE" =~ $share_rule ]]; then
+if [[ "$COMPUTER_SHARE" == "remote" ]]; then
+  REMOTE=1
+elif [[ ! "$COMPUTER_SHARE" =~ $share_rule ]]; then
   echo "setup.sh: invalid shared folder: $COMPUTER_SHARE" >&2
   exit 1
 fi
+
+if [[ $REMOTE == 1 ]]; then
+  # What the WSL distro is, and what this script was written against.
+  . /etc/os-release
+  if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
+    echo "setup.sh: a remote computer must run Ubuntu 24.04 (this is ${PRETTY_NAME:-unknown})" >&2
+    exit 1
+  fi
+fi
+
+# Rented machines are often ARM (Oracle's free ones, for a start).
+case "$(uname -m)" in
+  x86_64)
+    NODE_ARCH=x64
+    UV_ARCH=x86_64
+    UV_SHA256="2cf10babba653310606f8b49876cfb679928669e7ddaa1fb41fb00ce73e64f66"
+    ;;
+  aarch64)
+    NODE_ARCH=arm64
+    UV_ARCH=aarch64
+    UV_SHA256="9db0c2f6683099f86bfeea47f4134e915f382512278de95b2a0e625957594ff3"
+    ;;
+  *)
+    echo "setup.sh: unsupported processor: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
 
 echo "==> Updating Ubuntu"
 export DEBIAN_FRONTEND=noninteractive
@@ -47,7 +82,7 @@ apt-get install -y --no-install-recommends ca-certificates curl xz-utils   git p
 echo "==> Node.js ${NODE_VERSION}"
 if [[ "$(/usr/local/bin/node --version 2>/dev/null || true)" != "v${NODE_VERSION}" ]]; then
   tmp=$(mktemp -d)
-  tarball="node-v${NODE_VERSION}-linux-x64.tar.xz"
+  tarball="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
   curl -fsSLo "$tmp/$tarball" "https://nodejs.org/dist/v${NODE_VERSION}/${tarball}"
   curl -fsSLo "$tmp/SHASUMS256.txt" "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"
   (cd "$tmp" && grep " ${tarball}\$" SHASUMS256.txt | sha256sum -c -)
@@ -59,11 +94,11 @@ node --version
 echo "==> uv ${UV_VERSION}"
 if [[ "$(/usr/local/bin/uv --version 2>/dev/null || true)" != "uv ${UV_VERSION}"* ]]; then
   tmp=$(mktemp -d)
-  tarball="uv-x86_64-unknown-linux-gnu.tar.gz"
+  tarball="uv-${UV_ARCH}-unknown-linux-gnu.tar.gz"
   curl -fsSLo "$tmp/$tarball" "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${tarball}"
   echo "${UV_SHA256}  $tmp/$tarball" | sha256sum -c -
   tar -xzf "$tmp/$tarball" -C "$tmp" --no-same-owner
-  install -m 0755 "$tmp/uv-x86_64-unknown-linux-gnu/uv" "$tmp/uv-x86_64-unknown-linux-gnu/uvx" /usr/local/bin/
+  install -m 0755 "$tmp/uv-${UV_ARCH}-unknown-linux-gnu/uv" "$tmp/uv-${UV_ARCH}-unknown-linux-gnu/uvx" /usr/local/bin/
   rm -rf "$tmp"
 fi
 
@@ -94,7 +129,10 @@ echo "==> /computer: the folder every computer shares"
 install -d -m 0700 /etc/coucou-worker
 printf 'COMPUTER_SHARE=%q\n' "$COMPUTER_SHARE" > /etc/coucou-worker/computer.env
 chmod 0600 /etc/coucou-worker/computer.env
-if ! mountpoint -q /computer; then
+if [[ $REMOTE == 1 ]]; then
+  # Its own disk: mount-computer.sh only makes the folders.
+  bash "$APP/worker/provision/mount-computer.sh"
+elif ! mountpoint -q /computer; then
   # This computer's own /computer, from before the shared folder: its files
   # move onto the share (nothing already there is overwritten). Parked in
   # /computer.local first, which a run stopped halfway leaves for the next.
@@ -125,7 +163,9 @@ chmod -R u=rwX,go=rX "$APP"
 rm -f "$APP/.env"
 
 echo "==> wsl.conf and the service"
-install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
+if [[ $REMOTE == 0 ]]; then
+  install -m 0644 "$APP/worker/provision/wsl.conf" /etc/wsl.conf
+fi
 install -m 0644 "$APP/worker/provision/coucou-worker.service" /etc/systemd/system/coucou-worker.service
 install -m 0644 "$APP/worker/provision/coucou-runner.service" /etc/systemd/system/coucou-runner.service
 install -m 0644 "$APP/worker/provision/coucou-runner.socket" /etc/systemd/system/coucou-runner.socket
@@ -139,8 +179,72 @@ ln -sf /etc/systemd/system/coucou-computer.service /etc/systemd/system/multi-use
 ln -sf /etc/systemd/system/coucou-worker.service /etc/systemd/system/multi-user.target.wants/coucou-worker.service
 install -d /etc/systemd/system/sockets.target.wants
 ln -sf /etc/systemd/system/coucou-runner.socket /etc/systemd/system/sockets.target.wants/coucou-runner.socket
+
+if [[ $REMOTE == 1 ]]; then
+  echo "==> The backend's way in"
+  # The worker talks to the backend through a socket the backend's SSH
+  # connection opens in /workspace/.coucou: the worker's own folder, which the
+  # runner (what the agents run) cannot enter. Nothing listens on a port, so
+  # no command an agent runs can reach the backend. The WSL gateway's range is
+  # closed too: here it is somebody else's network.
+  install -d /etc/systemd/system/coucou-worker.service.d
+  cat > /etc/systemd/system/coucou-worker.service.d/remote.conf <<'EOF'
+[Service]
+Environment=ORCH_BACKEND_SOCKET=/workspace/.coucou/backend.sock
+IPAddressDeny=172.16.0.0/12
+EOF
+
+  # That connection logs in as `agent` with the keys of whoever ran this
+  # script, kept in a file only root can change, and may do nothing but open
+  # that socket: no shell, no command, no terminal, nothing forwarded out of
+  # this machine. AllowTcpForwarding stays at `remote`: at `no`, OpenSSH 9.6
+  # refuses the socket too (one permission list serves both), and with
+  # GatewayPorts off the most that login could add is a port on this
+  # machine's own loopback.
+  admin="${SUDO_USER:-root}"
+  admin_keys="$(getent passwd "$admin" | cut -d: -f6)/.ssh/authorized_keys"
+  if [[ ! -s "$admin_keys" ]]; then
+    echo "setup.sh: $admin has no SSH keys in $admin_keys; the backend would have no way in" >&2
+    exit 1
+  fi
+  install -m 0644 -o root -g root "$admin_keys" /etc/ssh/coucou-tunnel-keys
+  if ! grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
+    echo "setup.sh: /etc/ssh/sshd_config does not include /etc/ssh/sshd_config.d/*.conf" >&2
+    exit 1
+  fi
+  tunnel_conf=/etc/ssh/sshd_config.d/60-coucou-tunnel.conf
+  cat > "$tunnel_conf" <<'EOF'
+# Written by Coucou's setup.sh: the backend's connection to the worker.
+Match User agent
+    AuthorizedKeysFile /etc/ssh/coucou-tunnel-keys
+    ForceCommand /usr/sbin/nologin
+    PermitTTY no
+    X11Forwarding no
+    AllowAgentForwarding no
+    AllowTcpForwarding remote
+    GatewayPorts no
+    PermitTunnel no
+    AllowStreamLocalForwarding remote
+    StreamLocalBindUnlink yes
+Match all
+EOF
+  # Never leave an SSH server that would not start again: this machine has no other door.
+  if ! sshd -t; then
+    rm -f "$tunnel_conf"
+    echo "setup.sh: the SSH server refused Coucou's settings; they were removed and nothing else changed" >&2
+    exit 1
+  fi
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd
+else
+  rm -rf /etc/systemd/system/coucou-worker.service.d/remote.conf
+fi
+
 if [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
 fi
 
-echo "==> Done. Restart the distro (wsl --terminate $AGENT_ID) to apply wsl.conf."
+if [[ $REMOTE == 1 ]]; then
+  echo "==> Done."
+else
+  echo "==> Done. Restart the distro (wsl --terminate $AGENT_ID) to apply wsl.conf."
+fi

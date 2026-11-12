@@ -10,7 +10,8 @@ import { CursorCliAdapter } from "./model/cursor-cli.ts";
 import { OpenAICompatibleAdapter } from "./model/openai-compatible.ts";
 import { CLAUDE_CLI_PROFILE, CURSOR_CLI_PROFILE, ModelRouter } from "./model/router.ts";
 import { loadTokens } from "./tokens.ts";
-import { keepWslAlive } from "./vm.ts";
+import { isRemoteVm, keepTunnel, type Tunnel } from "./tunnel.ts";
+import { keepWslAlive, wslRunning, type VmProbe } from "./vm.ts";
 
 const config = loadConfig();
 
@@ -83,11 +84,27 @@ if (!models.has(config.defaultModelProfile)) {
 
 // The user's GitHub sign-in lives in Credential Manager, beside the tokens.
 const github = new Github({ clientId: config.githubClientId, slot: await keyringSlot() });
-const backend = createBackend(config, tokens, models, { github });
+// A remote computer whose connection is down is "not running" to Coucou; one
+// whose connection holds while its worker stays silent is a worker problem.
+const tunnels = new Map<string, Tunnel>();
+const vmProbe: VmProbe = (vmId) =>
+  isRemoteVm(vmId) ? Promise.resolve(tunnels.get(vmId)?.up() ? null : false) : wslRunning(vmId);
+const backend = createBackend(config, tokens, models, { github, vmProbe });
 const keepAlives = config.agents
   .filter((a) => process.platform === "win32" && a.vmId.startsWith("wsl:") && process.env.ORCH_KEEP_ALIVE !== "0")
   .map((a) => keepWslAlive(a.vmId.slice(4), (line) => console.log(`orchestrator: ${line}`)));
 const { apiPort, workerPort } = await backend.listen();
+// Computers elsewhere: one SSH connection each, out from here, that their
+// worker's calls come back through.
+for (const a of config.agents) {
+  if (!a.remote) continue;
+  tunnels.set(
+    a.vmId,
+    keepTunnel(a.id, a.remote, { host: config.workerHost, port: workerPort }, (line) => console.log(`orchestrator: ${line}`), {
+      keyFile: config.sshKeyFile,
+    }),
+  );
+}
 console.log(`orchestrator: API on http://${config.apiHost}:${apiPort}, workers on http://${config.workerHost}:${workerPort}`);
 console.log(`orchestrator: data in ${config.dataDir}`);
 console.log(
@@ -101,6 +118,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     closing = true;
     console.log("orchestrator: stopping; running tasks resume on the next start");
     for (const k of keepAlives) k.stop();
+    for (const t of tunnels.values()) t.stop();
     void backend.close().then(() => process.exit(0));
   });
 }

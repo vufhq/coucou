@@ -22,6 +22,12 @@ Windows. Everything that did not serve that goes.
   failed its task as "the computer stopped responding" and left the worker
   stuck on it; results are now cut in the middle, by the worker and, for a
   computer not updated yet, by the backend
+- **Computers that are not on your PC** — `provision.ps1 -Name agent-03
+  -RemoteHost <address>` installs the worker on a rented Ubuntu 24.04 machine
+  (x86 or ARM) over SSH; list it as `agent-03@<address>` in `ORCH_AGENTS`. The
+  backend opens one SSH connection out to it, so nothing on your PC is opened
+  to the internet. It has its own disk, and runs the tasks of the agents you
+  place on it
 - **Safer computers** (update each with `provision.ps1 -Name <agent> -Update`) —
   `terminal.run` is retired: it ran programs as the worker's own user, outside
   the shell's sandbox. A page or a program can no longer close the fence around
