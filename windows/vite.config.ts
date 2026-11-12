@@ -61,7 +61,7 @@ export default defineConfig({
         island: resolve(__dirname, "index.html"),
         settings: resolve(__dirname, "settings.html"),
         hq: resolve(__dirname, "hq.html"),
-        mochi: resolve(__dirname, "mochi.html"),
+        tofu: resolve(__dirname, "tofu.html"),
         pill: resolve(__dirname, "pill.html"),
       },
     },

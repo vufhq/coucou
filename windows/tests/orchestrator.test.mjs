@@ -8,7 +8,7 @@ import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { agentLine, eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
-import { miniOutfit } from "../src/mochi/minibots.ts";
+import { miniOutfit } from "../src/tofu/minibots.ts";
 
 const AGENT = "agent_agent-01";
 
@@ -243,13 +243,13 @@ test("the chief leads, then coworkers follow team order and their order", () => 
     agentInfo("linus", { name: "Linus", teamId: "dev", teamName: "Developers", teamOrder: 2, order: 1 }),
     agentInfo("ada", { name: "Ada", teamId: "research", teamName: "Research", teamOrder: 1, order: 3 }),
     agentInfo("grace", { name: "Grace", teamId: "research", teamName: "Research", teamOrder: 1, order: 1 }),
-    agentInfo("agent-01", { name: "Mochi", kind: "chief", order: 99 }),
+    agentInfo("agent-01", { name: "Tofu", kind: "chief", order: 99 }),
   ]);
   assert.deepEqual(
     State.tasks.filter((item) => item.orchestrator).map((item) => item.orchestrator.agentId),
     ["agent-01", "grace", "ada", "linus"],
   );
-  assert.equal(State.chatAgent, "agent-01", "Mochi is the default chat agent");
+  assert.equal(State.chatAgent, "agent-01", "Tofu is the default chat agent");
 });
 
 test("a coworker mini selects its outfit while an undressed mini stays unchanged", () => {
@@ -433,9 +433,9 @@ test("a goal check-in is labelled and appended to its agent chat", () => {
   assert.equal(agentHistory("agent-02").at(-1).content, "Goal: Watch releases\n\nVersion 2 shipped.");
 });
 
-test("delegation and reports are visible in Mochi's and the coworker's chats", () => {
+test("delegation and reports are visible in Tofu's and the coworker's chats", () => {
   State.syncOrchestratorAgents([
-    agentInfo("agent-01", { name: "Mochi", kind: "chief" }),
+    agentInfo("agent-01", { name: "Tofu", kind: "chief" }),
     agentInfo("ada", { name: "Ada" }),
   ]);
   emit("orchestrator-event", {
@@ -447,7 +447,7 @@ test("delegation and reports are visible in Mochi's and the coworker's chats", (
     payload: { toAgentId: "ada", childTaskId: "t-child", message: "Review the API" },
   });
   assert.equal(agentHistory("agent-01").at(-1).content, "Asked Ada: Review the API");
-  assert.equal(agentHistory("ada").at(-1).content, "From Mochi\n\nReview the API");
+  assert.equal(agentHistory("ada").at(-1).content, "From Tofu\n\nReview the API");
 
   emit("orchestrator-event", {
     seq: 11,
@@ -463,7 +463,7 @@ test("delegation and reports are visible in Mochi's and the coworker's chats", (
 
 test("a delegated coworker question stays in chat without lighting its pill for the user", () => {
   State.syncOrchestratorAgents([
-    agentInfo("agent-01", { name: "Mochi", kind: "chief" }),
+    agentInfo("agent-01", { name: "Tofu", kind: "chief" }),
     agentInfo("ada", { name: "Ada" }),
   ]);
   emit("orchestrator-event", {

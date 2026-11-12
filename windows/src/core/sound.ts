@@ -1,7 +1,7 @@
-// SoundEngine — port of SoundEngine.swift.
-// The 29 WAVs are the macOS app's own files (see SOUNDS_DIR in vite.config.ts);
-// they are served at /sounds/<name>.wav. Default volume 0.12, slider range 0–0.2,
-// exactly like the Mac player, and several sounds may overlap.
+// SoundEngine.
+// The 29 WAVs are written by scripts/gen-sounds.mjs into sounds/ (SOUNDS_DIR in
+// vite.config.ts) and served at /sounds/<name>.wav. Default volume 0.12, slider
+// range 0–0.2, and several sounds may overlap.
 // A file of the user's own in the sounds folder (src-tauri/src/sounds.rs)
 // replaces a sound; one that doesn't decode falls back to the built-in one.
 

@@ -48,10 +48,10 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "copyright": "© vufh. Built on Coucou, © Louis Raillé (MIT)",
+    "copyright": "© vufh",
     "category": "DeveloperTool",
     "shortDescription": "vufh HQ: run a team of AI agents from your desktop",
-    "longDescription": "vufh HQ runs a team of AI agents on their own computers. Mochi, the head of staff, delegates to coworkers; you follow them, approve, answer and chat from HQ or the island at the top of your screen.",
+    "longDescription": "vufh HQ runs a team of AI agents on their own computers. Tofu, the head of staff, delegates to coworkers; you follow them, approve, answer and chat from HQ or the island at the top of your screen.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

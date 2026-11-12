@@ -20,8 +20,8 @@ import { mountTitleBar } from "../views/titlebar";
 import { startHub, type PageId } from "../hub/shell";
 import { FLOW_PAGE_RENDERERS } from "../hub/pages";
 import { colorDot } from "./colors";
-import { TOFU_COLORS, applyCharacter, parseCharacter, parseTofuColor } from "../mochi/character";
-import { TOFU_PALETTE } from "../mochi/tofu-shape";
+import { TOFU_COLORS, applyCharacter, parseCharacter, parseTofuColor } from "../tofu/character";
+import { TOFU_PALETTE } from "../tofu/tofu-shape";
 import { statusDot } from "./parts";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t, tn,
@@ -44,7 +44,7 @@ async function save() {
   await Bridge.saveSettings(settings);
 }
 
-/** A colour was picked for a pill's Mochi (see ./colors.ts): the island follows. */
+/** A colour was picked for a pill's Tofu (see ./colors.ts): the island follows. */
 function pickColor(next: Record<string, string>) {
   settings.pillColors = next;
   void save();
@@ -518,7 +518,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
 
   function updateNote() {
     const used = settings.activeIntegrations.length;
-    note.textContent = t("Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: KEY_STORE });
+    note.textContent = t("Pick up to {max} pills to show next to Tofu — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: KEY_STORE });
   }
   declaredViews.push(updateNote);
 
@@ -668,7 +668,7 @@ function generalSection(): HTMLElement {
       volume,
     ),
     h("div", { class: "row" }, soundsFolder, reloadSounds, customCount),
-    h("div", { class: "hint", text: t("Drop a file named like one of Mochi's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.") }),
+    h("div", { class: "hint", text: t("Drop a file named like one of Tofu's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.") }),
     h("div", { class: "row" },
       h("label", { text: t("Open on hover") }),
       toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
@@ -698,15 +698,14 @@ function generalSection(): HTMLElement {
 }
 
 /**
- * Settings → General → Character: Mochi, or Tofu — a flat pebble with Mochi's
- * moves and outfits — and Tofu's colour. Every window redraws at once.
+ * Settings → General → Character: Tofu in liquid chrome or in one flat colour,
+ * and that colour. Every window redraws at once.
  */
 function characterRows(): HTMLElement[] {
   const select = h("select", {}) as HTMLSelectElement;
   select.append(
     h("option", { value: "chrome", text: t("Tofu, in chrome") }),
     h("option", { value: "tofu", text: "Tofu" }),
-    h("option", { value: "mochi", text: "Mochi" }),
   );
   select.value = parseCharacter(settings.character);
 
@@ -748,7 +747,7 @@ function characterRows(): HTMLElement[] {
   return [
     h("div", { class: "row" }, h("label", { text: t("Character") }), select),
     colorRow,
-    h("div", { class: "hint", text: t("Tofu is a pebble with Mochi's moves and outfits, in liquid chrome or in one flat colour. It shows in the island, on the desktop and in vufh HQ.") }),
+    h("div", { class: "hint", text: t("Tofu is a pebble, in liquid chrome or in one flat colour. It shows in the island, on the desktop and in vufh HQ.") }),
   ];
 }
 

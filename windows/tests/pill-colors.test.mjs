@@ -1,4 +1,4 @@
-// A colour of the user's own for each pill's Mochi (src/core/pill-colors.ts),
+// A colour of the user's own for each pill's Tofu (src/core/pill-colors.ts),
 // and how the app state paints with it.
 
 import { beforeEach, test } from "node:test";

@@ -1,5 +1,5 @@
 // vufh HQ: an exchange opened on its own. What the agents said to each
-// other takes the whole middle pane: who is talking at the top ("Mochi ⇄
+// other takes the whole middle pane: who is talking at the top ("Tofu ⇄
 // Ada"), their messages in runs, each run with its author's name above and face
 // below, and "Close chat" where the composer was. Nothing here can be typed
 // into: the user talks to the agent whose conversation this came from.

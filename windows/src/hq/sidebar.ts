@@ -1,5 +1,5 @@
 // vufh HQ: the sidebar. Search and + at the top, the Activity entry, the
-// pinned faces (Mochi first, with his star), then "Needs you" and one
+// pinned faces (Tofu first, with his star), then "Needs you" and one
 // collapsible section per team, each row with its last time, and at the bottom
 // the settings and "Connect apps". It only reads the store and asks it to
 // select; creating an agent goes straight to the backend.
@@ -9,7 +9,7 @@ import { OrchestratorBridge } from "../core/orchestrator";
 import { Bridge } from "../core/bridge";
 import { PILL_PALETTE } from "../core/pill-colors";
 import { t, tl } from "../i18n/i18n";
-import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../mochi/wardrobe";
+import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../tofu/wardrobe";
 import { HUB_ICONS } from "../hub/ui";
 import { clear, h, svg } from "../views/dom";
 import { rowTime } from "./activity";

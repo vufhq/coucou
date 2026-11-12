@@ -115,7 +115,7 @@ jobs:
         run: |
           $v = "${{ steps.pack.outputs.version }}"
           $notes = @"
-          vufh for Windows $v — Mochi at the top of your screen.
+          vufh for Windows $v — Tofu at the top of your screen.
 
           Download ``vufh-Windows-$v.msi`` (Windows Installer) or ``vufh-Windows-$v-setup.exe`` and run it. The installer is not
           code-signed yet, so Windows SmartScreen shows a warning: click

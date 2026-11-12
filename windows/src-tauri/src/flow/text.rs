@@ -15,7 +15,7 @@ pub struct Replacement {
     pub to: String,
 }
 
-/// Say the trigger, get the whole text: "my signature" → "Have a nice day,\nLouis".
+/// Say the trigger, get the whole text: "my signature" → "Have a nice day,\nAlex".
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Snippet {
     #[serde(default = "new_id")]
@@ -301,13 +301,13 @@ mod tests {
 
     #[test]
     fn snippets_are_set_aside_from_everything_else() {
-        let snippets = vec![snip("ma signature", "Belle journée,\nLouis Code")];
+        let snippets = vec![snip("ma signature", "Belle journée,\nAlex Code")];
         let reps = vec![rep("code", "CODE")];
         let p = prepare("merci, ma signature", &[], &reps, &snippets);
         assert_eq!(p.text, "merci, ⟦1⟧");
         assert!(keeps_marks(&p.text, &p.snippets));
         assert!(!keeps_marks("merci", &p.snippets));
-        assert_eq!(finish(&p.text, &p.snippets), "merci, Belle journée,\nLouis Code");
+        assert_eq!(finish(&p.text, &p.snippets), "merci, Belle journée,\nAlex Code");
         // A snippet with no text is never a mark.
         let empty = vec![snip("vide", "")];
         assert_eq!(apply("c'est vide", &[], &[], &empty), "c'est vide");

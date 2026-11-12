@@ -1,17 +1,15 @@
-// Which character vufh draws: Tofu in liquid chrome (the default, vufh's own
-// face: ./tofu.ts and ./metal.ts), Tofu as a flat pebble in one colour, or
-// Mochi. Picked in Settings → General and stored as `character`, the flat
-// Tofu's colour as `tofuColor`. Every window that draws
+// How vufh draws Tofu: in liquid chrome (the default: ./tofu.ts and
+// ./metal.ts) or as a flat pebble in one colour. Picked in Settings → General
+// and stored as `character`, the flat Tofu's colour as `tofuColor`. Every window that draws
 // a BotEngine applies the preferences here at boot and on settings-changed;
 // the engine reads them on each frame, so a change shows at once.
 
 import { TOFU_PALETTE, type TofuColor } from "./tofu-shape";
 
-export const CHARACTERS = ["chrome", "tofu", "mochi"] as const;
+export const CHARACTERS = ["chrome", "tofu"] as const;
 export type Character = (typeof CHARACTERS)[number];
 
 export const DEFAULT_CHARACTER: Character = "chrome";
-/** The colour grok-bot-avatar-engine's ID recipe gives "mochi". */
 export const DEFAULT_TOFU_COLOR: TofuColor = "brown";
 
 /** The colours offered, in the library's order. */
@@ -36,9 +34,6 @@ export function applyCharacter(settings: { character?: unknown; tofuColor?: unkn
 }
 
 export const character = (): Character => current;
-
-/** The pebble, in either finish: what ./tofu.ts draws in Mochi's place. */
-export const isTofu = (): boolean => current !== "mochi";
 
 /** Tofu's body is liquid chrome, not one flat colour. */
 export const isChrome = (): boolean => current === "chrome";

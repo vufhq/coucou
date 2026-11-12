@@ -2,7 +2,7 @@
 // pills, music, the user's own data, opening an app, preparing an email (the
 // mail app opens with it filled in; the user sends it) and Anthropic's web
 // search. The conversation lives in memory only and is forgotten 90 s after
-// the last turn. Port of ClaudeVoiceBrain.swift.
+// the last turn.
 
 use std::time::{Duration, Instant};
 

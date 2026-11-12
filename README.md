@@ -6,7 +6,7 @@
 
 **Run a team of AI agents from your Windows desktop.**
 
-Mochi, your head of staff, hires coworkers, hands them work and reports back.
+Tofu, your head of staff, hires coworkers, hands them work and reports back.
 Each agent works on its own Linux computer (a WSL2 VM) with a browser, a shell
 and your files, on the Claude Code or Cursor subscription you already pay for.
 You follow them in vufh HQ, and at a glance in the island at the top of your
@@ -23,9 +23,9 @@ screen; nothing risky happens without your click.
 
 ## What it does
 
-- **A team, not a chatbot.** Start with Mochi, the chief. Ask for a developer
-  team or a research assistant: Mochi proposes coworkers (name, role, colour,
-  outfit), and each one joins only after you approve it. Mochi delegates, and
+- **A team, not a chatbot.** Start with Tofu, the chief. Ask for a developer
+  team or a research assistant: Tofu proposes coworkers (name, role, colour,
+  outfit), and each one joins only after you approve it. Tofu delegates, and
   coworkers can ask each other for help.
 - **vufh HQ**, a window to run them: a sidebar of your agents and teams with
   what needs you, one conversation per agent, the exchanges between agents,
@@ -34,7 +34,7 @@ screen; nothing risky happens without your click.
   paste GitHub links into a message and the agent finds them on its computer.
   Dictate a message with the mic, offline.
 - **The island**, at the top of your screen: a pill per agent, with its mini
-  Mochi working, asking or done; approve or deny right there; chat with any
+  Tofu working, asking or done; approve or deny right there; chat with any
   agent; open HQ on its thread.
 - **Real computers.** Agents run bash, Python, Node and git on their own WSL2
   VM, as a separate user that can't reach your PC or your network. Several
@@ -79,7 +79,7 @@ the Cursor CLI (`cursor-agent`) signed in.
    `powershell -ExecutionPolicy Bypass -File orchestrator\worker\provision\provision.ps1`.
 3. Build and run vufh (below), open **Settings → Tasks** and switch on
    **Orchestrator backend**. From then on vufh starts the backend for you,
-   and vufh HQ opens after Mochi's greeting.
+   and vufh HQ opens after Tofu's greeting.
 
 Everything about computers, models, goals, rules and configuration is in
 [orchestrator/README.md](orchestrator/README.md); the app itself is described
@@ -109,31 +109,14 @@ cd orchestrator; npm run typecheck; npm test
 |---|---|
 | `orchestrator/` | The backend: API and events, task loop, policy, model adapters, and the worker and provisioning scripts for the computers |
 | `windows/` | The app: vufh HQ (`src/hq`), the island, the vufh window (Flow, Notetaker, settings), in Tauri 2 (Rust in `src-tauri/`) |
-| `design/` | The original prototype and captures, references for Mochi and new views |
-
-## Origins
-
-vufh HQ grew out of [Coucou](https://github.com/Louis-CFM/coucou), the notch
-companion for AI coding agents by Louis Raillé, and was called Coucou HQ until
-it took its own name, icon and face (Tofu, in chrome). This fork keeps Coucou's
-Windows app and its window, and builds the agent orchestrator and HQ on top. The Mac,
-iPhone, Android and Linux apps and the session monitoring of your own coding
-agents were removed; they are in the history, at the tag `pre-hq-focus`.
-
-## Credits
-
-Coucou by [Louis Raillé](https://louisraille.fr), with Claude Code, and its
-[contributors](https://github.com/Louis-CFM/coucou/graphs/contributors).
-The orchestrator and vufh HQ follow the structure of
-[rakazo](https://github.com/elie222/rakazo) (Apache-2.0; structure only, no code
-copied).
 
 ## License
 
 - **Code:** [MIT](LICENSE).
-- **The Mochi character, the sounds and the media in `design/`:** © Louis
-  Raillé, all rights reserved; see [LICENSE-ASSETS.md](LICENSE-ASSETS.md).
-- **The chrome shader** (`windows/src/mochi/metal.ts`): adapted from
+- **The chrome shader** (`windows/src/tofu/metal.ts`): adapted from
   [@paper-design/shaders](https://github.com/paper-design/shaders), Apache-2.0.
   Tofu's outline comes from
   [grok-bot-avatar-engine](https://github.com/RongleCat/grok-bot-avatar-engine), MIT.
+- The orchestrator and vufh HQ follow the structure of
+  [rakazo](https://github.com/elie222/rakazo) (Apache-2.0; structure only, no
+  code copied).

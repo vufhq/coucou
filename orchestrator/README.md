@@ -1,6 +1,6 @@
 # vufh orchestrator
 
-The backend that turns vufh into the control surface for Mochi and a team of
+The backend that turns vufh into the control surface for Tofu and a team of
 AI coworkers. Provisioned Linux VMs are **computers** (`agent-01`,
 `agent-02`…), while the characters the user names, colours and chats with are
 **agents**. The computers are a pool: any computer with room takes the next
@@ -20,22 +20,22 @@ vufh (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (
                                                        /computer = D:\vufh-vms\shared, the same folder on every computer
 ```
 
-## Mochi and the team
+## Tofu and the team
 
-On first start the only agent is Mochi, the chief. Its stable id is the first
-computer id and it cannot be retired. Every agent Mochi or the user creates gets
+On first start the only agent is Tofu, the chief. Its stable id is the first
+computer id and it cannot be retired. Every agent Tofu or the user creates gets
 the first configured computer as its own, but that only decides which free
-computer its tasks try first: Mochi's team proposals don't pick a computer
+computer its tasks try first: Tofu's team proposals don't pick a computer
 (a `computerId` in one is ignored).
 
-Mochi can propose a team, organize it, delegate work, answer a coworker's
+Tofu can propose a team, organize it, delegate work, answer a coworker's
 question and wait for reports. Creating or retiring a coworker always pauses
 for an explicit user approval. Coworker reports, personas, names and team data
-are fenced as untrusted data in model prompts. Coworkers cannot use Mochi's
+are fenced as untrusted data in model prompts. Coworkers cannot use Tofu's
 management operations or delegate to each other.
 
 Delegated tasks run on any computer with room and appear in that coworker's
-chat, so a council of three runs at once on two computers. While Mochi waits,
+chat, so a council of three runs at once on two computers. While Tofu waits,
 its task uses neither a parallel slot nor its timeout budget. Each agent still
 works on one task at a time.
 
@@ -53,8 +53,8 @@ works on one task at a time.
 - Files are shared, processes are not: a server an agent started stays on the
   computer it started on.
 
-There may be at most 12 live agents, including Mochi. In one chief task,
-Mochi may delegate at most 10 assignments, answer 20 coworker questions and
+There may be at most 12 live agents, including Tofu. In one chief task,
+Tofu may delegate at most 10 assignments, answer 20 coworker questions and
 wait 20 times.
 
 The model proposes one operation at a time. The backend's policy decides:
@@ -112,7 +112,7 @@ starts, with nothing to copy into WSL by hand.
   repository) is reported to the model, which carries on. These steps come on
   top of the task's step budget.
 - The model is told what came with the message and where it is. A coworker
-  Mochi hands the work to is told where the files are in Mochi's task folder.
+  Tofu hands the work to is told where the files are in Tofu's task folder.
 - `fs.receive` is a backend-only operation like `fs.fetch`: a model naming it
   is refused. It needs worker 0.4; an older worker gets a clear failure
   ("update it with provision.ps1 -Update") instead of a job it can't read.
@@ -229,7 +229,7 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    instructions, and save a summary to report.md."*
 
    Each agent then has a pill in the island that stays, first in the row,
-   like a ChatGPT dot: its mini Mochi works, asks and finishes with
+   like a ChatGPT dot: its mini Tofu works, asks and finishes with
    its tasks, and dims when its computer is off. Pick it to see how it is and
    how its last task ended; **Chat with …** opens the island's chat talking to
    that agent (agents are also in the chat's model picker). Each message is a

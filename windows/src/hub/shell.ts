@@ -1,7 +1,7 @@
 // The vufh window: a sidebar with Flow (dictation, the Notetaker, the
 // statistics, the dictionary, the snippets, the styles and their settings)
 // and Notch (every setting of the island), and the page on the right, under
-// its coloured band. Port of FlowHub.swift.
+// its coloured band.
 
 import "./hub.css";
 import { showAgentTasks } from "./pages/tasks";
@@ -9,7 +9,7 @@ import { h, clear } from "../views/dom";
 import { t } from "../i18n/i18n";
 import { onEvent } from "../core/bridge";
 import { FlowBridge, type FlowPrefs, type FlowStatus, type ModelsStatus } from "../core/flow";
-import { hero, liveMochi, setWindowShown } from "./hero";
+import { hero, liveTofu, setWindowShown } from "./hero";
 import { icon, keyLabel } from "./ui";
 
 export type PageId =
@@ -35,7 +35,7 @@ export const FLOW_PAGES: PageDef[] = [
 ];
 
 export const NOTCH_PAGES: PageDef[] = [
-  { id: "general", icon: "gear", title: () => t("General"), subtitle: () => t("Mochi, his sounds and how the island behaves.") },
+  { id: "general", icon: "gear", title: () => t("General"), subtitle: () => t("Tofu, his sounds and how the island behaves.") },
   { id: "pills", icon: "grid", title: () => t("Active pills"), subtitle: () => t("The pills shown in the island, their order and their colours.") },
   { id: "tasks", icon: "check", title: () => t("Tasks") },
   { id: "chat", icon: "chat", title: () => t("Chat"), subtitle: () => t("The AI of the island's chat, with your own keys.") },
@@ -54,7 +54,7 @@ export interface HubContext {
   refresh(): Promise<FlowStatus>;
   /** Saves new preferences and keeps them as the window's. */
   setPrefs(change: (p: FlowPrefs) => void): Promise<void>;
-  /** The band of a page, its Mochis walking. */
+  /** The band of a page, its Tofus walking. */
   hero(page: PageId, title: string, subtitle: string | null, actions?: HTMLElement[], compact?: boolean): HTMLElement;
   /** Set by a page: called when the page is left. */
   onLeave?: () => void;
@@ -163,7 +163,7 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
   const side = h("nav", { class: "hub-side" });
   const logo = h("canvas", {});
   side.append(h("div", { class: "hub-brand" }, logo, h("span", { text: "vufh" })));
-  liveMochi(logo as HTMLCanvasElement);
+  liveTofu(logo as HTMLCanvasElement);
   const group = (title: string, pages: PageDef[]) => {
     side.append(h("div", { class: "hub-group", text: title }));
     for (const p of pages) {

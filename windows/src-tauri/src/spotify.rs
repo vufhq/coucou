@@ -1,4 +1,4 @@
-// The Spotify pill — port of SpotifyController.swift.
+// The Spotify pill.
 //
 // The Mac listens to Spotify's distributed notification and drives it over
 // AppleScript. Linux has MPRIS instead: Spotify owns

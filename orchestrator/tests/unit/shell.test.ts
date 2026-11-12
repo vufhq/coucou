@@ -22,7 +22,7 @@ let server: Server;
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "orch-computer-")));
   taskDir = join(root, "tasks", "11111111-2222-3333-4444-555555555555");
-  home = agentHome(root, "mochi");
+  home = agentHome(root, "tofu");
   await mkdir(join(taskDir, "app"), { recursive: true });
   socketPath = isWindows ? `\\\\.\\pipe\\orch-runner-${process.pid}-${Date.now()}` : join(root, "runner.sock");
   // `-c`, not `-lc`: a login shell on the test machine reads its profile.

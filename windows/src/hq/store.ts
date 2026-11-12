@@ -1,10 +1,10 @@
-// vufh HQ: what the window knows about Mochi and his team, kept up to date
+// vufh HQ: what the window knows about Tofu and his team, kept up to date
 // from the backend. The sidebar and the conversation read it through HqStore
 // (types.ts) and never call the backend themselves for what is listed here.
 //
 // Loading: the agents first (with teams, computers and approvals), then each
 // agent's conversation (its chat and delegated tasks, plus its goal runs) and
-// the delegated tasks for Mochi's exchanges. After that, the backend's events
+// the delegated tasks for Tofu's exchanges. After that, the backend's events
 // say what changed: they are gathered for a moment, then only the agents they
 // touch are fetched again. Nothing runs between events (0 % CPU hidden).
 
@@ -163,7 +163,7 @@ export function createHqStore(): HqStore {
     return request;
   }
 
-  /** Every delegated task, for the exchanges: Mochi's, and coworkers' with their teammates. */
+  /** Every delegated task, for the exchanges: Tofu's, and coworkers' with their teammates. */
   async function loadDelegated(): Promise<void> {
     const data = await OrchestratorBridge.listTasks({ source: "delegated", limit: DELEGATED_LIMIT }).catch(() => null);
     if (!data) return;
@@ -193,7 +193,7 @@ export function createHqStore(): HqStore {
 
   // ── Live events ────────────────────────────────────────────────────────────
 
-  /** The agent whose conversation shows a task: the owner, and Mochi for a delegated one. */
+  /** The agent whose conversation shows a task: the owner, and Tofu for a delegated one. */
   function chiefOfTask(taskId: string | null): string | null {
     if (!taskId || !parentOf.has(taskId)) return null;
     return chief()?.id ?? null;

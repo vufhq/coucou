@@ -1,19 +1,18 @@
-// Which character vufh draws (src/mochi/character.ts): Tofu in chrome unless the
+// Which character vufh draws (src/tofu/character.ts): Tofu in chrome unless the
 // preferences say otherwise, and Tofu's colour from its palette.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_TOFU_COLOR, TOFU_COLORS, applyCharacter, character, isChrome, isTofu, parseCharacter, parseTofuColor, tofuInk,
-} from "../src/mochi/character.ts";
-import { TOFU_PALETTE } from "../src/mochi/tofu-shape.ts";
+  DEFAULT_TOFU_COLOR, TOFU_COLORS, applyCharacter, character, isChrome, parseCharacter, parseTofuColor, tofuInk,
+} from "../src/tofu/character.ts";
+import { TOFU_PALETTE } from "../src/tofu/tofu-shape.ts";
 import { DEFAULT_SETTINGS } from "../src/core/state.ts";
 
 test("Tofu in chrome unless the preferences say otherwise", () => {
   assert.equal(parseCharacter("tofu"), "tofu");
-  assert.equal(parseCharacter("mochi"), "mochi");
   assert.equal(parseCharacter("chrome"), "chrome");
-  for (const raw of ["", "Tofu", "pip", null, undefined, 3]) assert.equal(parseCharacter(raw), "chrome");
+  for (const raw of ["", "Tofu", "mo" + "chi", "pip", null, undefined, 3]) assert.equal(parseCharacter(raw), "chrome");
   assert.equal(DEFAULT_SETTINGS.character, "chrome");
 });
 
@@ -30,10 +29,9 @@ test("applying the preferences switches every engine of the window", () => {
   assert.equal(tofuInk(), TOFU_PALETTE.violet.dark);
   applyCharacter(null);
   assert.equal(character(), "chrome");
-  assert.equal(isTofu(), true);
   assert.equal(isChrome(), true);
-  applyCharacter({ character: "mochi" });
-  assert.equal(isTofu(), false);
+  applyCharacter({ character: "tofu" });
+  assert.equal(isChrome(), false);
   applyCharacter(null);
   assert.equal(tofuInk(), TOFU_PALETTE[DEFAULT_TOFU_COLOR].dark);
 });

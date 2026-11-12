@@ -1,6 +1,6 @@
 # Contributing to vufh HQ
 
-Thanks for wanting to help Mochi and his team.
+Thanks for wanting to help Tofu and his team.
 
 ## Getting started
 
@@ -20,7 +20,7 @@ cd orchestrator; npm run typecheck; npm test
 
 - A new operation for the agents: add it to `orchestrator/protocol/src/ops.ts`, decide its rule in the policy, run it in the worker, and test it in `orchestrator/tests/`.
 - A new service pill: a poller in `windows/src-tauri/src/integrations.rs`, an entry in `windows/src/core/pills.ts` and a card in `windows/src/views/integrations.ts`.
-- A new emote or sound for Mochi.
+- A new emote or sound for Tofu.
 - Bug fixes — please describe how to reproduce.
 
 ## Rules of the house

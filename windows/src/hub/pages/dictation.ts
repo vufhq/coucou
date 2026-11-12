@@ -1,6 +1,6 @@
 // Dictation: today's dictations with search and copy, the big numbers, and the
 // way to the Notetaker. Until dictation is set up, the steps to get there.
-// Port of FlowHubHome.swift.
+//
 
 import { h, clear } from "../../views/dom";
 import { t } from "../../i18n/i18n";

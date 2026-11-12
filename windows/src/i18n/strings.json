@@ -717,16 +717,16 @@
    "ru": "Черновик",
    "id": "Draf"
   },
-  "Drop a file named like one of Mochi's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.": {
-   "zh-Hans": "在声音文件夹中放入与 Mochi 某个声音同名的文件（finish.wav、approval.mp3、greet.m4a…）即可替换它，然后重新载入。",
-   "hi": "Mochi की किसी साउंड के नाम वाली फ़ाइल (finish.wav, approval.mp3, greet.m4a…) साउंड फ़ोल्डर में रखें, वह उसकी जगह ले लेगी; फिर Reload करें।",
-   "es": "Deja en la carpeta de sonidos un archivo con el nombre de uno de los sonidos de Mochi (finish.wav, approval.mp3, greet.m4a…) para reemplazarlo y luego recarga.",
-   "ar": "ضع في مجلد الأصوات ملفًا يحمل اسم أحد أصوات Mochi (finish.wav وapproval.mp3 وgreet.m4a…) ليحل محله، ثم أعد التحميل.",
-   "fr": "Déposez dans le dossier des sons un fichier nommé comme l'un des sons de Mochi (finish.wav, approval.mp3, greet.m4a…) pour le remplacer, puis rechargez.",
-   "bn": "Mochi-র কোনো সাউন্ডের নামে একটি ফাইল (finish.wav, approval.mp3, greet.m4a…) সাউন্ড ফোল্ডারে রাখুন, সেটি বদলে যাবে; তারপর Reload করুন।",
-   "pt-BR": "Coloque na pasta de sons um arquivo com o nome de um dos sons do Mochi (finish.wav, approval.mp3, greet.m4a…) para substituí-lo e depois recarregue.",
-   "ru": "Положите в папку звуков файл с именем одного из звуков Mochi (finish.wav, approval.mp3, greet.m4a…), чтобы заменить его, затем перезагрузите.",
-   "id": "Taruh file bernama seperti salah satu suara Mochi (finish.wav, approval.mp3, greet.m4a…) di folder suara untuk menggantinya, lalu muat ulang."
+  "Drop a file named like one of Tofu's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.": {
+   "zh-Hans": "在声音文件夹中放入与 Tofu 某个声音同名的文件（finish.wav、approval.mp3、greet.m4a…）即可替换它，然后重新载入。",
+   "hi": "Tofu की किसी साउंड के नाम वाली फ़ाइल (finish.wav, approval.mp3, greet.m4a…) साउंड फ़ोल्डर में रखें, वह उसकी जगह ले लेगी; फिर Reload करें।",
+   "es": "Deja en la carpeta de sonidos un archivo con el nombre de uno de los sonidos de Tofu (finish.wav, approval.mp3, greet.m4a…) para reemplazarlo y luego recarga.",
+   "ar": "ضع في مجلد الأصوات ملفًا يحمل اسم أحد أصوات Tofu (finish.wav وapproval.mp3 وgreet.m4a…) ليحل محله، ثم أعد التحميل.",
+   "fr": "Déposez dans le dossier des sons un fichier nommé comme l'un des sons de Tofu (finish.wav, approval.mp3, greet.m4a…) pour le remplacer, puis rechargez.",
+   "bn": "Tofu-র কোনো সাউন্ডের নামে একটি ফাইল (finish.wav, approval.mp3, greet.m4a…) সাউন্ড ফোল্ডারে রাখুন, সেটি বদলে যাবে; তারপর Reload করুন।",
+   "pt-BR": "Coloque na pasta de sons um arquivo com o nome de um dos sons do Tofu (finish.wav, approval.mp3, greet.m4a…) para substituí-lo e depois recarregue.",
+   "ru": "Положите в папку звуков файл с именем одного из звуков Tofu (finish.wav, approval.mp3, greet.m4a…), чтобы заменить его, затем перезагрузите.",
+   "id": "Taruh file bernama seperti salah satu suara Tofu (finish.wav, approval.mp3, greet.m4a…) di folder suara untuk menggantinya, lalu muat ulang."
   },
   "Drop a file or window, or ask me anything.": {
    "zh-Hans": "拖入文件或窗口，或问我任何问题。",

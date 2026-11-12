@@ -170,9 +170,9 @@ test("an agent's pill made before the agent list goes first, and is adopted by i
   State.loadIntegrationTasks();
   State.upsertExternalAgent("agent_agent-01", "agent-01", "#22C55E");
   assert.equal(ids()[0], "agent_agent-01");
-  State.syncOrchestratorAgents([{ ...agent("agent-01", "chief"), name: "Mochi" }]);
+  State.syncOrchestratorAgents([{ ...agent("agent-01", "chief"), name: "Tofu" }]);
   const pill = State.tasks.find((t) => t.id === "agent_agent-01");
-  assert.equal(pill.name, "Mochi");
+  assert.equal(pill.name, "Tofu");
   assert.ok(pill.orchestrator);
   assert.ok(State.isKept("agent_agent-01"));
 });

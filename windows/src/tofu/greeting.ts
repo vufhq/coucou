@@ -1,11 +1,13 @@
-// The launch hello (greeting v2) — port of GreetingCanvasView.swift.
-// Mochi drops into the island, bounces, slides to the side and waves hello with
+// The launch hello (greeting v2).
+// Tofu drops into the island, bounces, slides to the side and waves hello with
 // a quick little hand, then comes back and settles in the compact island.
 // Everything is laid out in the same 640×150 reference space as on macOS.
 
 import { closeCurve } from "../core/anim";
 import { Sound } from "../core/sound";
 import { COMPACT_W, NOTCH_H, NOTCH_W } from "../core/layout";
+import { PEBBLE } from "./tofu-shape";
+import { eyeInk, fillFinish, pebblePath, type FinishPart } from "./tofu";
 
 // ── Timing (GT in the Swift file) ─────────────────────────────────────────────
 
@@ -28,7 +30,7 @@ const T = {
 
 export const GREETING_END = T.end;
 
-/** The greeting's own sound, played from the start (greeting.wav, the Mac's file). */
+/** The greeting's own sound, played from the start (greeting.wav). */
 const GREETING_SOUND = "greeting";
 
 // ── Geometry (640×150) ────────────────────────────────────────────────────────
@@ -37,7 +39,8 @@ export const GREETING_W = 640;
 export const GREETING_H = 150;
 const C0 = { x: 320, y: 90 };
 const HB = 58;
-export const ASP = 1.34;
+/** The pebble's width over its height. */
+export const ASP = PEBBLE.box[2] / PEBBLE.box[3];
 const EAR_X = 40;
 const EAR_HB = 17;
 const CARD = { x: 10, y: 36, w: 620, h: 104 };
@@ -220,13 +223,13 @@ function smallPose(): Pose {
   };
 }
 
-/** Mochi's pose `t` seconds in; `tc` is when the collapse began (∞ if not yet). */
+/** Tofu's pose `t` seconds in; `tc` is when the collapse began (∞ if not yet). */
 export function greetingPose(t: number, tc = Number.POSITIVE_INFINITY): Pose {
   if (t < tc) return greetPose(Math.min(t, T.end + 10));
   const a = greetPose(tc);
   const b = smallPose();
   // Same curve and duration (340 ms) as the island shrinking around him: with
-  // the Mac's inOut ease the island got ahead of Mochi and cut his body off
+  // the Mac's inOut ease the island got ahead of Tofu and cut his body off
   // when the greeting was left early.
   const k = seg(t, tc, tc + T.COLLAPSE);
   const e = k >= 1 ? 1 : closeCurve(k);
@@ -290,10 +293,10 @@ function handRPos(hw: number, hh: number, p: Pose) {
 }
 
 /**
- * Bounding box of Mochi's body and hands in the 640×150 space — what must stay
+ * Bounding box of Tofu's body and hands in the 640×150 space — what must stay
  * inside the island so nothing of him is cut off.
  */
-export function mochiBounds(p: Pose): { left: number; right: number; top: number; bottom: number } | null {
+export function tofuBounds(p: Pose): { left: number; right: number; top: number; bottom: number } | null {
   const hh = p.hb / 2;
   const hw = hh * ASP;
   if (hh <= 0.4) return null;
@@ -365,68 +368,28 @@ function rr(x: CanvasRenderingContext2D, X: number, Y: number, W: number, H: num
   x.closePath();
 }
 
-function mochiPath(hw: number, hh: number): Path2D {
-  const n = 3.2;
-  const p = new Path2D();
-  const steps = 96;
-  for (let i = 0; i <= steps; i++) {
-    const a = (i / steps) * 2 * Math.PI;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    const px = hw * (ca < 0 ? -1 : 1) * Math.pow(Math.abs(ca), 2 / n);
-    const py = hh * (sa < 0 ? -1 : 1) * Math.pow(Math.abs(sa), 2 / n);
-    if (i === 0) p.moveTo(px, py);
-    else p.lineTo(px, py);
-  }
-  p.closePath();
-  return p;
-}
-
-/** White body gradient. A canvas gradient pads past its ends, so the corners are never left unpainted. */
-function whiteFill(
-  x: CanvasRenderingContext2D, path: Path2D,
-  x0: number, y0: number, x1: number, y1: number,
-) {
-  const g = x.createLinearGradient(x0, y0, x1, y1);
-  g.addColorStop(0, "rgb(251,251,252)");
-  g.addColorStop(1, "rgb(231,233,236)");
-  x.fillStyle = g;
-  x.fill(path);
-}
-
-function drawHandL(x: CanvasRenderingContext2D, hw: number, hh: number, p: Pose) {
-  if (p.handL <= 0.01) return;
+/** The waving hand, as a part of the body. */
+function handL(hw: number, hh: number, p: Pose): FinishPart | null {
+  if (p.handL <= 0.01) return null;
   const { x: hx, y: hy, r } = handLPos(hw, hh, p);
-  x.save();
-  x.translate(hx, hy);
-  const circ = new Path2D();
-  circ.ellipse(0, 0, r, r, 0, 0, Math.PI * 2);
-  whiteFill(x, circ, r, -r, -r, r);
-  x.strokeStyle = "rgba(0,0,0,0.08)";
-  x.lineWidth = 0.8;
-  x.stroke(circ);
-  x.restore();
+  const path = new Path2D();
+  path.ellipse(hx, hy, r, r, 0, 0, Math.PI * 2);
+  return { path, cx: hx, cy: hy, hw: r, hh: r };
 }
 
-function drawHandR(x: CanvasRenderingContext2D, hw: number, hh: number, p: Pose) {
-  if (p.handR <= 0.01) return;
+/** The resting hand, as a part of the body. */
+function handR(hw: number, hh: number, p: Pose): FinishPart | null {
+  if (p.handR <= 0.01) return null;
   const h = handRPos(hw, hh, p);
-  x.save();
-  x.translate(h.x, h.y);
-  x.rotate(h.ang);
-  rr(x, -h.L / 2, -h.T / 2, h.L, h.T, h.T / 2);
-  const g = x.createLinearGradient(h.L / 2, -h.T / 2, -h.L / 2, h.T / 2);
-  g.addColorStop(0, "rgb(251,251,252)");
-  g.addColorStop(1, "rgb(231,233,236)");
-  x.fillStyle = g;
-  x.fill();
-  x.strokeStyle = "rgba(0,0,0,0.08)";
-  x.lineWidth = 0.8;
-  x.stroke();
-  x.restore();
+  const capsule = new Path2D();
+  capsule.roundRect(-h.L / 2, -h.T / 2, h.L, h.T, h.T / 2);
+  const path = new Path2D();
+  path.addPath(capsule, new DOMMatrix().translateSelf(h.x, h.y).rotateSelf((h.ang * 180) / Math.PI));
+  const ext = h.L / 2 + h.T / 2;
+  return { path, cx: h.x, cy: h.y, hw: ext, hh: ext };
 }
 
-function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
+function drawTofu(x: CanvasRenderingContext2D, p: Pose) {
   const hh = p.hb / 2;
   const hw = hh * ASP;
   if (hh <= 0.4) return;
@@ -453,11 +416,9 @@ function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
   x.rotate(p.tilt);
   x.scale(p.sx, p.sy);
 
-  drawHandL(x, hw, hh, p);
-  drawHandR(x, hw, hh, p);
-
-  const body = mochiPath(hw, hh);
-  whiteFill(x, body, hw * 0.6, -hh, -hw * 0.6, hh);
+  const body = pebblePath(hw, hh);
+  const parts = [handL(hw, hh, p), handR(hw, hh, p), { path: body, cx: 0, cy: 0, hw, hh }];
+  fillFinish(x, parts.filter((part): part is FinishPart => part !== null), "greeting");
 
   if (p.tint > 0) {
     const g = x.createLinearGradient(0, hh, 0, -hh * 0.1);
@@ -470,12 +431,16 @@ function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
   // Eyes
   x.save();
   x.clip(body);
-  x.fillStyle = "#16171A";
-  x.strokeStyle = "#16171A";
-  const er = p.hb * 0.06;
-  const sp = p.hb * 0.19;
+  x.fillStyle = eyeInk();
+  x.strokeStyle = eyeInk();
+  // The pebble's eye seat: pills, set a little above the middle.
+  const seat = PEBBLE.seat;
+  const ew = seat.width * 2 * hw;
+  const eh = seat.height * 2 * hw;
+  const er = ew * 0.55;
+  const sp = seat.gap * hw;
   const lx = p.lookX * hw * 0.42;
-  const ly = p.lookY * hh * 0.28 + hh * 0.12 + p.eyeRoll * hh * 1.25;
+  const ly = p.lookY * hh * 0.28 - seat.shiftY * 2 * hw + p.eyeRoll * hh * 1.25;
   for (const sd of [-1, 1]) {
     x.save();
     x.translate(sd * sp + lx, ly);
@@ -494,7 +459,7 @@ function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
     } else {
       x.scale(1, Math.max(0.12, p.open));
       x.beginPath();
-      x.arc(0, 0, er, 0, Math.PI * 2);
+      x.roundRect(-ew / 2, -eh / 2, ew, eh, ew / 2);
       x.fill();
     }
     x.restore();
@@ -530,7 +495,7 @@ function drawMochi(x: CanvasRenderingContext2D, p: Pose) {
 function drawParticles(x: CanvasRenderingContext2D, t: number, p: Pose) {
   if (!(p.card > 0 || p.fx < 1)) return;
 
-  // Warp streaks: white vertical lines while Mochi falls in
+  // Warp streaks: white vertical lines while Tofu falls in
   if (t < 0.55) {
     const fadeOut = 1 - seg(t, 0.4, 0.55);
     x.lineCap = "butt";
@@ -577,7 +542,7 @@ function drawMinis(x: CanvasRenderingContext2D, alpha: number) {
     const scale = alpha * COMPACT.miniGridScale;
     x.scale(scale, scale);
     x.fillStyle = MINI_COLORS[i];
-    x.fill(mochiPath(5.3, 4));
+    x.fill(pebblePath(4 * ASP, 4));
     x.restore();
   });
 }
@@ -671,6 +636,6 @@ export class Greeting {
     }
 
     drawMinis(x, p.minis);
-    drawMochi(x, p);
+    drawTofu(x, p);
   }
 }

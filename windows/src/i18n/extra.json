@@ -771,16 +771,16 @@
    "ru": "Без звука",
    "id": "Bisukan"
   },
-  "Mute or unmute Mochi": {
-   "zh-Hans": "静音或取消静音 Mochi",
-   "hi": "Mochi को म्यूट या अनम्यूट करें",
-   "es": "Silenciar o activar a Mochi",
-   "ar": "كتم صوت Mochi أو إلغاء كتمه",
-   "fr": "Couper ou remettre le son de Mochi",
-   "bn": "Mochi-কে মিউট বা আনমিউট করুন",
-   "pt-BR": "Silenciar ou ativar o som do Mochi",
-   "ru": "Выключить или включить звук Mochi",
-   "id": "Bisukan atau bunyikan Mochi"
+  "Mute or unmute Tofu": {
+   "zh-Hans": "静音或取消静音 Tofu",
+   "hi": "Tofu को म्यूट या अनम्यूट करें",
+   "es": "Silenciar o activar a Tofu",
+   "ar": "كتم صوت Tofu أو إلغاء كتمه",
+   "fr": "Couper ou remettre le son de Tofu",
+   "bn": "Tofu-কে মিউট বা আনমিউট করুন",
+   "pt-BR": "Silenciar ou ativar o som do Tofu",
+   "ru": "Выключить или включить звук Tofu",
+   "id": "Bisukan atau bunyikan Tofu"
   },
   "Network error: {error}": {
    "zh-Hans": "网络错误：{error}",
@@ -1079,16 +1079,16 @@
    "ru": "Выберите модель {name} над полем чата.",
    "id": "Pilih model {name} di atas kotak obrolan."
   },
-  "Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.": {
-   "zh-Hans": "最多选择 {max} 个标签显示在 Mochi 旁边 — 已用 {used}/{max}。密钥保存在 {store} 中，绝不写入磁盘。",
-   "hi": "Mochi के बगल में दिखाने के लिए अधिकतम {max} टैब चुनें — {used}/{max} उपयोग में। कुंजियाँ {store} में रखी जाती हैं, डिस्क पर कभी नहीं।",
-   "es": "Elige hasta {max} pestañas para mostrar junto a Mochi — {used}/{max} en uso. Las claves se guardan en {store}, nunca en el disco.",
-   "ar": "اختر حتى {max} تبويبات لعرضها بجانب Mochi — {used}/{max} مستخدمة. تُحفظ المفاتيح في {store}، ولا تُكتب على القرص أبدًا.",
-   "fr": "Choisis jusqu'à {max} onglets à afficher à côté de Mochi — {used}/{max} utilisés. Les clés sont stockées dans {store}, jamais sur le disque.",
-   "bn": "Mochi-র পাশে দেখাতে সর্বোচ্চ {max}টি ট্যাব বেছে নিন — {used}/{max} ব্যবহৃত। কী {store}-এ রাখা হয়, কখনো ডিস্কে নয়।",
-   "pt-BR": "Escolha até {max} abas para mostrar ao lado do Mochi — {used}/{max} em uso. As chaves ficam em {store}, nunca no disco.",
-   "ru": "Выберите до {max} вкладок рядом с Mochi — занято {used}/{max}. Ключи хранятся в {store}, никогда на диске.",
-   "id": "Pilih hingga {max} tab untuk ditampilkan di samping Mochi — {used}/{max} terpakai. Kunci disimpan di {store}, tidak pernah di disk."
+  "Pick up to {max} pills to show next to Tofu — {used}/{max} in use. Keys are stored in the {store}, never on disk.": {
+   "zh-Hans": "最多选择 {max} 个标签显示在 Tofu 旁边 — 已用 {used}/{max}。密钥保存在 {store} 中，绝不写入磁盘。",
+   "hi": "Tofu के बगल में दिखाने के लिए अधिकतम {max} टैब चुनें — {used}/{max} उपयोग में। कुंजियाँ {store} में रखी जाती हैं, डिस्क पर कभी नहीं।",
+   "es": "Elige hasta {max} pestañas para mostrar junto a Tofu — {used}/{max} en uso. Las claves se guardan en {store}, nunca en el disco.",
+   "ar": "اختر حتى {max} تبويبات لعرضها بجانب Tofu — {used}/{max} مستخدمة. تُحفظ المفاتيح في {store}، ولا تُكتب على القرص أبدًا.",
+   "fr": "Choisis jusqu'à {max} onglets à afficher à côté de Tofu — {used}/{max} utilisés. Les clés sont stockées dans {store}, jamais sur le disque.",
+   "bn": "Tofu-র পাশে দেখাতে সর্বোচ্চ {max}টি ট্যাব বেছে নিন — {used}/{max} ব্যবহৃত। কী {store}-এ রাখা হয়, কখনো ডিস্কে নয়।",
+   "pt-BR": "Escolha até {max} abas para mostrar ao lado do Tofu — {used}/{max} em uso. As chaves ficam em {store}, nunca no disco.",
+   "ru": "Выберите до {max} вкладок рядом с Tofu — занято {used}/{max}. Ключи хранятся в {store}, никогда на диске.",
+   "id": "Pilih hingga {max} tab untuk ditampilkan di samping Tofu — {used}/{max} terpakai. Kunci disimpan di {store}, tidak pernah di disk."
   },
   "Press keys…": {
    "zh-Hans": "请按键…",
@@ -1255,16 +1255,16 @@
    "ru": "Секретный ключ",
    "id": "Kunci rahasia"
   },
-  "Send Mochi to the desktop": {
-   "zh-Hans": "把 Mochi 送到桌面",
-   "hi": "Mochi को डेस्कटॉप पर भेजें",
-   "es": "Enviar a Mochi al escritorio",
-   "ar": "إرسال Mochi إلى سطح المكتب",
-   "fr": "Envoyer Mochi sur le bureau",
-   "bn": "Mochi-কে ডেস্কটপে পাঠান",
-   "pt-BR": "Enviar o Mochi para a área de trabalho",
-   "ru": "Отправить Mochi на рабочий стол",
-   "id": "Kirim Mochi ke desktop"
+  "Send Tofu to the desktop": {
+   "zh-Hans": "把 Tofu 送到桌面",
+   "hi": "Tofu को डेस्कटॉप पर भेजें",
+   "es": "Enviar a Tofu al escritorio",
+   "ar": "إرسال Tofu إلى سطح المكتب",
+   "fr": "Envoyer Tofu sur le bureau",
+   "bn": "Tofu-কে ডেস্কটপে পাঠান",
+   "pt-BR": "Enviar o Tofu para a área de trabalho",
+   "ru": "Отправить Tofu на рабочий стол",
+   "id": "Kirim Tofu ke desktop"
   },
   "Send the message": {
    "zh-Hans": "发送消息",
@@ -1398,16 +1398,16 @@
    "ru": "Этот адрес — другой компьютер: ваши запросы отправляются туда.",
    "id": "Alamat ini adalah mesin lain: pertanyaan Anda dikirim ke sana."
   },
-  "Tofu is a pebble with Mochi's moves and outfits, in liquid chrome or in one flat colour. It shows in the island, on the desktop and in vufh HQ.": {
-   "zh-Hans": "Tofu 是一颗小卵石，拥有 Mochi 的动作和服装，可以是液态铬，也可以是单一纯色。它会出现在灵动岛、桌面和 vufh HQ 中。",
-   "hi": "Tofu एक कंकड़ है, जिसकी हरकतें और कपड़े Mochi जैसे हैं, तरल क्रोम में या एक सपाट रंग में। यह आइलैंड में, डेस्कटॉप पर और vufh HQ में दिखता है।",
-   "es": "Tofu es un guijarro con los movimientos y los disfraces de Mochi, en cromo líquido o en un solo color liso. Aparece en la isla, en el escritorio y en vufh HQ.",
-   "ar": "Tofu حصاة بحركات Mochi وأزيائه، بالكروم السائل أو بلون واحد مسطّح. يظهر في الجزيرة وعلى سطح المكتب وفي vufh HQ.",
-   "fr": "Tofu est un galet, avec les mouvements et les tenues de Mochi, en chrome liquide ou d'une seule couleur unie. Il apparaît dans l'île, sur le bureau et dans vufh HQ.",
-   "bn": "Tofu একটি নুড়ি, Mochi-র মতো নড়াচড়া আর পোশাক নিয়ে, তরল ক্রোমে বা একটি সমান রঙে। এটি আইল্যান্ডে, ডেস্কটপে আর vufh HQ-তে দেখা যায়।",
-   "pt-BR": "Tofu é um seixo com os movimentos e as roupas do Mochi, em cromo líquido ou em uma só cor lisa. Ele aparece na ilha, na área de trabalho e no vufh HQ.",
-   "ru": "Tofu — камешек с движениями и нарядами Mochi, из жидкого хрома или одного ровного цвета. Он появляется на острове, на рабочем столе и в vufh HQ.",
-   "id": "Tofu adalah kerikil dengan gerakan dan kostum Mochi, dalam krom cair atau satu warna polos. Ia muncul di pulau, di desktop, dan di vufh HQ."
+  "Tofu is a pebble, in liquid chrome or in one flat colour. It shows in the island, on the desktop and in vufh HQ.": {
+   "zh-Hans": "Tofu 是一颗小卵石，可以是液态铬，也可以是单一纯色。它会出现在灵动岛、桌面和 vufh HQ 中。",
+   "hi": "Tofu एक कंकड़ है, तरल क्रोम में या एक सपाट रंग में। यह आइलैंड में, डेस्कटॉप पर और vufh HQ में दिखता है।",
+   "es": "Tofu es un guijarro, en cromo líquido o en un solo color liso. Aparece en la isla, en el escritorio y en vufh HQ.",
+   "ar": "Tofu حصاة، بالكروم السائل أو بلون واحد مسطّح. يظهر في الجزيرة وعلى سطح المكتب وفي vufh HQ.",
+   "fr": "Tofu est un galet, en chrome liquide ou d'une seule couleur unie. Il apparaît dans l'île, sur le bureau et dans vufh HQ.",
+   "bn": "Tofu একটি নুড়ি, তরল ক্রোমে বা একটি সমান রঙে। এটি আইল্যান্ডে, ডেস্কটপে আর vufh HQ-তে দেখা যায়।",
+   "pt-BR": "Tofu é um seixo, em cromo líquido ou em uma só cor lisa. Ele aparece na ilha, na área de trabalho e no vufh HQ.",
+   "ru": "Tofu — камешек, из жидкого хрома или одного ровного цвета. Он появляется на острове, на рабочем столе и в vufh HQ.",
+   "id": "Tofu adalah kerikil, dalam krom cair atau satu warna polos. Ia muncul di pulau, di desktop, dan di vufh HQ."
   },
   "Tofu, in chrome": {
    "zh-Hans": "Tofu（铬色）",
@@ -2294,16 +2294,16 @@
    "ru": "Когда очистка включена, текст (но никогда не голос) уходит в Anthropic с вашим ключом Claude. Когда выключена, всё остаётся на этом компьютере.",
    "id": "Dengan pembersihan aktif, teks (tidak pernah suaramu) dikirim ke Anthropic dengan kunci Claude-mu. Saat nonaktif, semuanya tetap di komputer ini."
   },
-  "Mochi, his sounds and how the island behaves.": {
-   "zh-Hans": "Mochi、它的声音以及岛的行为方式。",
-   "hi": "Mochi, उसकी आवाज़ें और आइलैंड कैसे काम करता है।",
-   "es": "Mochi, sus sonidos y cómo se comporta la isla.",
-   "ar": "Mochi وأصواته وطريقة عمل الجزيرة.",
-   "fr": "Mochi, ses sons et le comportement de l'île.",
-   "bn": "Mochi, তার শব্দ আর আইল্যান্ড কেমন আচরণ করে।",
-   "pt-BR": "Mochi, seus sons e como a ilha se comporta.",
-   "ru": "Mochi, его звуки и поведение острова.",
-   "id": "Mochi, suaranya, dan cara pulau berperilaku."
+  "Tofu, his sounds and how the island behaves.": {
+   "zh-Hans": "Tofu、它的声音以及岛的行为方式。",
+   "hi": "Tofu, उसकी आवाज़ें और आइलैंड कैसे काम करता है।",
+   "es": "Tofu, sus sonidos y cómo se comporta la isla.",
+   "ar": "Tofu وأصواته وطريقة عمل الجزيرة.",
+   "fr": "Tofu, ses sons et le comportement de l'île.",
+   "bn": "Tofu, তার শব্দ আর আইল্যান্ড কেমন আচরণ করে।",
+   "pt-BR": "Tofu, seus sons e como a ilha se comporta.",
+   "ru": "Tofu, его звуки и поведение острова.",
+   "id": "Tofu, suaranya, dan cara pulau berperilaku."
   },
   "The pills shown in the island, their order and their colours.": {
    "zh-Hans": "岛中显示的胶囊、它们的顺序和颜色。",

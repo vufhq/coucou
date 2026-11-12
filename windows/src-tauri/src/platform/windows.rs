@@ -38,7 +38,7 @@ fn base_dir(var: &str) -> PathBuf {
 }
 
 /// `base`\vufh, or the folder from before the rename while it could not be
-/// moved (adopt_legacy_dirs): the files are never split between the two.
+/// moved (adopt_legacy_dirs): the preferences are never split between the two.
 fn app_dir(base: PathBuf) -> PathBuf {
     let dir = base.join(DIR);
     let legacy = base.join(LEGACY_DIR);
@@ -56,17 +56,32 @@ pub fn config_dir() -> PathBuf {
 
 /// %LOCALAPPDATA%\vufh — where the inbox, the models and the log live.
 pub fn local_dir() -> PathBuf {
-    app_dir(base_dir("LOCALAPPDATA"))
+    base_dir("LOCALAPPDATA").join(DIR)
 }
 
-/// Renames the two folders from before the rename, once, at launch. A folder
-/// still in use (the old app is running) stays where it is and is used there.
+/// What the app kept in %LOCALAPPDATA% under its former name. That folder is
+/// also where the former app is installed (its program, its uninstaller), so
+/// it is never renamed whole: only these move.
+const LEGACY_LOCAL_DATA: &[&str] = &["Models", "Flow", "Notes", "inbox", "recap.json"];
+
+/// Brings over the folders from before the rename, at launch. What is still in
+/// use (the old app is running) stays, and is tried again at the next launch.
 fn adopt_legacy_dirs() {
-    for var in ["APPDATA", "LOCALAPPDATA"] {
-        let base = base_dir(var);
-        let (dir, legacy) = (base.join(DIR), base.join(LEGACY_DIR));
-        if !dir.exists() && legacy.is_dir() {
-            let _ = std::fs::rename(&legacy, &dir);
+    let config = base_dir("APPDATA");
+    let (dir, legacy) = (config.join(DIR), config.join(LEGACY_DIR));
+    if !dir.exists() && legacy.is_dir() {
+        let _ = std::fs::rename(&legacy, &dir);
+    }
+
+    let local = base_dir("LOCALAPPDATA");
+    let (dir, legacy) = (local.join(DIR), local.join(LEGACY_DIR));
+    if !legacy.is_dir() {
+        return;
+    }
+    for name in LEGACY_LOCAL_DATA {
+        let (from, to) = (legacy.join(name), dir.join(name));
+        if from.exists() && !to.exists() && std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::rename(&from, &to);
         }
     }
 }
@@ -128,7 +143,7 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
 
 // ── Who we are ────────────────────────────────────────────────────────────────
 //
-// The display name only feeds Mochi's greeting (identity.rs). The calls are
+// The display name only feeds Tofu's greeting (identity.rs). The calls are
 // declared here by hand, with their documented C signatures, so they need no
 // extra `windows` crate features.
 #[link(name = "secur32")]
@@ -145,7 +160,7 @@ extern "system" {
 /// EXTENDED_NAME_FORMAT::NameDisplay.
 const NAME_DISPLAY: i32 = 3;
 
-/// The account's display name ("Louis Raille"): the directory's for a domain
+/// The account's display name ("Alex Martin"): the directory's for a domain
 /// or Entra account, else the local account's "Full name", else nothing.
 pub fn user_full_name() -> Option<String> {
     directory_display_name().or_else(local_full_name).filter(|n| !n.trim().is_empty())
@@ -322,7 +337,7 @@ pub fn ctrl_alt_types(vk: u16, shift: bool) -> Option<String> {
     None
 }
 
-// ── Desktop Mochi window ──────────────────────────────────────────────────────
+// ── Desktop Tofu window ──────────────────────────────────────────────────────
 
 /// Windows places a window wherever it is asked, and the cursor poll is there.
 pub fn desktop_mode() -> super::DesktopMode {
@@ -346,7 +361,7 @@ pub fn set_layer_margins(_win: &WebviewWindow, _x: f64, _y: f64) {}
 pub fn set_layer_overlay(_win: &WebviewWindow, _on: bool) {}
 
 /// Layer-shell only (Linux): the logical size of the display the island is on.
-pub fn layer_display(_island: &WebviewWindow, _mochi: &WebviewWindow) -> Option<(f64, f64)> {
+pub fn layer_display(_island: &WebviewWindow, _tofu: &WebviewWindow) -> Option<(f64, f64)> {
     None
 }
 
