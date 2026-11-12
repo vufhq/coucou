@@ -494,7 +494,11 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     const outcome = await runBackendJob(store, signals, { taskId: task.id, agentId: computerId, op: "fs.list", args: {} }, fileTimeoutMs);
     if (!outcome) return reply.code(504).send({ error: "worker_unavailable" });
     if (outcome.status !== "succeeded") return reply.code(502).send({ error: "failed", message: outcome.error?.message });
-    return { taskId: task.id, files: JSON.parse(outcome.result ?? "[]") as unknown };
+    try {
+      return { taskId: task.id, files: JSON.parse(outcome.result ?? "[]") as unknown };
+    } catch {
+      return reply.code(502).send({ error: "failed", message: "the list of files is too long for this computer's worker: update it with provision.ps1 -Update" });
+    }
   });
 
   app.get<{ Params: { id: string; taskId: string; "*": string } }>(

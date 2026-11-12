@@ -3,9 +3,8 @@
 // Strings are looked up by their English text, like the Mac's catalog:
 // `t("Allow")`, `t("Uploading {name}", { name })`. Two tables, both keyed by
 // the English text:
-// - strings.json, generated from the Mac's Localizable.xcstrings by
-//   scripts/gen-strings.mjs (never edited by hand);
-// - extra.json, the strings only Windows and Linux have, written by hand.
+// - strings.json, first generated from the Mac app's catalog, now edited by hand;
+// - extra.json, the strings added since, also written by hand.
 // A string missing from both, or from one language, shows in English.
 //
 // The Rust side (src-tauri/src/i18n.rs) embeds the same two files and looks up

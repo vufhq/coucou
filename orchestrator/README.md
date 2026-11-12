@@ -89,8 +89,9 @@ boundary, not each command.
   everything it started. A server started with `&` doesn't hold the command
   and keeps running. The runner may use at most 75 % of the VM's memory and
   512 processes.
-- Output streams live to Coucou; the model gets the exit code and the last
-  64 KB.
+- Output streams live to Coucou; the model gets the exit code and up to
+  20,000 characters of it, the start and the end (the middle of a longer
+  output is cut).
 
 ## Files and links in messages
 
@@ -200,8 +201,8 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    *"Open the documentation for httpx, find the current installation
    instructions, and save a summary to report.md."*
 
-   Each agent then has a pill in the island that stays, after Claude Code and
-   Cursor, like a ChatGPT dot: its mini Mochi works, asks and finishes with
+   Each agent then has a pill in the island that stays, first in the row,
+   like a ChatGPT dot: its mini Mochi works, asks and finishes with
    its tasks, and dims when its computer is off. Pick it to see how it is and
    how its last task ended; **Chat with …** opens the island's chat talking to
    that agent (agents are also in the chat's model picker). Each message is a
@@ -219,42 +220,6 @@ output goes to `%LOCALAPPDATA%\Coucou\orchestrator-backend.log`). Turn that off
 to run `npm start` yourself. Closing Coucou leaves the backend running and
 does not stop a task. Stopping the backend pauses tasks, and they carry on when
 it starts again.
-
-## Setup on a Mac
-
-On a Mac the computers are [Lima](https://lima-vm.io) VMs on Apple's
-Virtualization framework (`vmType: vz`), named `coucou-agent-01`,
-`coucou-agent-02`… so they never clash with your own Lima VMs. Apple silicon
-and Intel both work. Everything else (backend, worker, runner, policy) is the
-same as on Windows.
-
-```bash
-brew install lima node
-cd orchestrator && npm ci
-worker/provision/provision.sh                    # agent-01; a few minutes the first time
-worker/provision/provision.sh --name agent-02    # another computer
-npm start
-```
-
-- The shared folder is `~/Library/Application Support/Coucou/computers/shared`
-  (`--shared-dir` to change it; give every computer the same one). Lima mounts
-  it over virtiofs at `/mnt/coucou-share`, and `mount-computer.sh` shows it at
-  `/computer` through bindfs with the same rules as drvfs on Windows: owned by
-  `runner:computer`, mode 770. The raw mount is hidden from the worker and the
-  runner. Nothing else of the Mac is mounted (no home folder, no `/tmp/lima`),
-  and no port an agent opens is forwarded to the Mac (`worker/provision/lima/agent.yaml`).
-- The worker reaches the backend at `host.lima.internal` (the VM's default
-  gateway), which is the Mac's loopback, so the backend's worker port stays on
-  `127.0.0.1`. The runner's firewall denies 192.168.0.0/16, so an agent's shell
-  cannot reach the Mac's loopback; DNS goes through systemd-resolved's stub.
-- Tokens live in the macOS Keychain (service `fr.louisraille.coucou`).
-- The backend starts a stopped computer again (`limactl start`); the VMs keep
-  running when the backend stops. `limactl stop coucou-agent-01` stops one.
-- Data is in `~/Library/Application Support/CoucouOrchestrator`.
-- `ORCH_VM_DRIVER=wsl|lima` overrides the choice; `ORCH_LIMACTL` points at
-  limactl when it isn't in Homebrew's folder.
-- The shared folder is case-insensitive, like any default macOS volume:
-  `File.txt` and `file.txt` are one file.
 
 ## Goals and schedules
 
@@ -354,8 +319,17 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 - **Operations** are an allowlist (`protocol/src/ops.ts`): navigate, extract
   text and take a screenshot in the browser; write, list and read files in the
   task's folder; run bash command lines on the computer (`terminal.shell`, see
-  The computer). The older `terminal.run` (one command, no shell, as the
-  worker's user) keeps its rules, so an outdated worker never runs free code.
+  The computer). The older `terminal.run` is retired: it started a program as
+  the worker's own user, outside the shell's sandbox, so the model can no longer
+  propose it, the policy denies it and the worker refuses it.
+- **The browser** runs in Chromium's own sandbox when the computer allows one
+  (the worker's log says when it does not). Every request and WebSocket is
+  checked against the PC and private networks; an answer that still comes from
+  a private address closes the session; and `coucou-worker.service` denies the
+  local network to the worker and its browser, whatever a name resolves to.
+- **Tool output** (pages, command output) reaches the model unchanged, inside a
+  tag whose name carries a code only the backend knows, so a page cannot close
+  its own fence and write "instructions" after it.
 - **Rule levels:** each agent has one, set only by you in HQ (`PUT
   /api/agents/:id/rules`; no model operation can change it). New and existing
   agents are at 2.
@@ -363,7 +337,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   | Level | Asks before |
   |---|---|
   | 1 Ask before everything | every step but reading files and pages |
-  | 2 Ask before risky steps | a site's first visit, `terminal.run` beyond read-only commands |
+  | 2 Ask before risky steps | a site's first visit, a first clone, a push |
   | 3 Act freely within budget | a push past `ORCH_RISKY_PER_DAY` today |
   | 4 Fully trusted | nothing below |
 

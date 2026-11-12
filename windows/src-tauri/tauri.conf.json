@@ -48,11 +48,10 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "resources": { "../target/release/coucou-hook.exe": "coucou-hook.exe" },
     "copyright": "© Louis Raille",
     "category": "DeveloperTool",
-    "shortDescription": "Mochi lives at the top of your screen",
-    "longDescription": "Coucou puts Mochi at the top of your screen: it shows your Claude Code sessions and a few integrations, and lets you approve, answer, chat and drop files without leaving what you are doing.",
+    "shortDescription": "Coucou HQ: run a team of AI agents from your desktop",
+    "longDescription": "Coucou HQ runs a team of AI agents on their own computers. Mochi, the head of staff, delegates to coworkers; you follow them, approve, answer and chat from HQ or the island at the top of your screen.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

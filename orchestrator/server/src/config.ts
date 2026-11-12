@@ -22,7 +22,7 @@ export interface Config {
   retentionDays: number;
   /** The model profile used when a task names none. */
   defaultModelProfile: string;
-  /** Provisioned computers: a WSL distro of the same name on Windows, a Lima VM `coucou-<id>` on a Mac. */
+  /** Provisioned computers, each with its own WSL distro of the same name. */
   agents: { id: string; name: string; vmId: string }[];
   /** How many tasks may be worked on at the same time, all computers together; the others wait. */
   maxParallel: number;
@@ -48,20 +48,6 @@ export function wslHostAddress(): string {
   return "127.0.0.1";
 }
 
-/** Which VMs the computers are: ORCH_VM_DRIVER, else Lima on a Mac and WSL anywhere else. */
-export type VmDriver = "wsl" | "lima";
-export function vmDriver(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): VmDriver {
-  const raw = env.ORCH_VM_DRIVER?.trim();
-  if (raw === "wsl" || raw === "lima") return raw;
-  if (raw) throw new Error(`ORCH_VM_DRIVER: ${JSON.stringify(raw)} is not wsl or lima`);
-  return platform === "darwin" ? "lima" : "wsl";
-}
-
-/** The VM a computer runs in: `wsl:agent-01`, or `lima:coucou-agent-01` (Lima's names are shared by every VM on the Mac). */
-export function vmIdFor(id: string, driver: VmDriver): string {
-  return driver === "lima" ? `lima:coucou-${id}` : `wsl:${id}`;
-}
-
 function int(value: string | undefined, fallback: number): number {
   const n = value ? Number.parseInt(value, 10) : Number.NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -73,7 +59,7 @@ export function agentName(id: string): string {
 }
 
 /** ORCH_AGENTS: a comma-separated list of agent ids, agent-01 when unset. */
-export function parseAgents(raw: string | undefined, driver: VmDriver = "wsl"): Config["agents"] {
+export function parseAgents(raw: string | undefined): Config["agents"] {
   const ids = (raw ?? "agent-01").split(",").map((s) => s.trim()).filter(Boolean);
   const seen = new Set<string>();
   const agents: Config["agents"] = [];
@@ -82,26 +68,22 @@ export function parseAgents(raw: string | undefined, driver: VmDriver = "wsl"): 
     if (!parsed.success) throw new Error(`ORCH_AGENTS: ${JSON.stringify(id)} is not an agent id (a-z, 0-9 and -, up to 24)`);
     if (seen.has(id)) continue;
     seen.add(id);
-    agents.push({ id, name: agentName(id), vmId: vmIdFor(id, driver) });
+    agents.push({ id, name: agentName(id), vmId: `wsl:${id}` });
   }
   if (agents.length === 0) throw new Error("ORCH_AGENTS names no agent");
   return agents;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): Config {
-  const driver = vmDriver(env, platform);
-  const home = env.HOME ?? ".";
-  const base =
-    env.LOCALAPPDATA ?? (platform === "darwin" ? join(home, "Library", "Application Support") : join(home, ".local", "share"));
-  const agents = parseAgents(env.ORCH_AGENTS, driver);
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const base = env.LOCALAPPDATA ?? join(env.HOME ?? ".", ".local", "share");
+  const agents = parseAgents(env.ORCH_AGENTS);
   // A worker runs up to 4 operations at once (WORKER_SLOTS), whatever this says.
   const tasksPerComputer = Math.max(1, int(env.ORCH_TASKS_PER_COMPUTER, 2));
   return {
     dataDir: env.ORCH_DATA_DIR ?? join(base, "CoucouOrchestrator"),
     apiHost: "127.0.0.1",
     apiPort: int(env.ORCH_API_PORT, 47620),
-    // A Lima VM reaches the Mac's loopback as its default gateway (host.lima.internal).
-    workerHost: env.ORCH_WORKER_HOST ?? (driver === "lima" ? "127.0.0.1" : wslHostAddress()),
+    workerHost: env.ORCH_WORKER_HOST ?? wslHostAddress(),
     workerPort: int(env.ORCH_WORKER_PORT, 47621),
     leaseMs: int(env.ORCH_LEASE_MS, 15_000),
     claimWaitMs: int(env.ORCH_CLAIM_WAIT_MS, 25_000),

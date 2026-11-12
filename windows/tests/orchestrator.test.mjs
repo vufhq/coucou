@@ -74,10 +74,14 @@ test("its approval card comes up, and Allow goes back with the backend's request
   assert.ok(asked.includes("alert:approval"));
 });
 
-test("an agent outside the orchestrator still cannot raise a card it cannot be answered on", () => {
+test("a request the orchestrator does not own raises no card", () => {
   emit("hook", { hook_event_name: "PermissionRequest", request_id: "r1", coucou_agent: "agent-01", tool_name: "Bash" });
   assert.equal(State.pendingApproval, null);
-  assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }]);
+});
+
+test("an untagged event is ignored", () => {
+  emit("hook", { hook_event_name: "UserPromptSubmit", prompt: "go" });
+  assert.equal(State.tasks.some((t) => t.id.startsWith("agent_")), false);
 });
 
 test("the card goes when the approval is answered on the Tasks page", () => {
@@ -163,7 +167,7 @@ const agentInfo = (id, extra = {}) => ({
   ...extra,
 });
 
-test("the backend's agents get pills that stay, after the catalog's", () => {
+test("the backend's agents get pills that stay, before the catalog's", () => {
   emit("orchestrator-agents", {
     agents: [
       { id: "agent-01", name: "Scout", status: "ready", color: "#38BDF8", problems: [] },
@@ -171,8 +175,7 @@ test("the backend's agents get pills that stay, after the catalog's", () => {
     ],
   });
   const ids = State.tasks.map((t) => t.id);
-  assert.deepEqual(ids.slice(-2), ["agent_agent-01", "agent_agent-02"]);
-  assert.equal(ids[0], State.settings.mainPill);
+  assert.deepEqual(ids.slice(0, 2), ["agent_agent-01", "agent_agent-02"]);
   const one = State.tasks.find((t) => t.id === "agent_agent-01");
   assert.equal(one.name, "Scout");
   assert.equal(one.color, "#38BDF8");

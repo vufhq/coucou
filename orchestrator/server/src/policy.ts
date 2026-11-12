@@ -8,14 +8,6 @@ export type Verdict =
   | { verdict: "approve"; reason: string }
   | { verdict: "deny"; reason: string };
 
-/** Commands that only read, run without asking. Anything else needs a click. */
-export const SAFE_COMMANDS: ReadonlySet<string> = new Set([
-  "ls", "cat", "head", "tail", "wc", "grep", "pwd", "date", "echo", "sort", "uniq", "diff", "stat", "file",
-]);
-
-/** Package managers and anything that installs or escalates: always a click. */
-const INSTALLERS = /^(?:apt|apt-get|dpkg|snap|pip|pip3|npm|npx|pnpm|yarn|curl|wget|sudo|su)$/;
-
 export interface PolicyContext {
   /** Domains a human already approved for this agent. */
   approvedDomains: readonly string[];
@@ -109,16 +101,10 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
       if (ctx.approvedDomains.includes(domain)) return { verdict: "allow" };
       return { verdict: "approve", reason: `first visit to ${domain}` };
     }
-    case "terminal.run": {
-      const argv = a.argv as string[];
-      const bin = argv[0] ?? "";
-      if (level === 1) return { verdict: "approve", reason: EVERYTHING };
-      if (level >= 3) return { verdict: "allow" };
-      if (bin.includes("/")) return { verdict: "approve", reason: "runs a program by path" };
-      if (INSTALLERS.test(bin)) return { verdict: "approve", reason: "installs software or reaches the network" };
-      if (!SAFE_COMMANDS.has(bin)) return { verdict: "approve", reason: `${bin} is not on the read-only list` };
-      return { verdict: "allow" };
-    }
+    // Retired (protocol's RETIRED_OPS): it ran outside the shell's sandbox. A
+    // step written before the update is refused like any other, at every level.
+    case "terminal.run":
+      return { verdict: "deny", reason: "terminal.run is no longer available: use terminal.shell" };
     // The shell runs as the computer's `runner` user, which cannot reach the
     // worker, its token, Windows or the local network: the computer is the
     // boundary, as in rakazo, so code runs without a click. The same shell can

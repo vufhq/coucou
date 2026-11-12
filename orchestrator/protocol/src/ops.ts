@@ -62,6 +62,7 @@ export const WORKER_OPS = {
       sha256: z.string().regex(/^[0-9a-f]{64}$/),
     })
     .strict(),
+  // Retired (RETIRED_OPS): still named so an older worker's hello and old steps parse.
   "terminal.run": z.object({ argv: z.array(z.string().min(1).max(1_000)).min(1).max(32) }).strict(),
   // A bash command line on the shared computer, as its sandboxed `runner`
   // user. `cwd` is a folder under the task folder, or `~/…` for the agent's
@@ -191,8 +192,17 @@ export const READ_ONLY_OPS: ReadonlySet<WorkerOpName> = new Set([
  */
 export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch", "fs.receive"]);
 
+/**
+ * Operations nothing runs any more. terminal.run started a program as the
+ * worker's own user, outside the shell's sandbox: "read-only" commands such as
+ * `sort --compress-program=…` or `cat` on a link reached the worker's token
+ * and the network the shell is kept from. terminal.shell does all it did. The
+ * model cannot propose one, the policy denies it and the worker refuses it.
+ */
+export const RETIRED_OPS: ReadonlySet<OpName> = new Set(["terminal.run"]);
+
 /** What a model may propose. */
-export const MODEL_OP_NAMES = ALL_OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op));
+export const MODEL_OP_NAMES = ALL_OP_NAMES.filter((op) => !BACKEND_ONLY_OPS.has(op) && !RETIRED_OPS.has(op));
 
 export type ParsedOp = { ok: true; op: Operation } | { ok: false; error: string };
 

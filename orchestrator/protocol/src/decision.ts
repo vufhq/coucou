@@ -5,7 +5,7 @@
 // The arguments are then checked against the operation's own schema.
 
 import { z } from "zod";
-import { BACKEND_ONLY_OPS, MODEL_OP_NAMES, parseOperation, type Operation } from "./ops.ts";
+import { BACKEND_ONLY_OPS, MODEL_OP_NAMES, RETIRED_OPS, parseOperation, type Operation } from "./ops.ts";
 
 export const RawDecision = z.object({
   kind: z.enum(["action", "ask", "done"]),
@@ -50,6 +50,7 @@ export function parseDecision(value: unknown): ParsedDecision {
   const op = parseOperation(d.op, d.args);
   if (!op.ok) return { ok: false, error: op.error };
   if (BACKEND_ONLY_OPS.has(op.op.op)) return { ok: false, error: `unknown operation ${op.op.op}` };
+  if (RETIRED_OPS.has(op.op.op)) return { ok: false, error: `${op.op.op} is no longer available: use terminal.shell` };
   return { ok: true, decision: { kind: "action", note: d.note?.trim() ?? "", op: op.op } };
 }
 

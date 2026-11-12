@@ -32,12 +32,12 @@ fn tools() -> Vec<Value> {
     vec![
         json!({
             "name": "pills",
-            "description": "Add, remove, set as main or list the pills shown in the island at the top of the screen. At most 4 pills besides the main one: remove one first if needed.",
+            "description": "Add, remove or list the service and AI pills shown in the island at the top of the screen, beside the agents' own. At most 4: remove one first if needed.",
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "action": { "type": "string", "enum": ["add", "remove", "set_main", "list"] },
-                    "names": { "type": "array", "items": { "type": "string" }, "description": "Pill names as listed (e.g. Stripe, GitHub, Cursor). Empty for list." }
+                    "action": { "type": "string", "enum": ["add", "remove", "list"] },
+                    "names": { "type": "array", "items": { "type": "string" }, "description": "Pill names as listed (e.g. Stripe, GitHub, Vercel). Empty for list." }
                 },
                 "required": ["action"]
             }
@@ -57,7 +57,7 @@ fn tools() -> Vec<Value> {
         }),
         json!({
             "name": "service_info",
-            "description": "Read the user's real data that Coucou already has, as JSON: the active pills, the agent sessions (Claude Code, Codex…) and what they are doing, Claude or Codex plan usage, Spotify now playing, and the services' latest data (Stripe, GitHub, Vercel, Resend, n8n, Notion, Cal.com).",
+            "description": "Read the user's real data that Coucou already has, as JSON: the active pills, the user's agents and what they are doing, Spotify now playing, and the services' latest data (Stripe, GitHub, Vercel, Resend, n8n, Notion, Cal.com).",
             "input_schema": { "type": "object", "properties": {} }
         }),
         json!({

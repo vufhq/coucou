@@ -248,27 +248,23 @@ test("Ctrl stands in for ⌘ inside the island", () => {
   assert.ok(ISLAND_SHORTCUTS.length >= 6);
 });
 
-test("Ctrl+↓ ↑ walk a card's list, Ctrl+O opens, Ctrl+E is the overview's diff", () => {
+test("Ctrl+↓ ↑ walk a card's list, Ctrl+O opens", () => {
   const ctx = { view: "overview", inTextField: false };
   const ctrl = (key, code = "") => press({ key, code, ctrlKey: true });
   assert.deepEqual(islandKeyAction(ctrl("ArrowDown", "ArrowDown"), ctx), { kind: "list", delta: 1 });
   assert.deepEqual(islandKeyAction(ctrl("ArrowUp", "ArrowUp"), ctx), { kind: "list", delta: -1 });
   assert.deepEqual(islandKeyAction(ctrl("o", "KeyO"), ctx), { kind: "openSelection" });
-  assert.deepEqual(islandKeyAction(ctrl("e", "KeyE"), ctx), { kind: "diff" });
-  // The key labelled E on any layout, and Ctrl+Shift+E is something else.
-  assert.deepEqual(islandKeyAction(ctrl("E", "KeyE"), ctx), { kind: "diff" });
-  assert.equal(islandKeyAction(press({ key: "E", code: "KeyE", ctrlKey: true, shiftKey: true }), ctx), null);
-  // ⌘E only means something in the overview, where the diff opens.
-  assert.equal(islandKeyAction(ctrl("e", "KeyE"), { view: "prompt", inTextField: true }), null);
+  // The key labelled O on any layout, and Ctrl+Shift+O is something else.
+  assert.deepEqual(islandKeyAction(ctrl("O", "KeyO"), ctx), { kind: "openSelection" });
+  assert.equal(islandKeyAction(press({ key: "O", code: "KeyO", ctrlKey: true, shiftKey: true }), ctx), null);
   // In the chat field Ctrl+↑ ↓ keep moving by paragraph.
   assert.equal(islandKeyAction(ctrl("ArrowDown", "ArrowDown"), { view: "prompt", inTextField: true }), null);
-  // Settings lists them in the Mac's order (ShortcutLogic.islandShortcuts).
+  // Settings lists them in this order.
   assert.deepEqual(ISLAND_SHORTCUTS.map((s) => s.keys).slice(0, 5), [
-    "Ctrl+→ / Ctrl+←", "Ctrl+1 – Ctrl+9", "Ctrl+↓ / Ctrl+↑", "Ctrl+O", "Ctrl+E",
+    "Ctrl+→ / Ctrl+←", "Ctrl+1 – Ctrl+9", "Ctrl+↓ / Ctrl+↑", "Ctrl+O", "Ctrl+Enter",
   ]);
   assert.equal(SHORTCUT_TEXT.island.navItems, "Navigate list items");
   assert.equal(SHORTCUT_TEXT.island.open, "Open selected item");
-  assert.equal(SHORTCUT_TEXT.island.diff, "Open / close current diff");
 });
 
 // ── What the island does ──────────────────────────────────────────────────────
@@ -360,47 +356,35 @@ test("the island toggle opens with the keyboard, and closes an open island", () 
   assert.deepEqual(did, ["collapse"]);
 });
 
-test("go to alert: the permission first, then a question, else Mochi is annoyed", () => {
+test("go to alert: the approval first, then an agent's question in its chat, else Mochi is annoyed", () => {
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["emote:annoyed"]);
 
   did = [];
-  State.upsertExternalAgent("agent_gemini", "Gemini", "#fff");
-  State.updateTask("agent_gemini", "question");
+  State.syncOrchestratorAgents([{
+    agentId: "agent-02", name: "Scout", color: "#fff", kind: "coworker", role: null, outfit: null, teamId: null,
+    teamName: null, teamOrder: null, order: 0, computerId: "agent-01", status: "ready", problems: [], paused: false,
+    limits: { tasksPerDay: 30, stepsPerDay: 300 }, usage: { tasksToday: 0, stepsToday: 0 },
+  }]);
+  State.chatAgent = null;
+  State.updateTask("agent_agent-02", "question");
   runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
-  assert.equal(State.focusId, "agent_gemini");
+  assert.deepEqual(did, ["resume", "alert:prompt", "keyboard"]);
+  assert.equal(State.focusId, "agent_agent-02");
+  assert.equal(State.chatAgent, "agent-02");
 
   did = [];
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.upsertExternalAgent("agent_agent-03", "agent-03", "#fff");
+  State.pendingApproval = { requestId: "orch:agent-03:a", sessionId: "s", pillId: "agent_agent-03", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
+  assert.equal(State.focusId, "agent_agent-03");
   // Nothing is ever decided from a shortcut.
   assert.deepEqual(sent("approval_decision"), []);
 });
 
-test("go to alert brings up the unified card: any agent's pill, a question as a question", () => {
-  State.upsertExternalAgent("agent_codex", "Codex", "#fff");
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_codex", tool: "Bash", command: "ls" };
-  runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
-  assert.equal(State.focusId, "agent_codex");
-
-  did = [];
-  State.pendingApproval = {
-    requestId: "r2", sessionId: "s", pillId: "integration_claude", tool: "AskUserQuestion", command: "",
-    questions: [{ question: "Which?", options: [], multiSelect: false }],
-  };
-  runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
-  assert.deepEqual(sent("approval_decision"), []);
-  assert.deepEqual(sent("approval_answer"), []);
-});
-
 test("the island toggle opens on a waiting card, and folds it rather than dropping it", () => {
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_agent-01", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "toggleIsland", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
   did = [];
@@ -411,19 +395,11 @@ test("the island toggle opens on a waiting card, and folds it rather than droppi
   assert.equal(State.pendingApproval.requestId, "r1");
 });
 
-test("the terminal shortcut is the existing Open terminal (the session's window), and folds the island", () => {
-  State.tasks[0].sessionCwd = "C:\\work\\proj";
+test("the old terminal shortcut opens Coucou HQ on the focused agent, and folds the island", () => {
   State.mode = "expanded";
   runGlobalShortcut(host, "jumpToTerminal", resume);
-  assert.deepEqual(sent("open_session"), [{ sessionId: null, path: "C:\\work\\proj" }]);
+  assert.deepEqual(sent("show_hq"), [{ agentId: null }]);
   assert.deepEqual(did, ["collapse"]);
-
-  // A Claude Desktop session lives in the Claude app.
-  did = [];
-  State.upsertExternalAgent("agent_claude-desktop", "Claude Desktop", "#D97757");
-  State.setFocus("agent_claude-desktop");
-  runGlobalShortcut(host, "jumpToTerminal", resume);
-  assert.equal(sent("open_claude_desktop").length, 1);
 });
 
 test("next and previous pill wrap around and open the overview", () => {
@@ -499,7 +475,7 @@ test("island keys: pills by number, new chat, settings, pin", () => {
   assert.equal(sent("open_settings_window").length, 1);
 
   runIslandKey(host, { kind: "pin" });
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_agent-01", tool: "Bash", command: "ls" };
   runIslandKey(host, { kind: "pin" });
   assert.deepEqual(did, ["setView:overview", "setView:overview", "setView:prompt", "pin:true"]);
 });
@@ -537,7 +513,4 @@ test("island keys: the highlight walks the list on screen, Ctrl+O opens it, Ctrl
   runIslandKey(host, { kind: "pill", number: 1 });
   assert.equal(State.cardSelection, null);
 
-  did = [];
-  runIslandKey(host, { kind: "diff" });
-  assert.deepEqual(did, ["view:toggleDiff"]);
 });

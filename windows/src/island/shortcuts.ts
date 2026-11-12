@@ -13,7 +13,6 @@ import { cyclePill, islandKeyAction, navigate, pillByNumber, type IslandKeyActio
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 
-const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
 
 /** What the shortcuts need from the island. */
 export interface ShortcutHost {
@@ -34,8 +33,8 @@ export interface ShortcutHost {
   viewCommand(command: ViewCommand): void;
 }
 
-/** What the open view is asked to do: open the highlighted item, toggle the diff. */
-export type ViewCommand = "openSelection" | "toggleDiff";
+/** What the open view is asked to do: open the highlighted item. */
+export type ViewCommand = "openSelection";
 
 function focusPill(host: ShortcutHost, id: string | null, open: boolean) {
   if (!id) return;
@@ -69,16 +68,18 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
       const asking = State.tasks.find((t) => t.state === "question");
       const pending = State.pendingApproval;
       if (pending) {
-        // The one card every agent's request uses: its own pill to the front,
-        // its card (permission or question) up. Nothing is answered from here.
+        // The approval card: its agent's pill to the front, its card up.
+        // Nothing is answered from here.
         resume();
         State.setFocus(pending.pillId);
-        host.alert(pending.questions ? "question" : "approval");
+        host.alert("approval");
         host.takeKeyboard();
       } else if (asking) {
+        // An agent asked in its chat: the chat with it, where the answer goes.
         resume();
         State.setFocus(asking.id);
-        host.alert("question");
+        if (asking.orchestrator) State.chatAgent = asking.orchestrator.agentId;
+        host.alert("prompt");
         host.takeKeyboard();
       } else {
         // Nothing is waiting: Mochi says so.
@@ -88,13 +89,10 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
       break;
     }
 
-    // The Mac brings the terminal app forward; here it is the existing "Open
-    // terminal": the session's own window when it was found, else its folder
-    // in VS Code; the Claude app for a Claude Desktop session.
+    // Coucou HQ, on the focused agent's thread. The id is the old "Open the
+    // terminal" one, kept so the key the user set keeps working.
     case "jumpToTerminal": {
-      const task = State.focusTask;
-      if (task?.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-      else void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
+      void Bridge.showHq(State.focusTask?.orchestrator?.agentId ?? null);
       if (State.mode === "expanded") host.collapse();
       break;
     }
@@ -158,9 +156,6 @@ export function runIslandKey(host: ShortcutHost, action: IslandKeyAction) {
     case "openSelection":
       if (State.cardSelection == null) return;
       host.viewCommand("openSelection");
-      break;
-    case "diff":
-      host.viewCommand("toggleDiff");
       break;
     case "newChat":
       // Not while an answer is on its way: it would land in the new chat.

@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ensureTaskDir, inside, taskDir } from "../../worker/src/paths.ts";
-import { checkArgv } from "../../worker/src/ops/terminal.ts";
 import { pruneTaskDirs } from "../../worker/src/retention.ts";
 
 const TASK = "11111111-2222-3333-4444-555555555555";
@@ -37,17 +36,6 @@ describe("task folder confinement", () => {
       return;
     }
     await expect(inside(dir, "sub/link.txt")).rejects.toThrow(/symlink/);
-  });
-});
-
-describe("terminal arguments", () => {
-  it.each([["cat", "/etc/shadow"], ["cat", "~/.ssh/id_rsa"], ["grep", "--file=/etc/x", "a"], ["cat", "../x"], ["cat", "a/../../x"], ["/bin/sh"], ["sh;rm"]])(
-    "refuses %j",
-    (...argv) => expect(() => checkArgv(argv)).toThrow(),
-  );
-
-  it("allows arguments that stay in the folder", () => {
-    expect(() => checkArgv(["grep", "-n", "install", "report.md"])).not.toThrow();
   });
 });
 

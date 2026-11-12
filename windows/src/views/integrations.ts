@@ -9,7 +9,6 @@ import { ICONS } from "./icons";
 import { State, type AgentTask } from "../core/state";
 import { Bridge } from "../core/bridge";
 import { isComingSoon, pillDefinition } from "../core/pills";
-import { refreshHookPills } from "../island/integrations";
 import { readActivity, readPulse, readStats } from "../core/github";
 import { githubDetail, githubPulseCard } from "./github";
 import { N_, language, t } from "../i18n/i18n";
@@ -70,9 +69,6 @@ export function idleStatus(
   const def = pillDefinition(id);
   const ok = (label: string) => ({ label, color: "#22C55E" });
   const missing = (label: string) => ({ label, color: "#F4505E" });
-  // Pills driven by hooks never have a key: they are connected once the hooks
-  // are in place (Mac #183). A session replaces this card; nothing is loading.
-  if (def?.connect.kind === "hooks") return configured ? ok(t("Hooks installed")) : missing(t("Hooks not installed"));
   if (def?.connect.kind === "none") return ok(t("Ready · no setup needed"));
   if (def?.connect.kind === "server") return configured ? ok(t("Connected")) : missing(t("Not connected"));
   if (def?.category === "ai") {
@@ -89,25 +85,7 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const status = idleStatus(task.id, info, State.settings.model);
 
   const actions = h("div", { class: "int-actions" });
-  if (task.id === "integration_claude") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}b3`,
-        text: t("Open Visual Studio Code"),
-        onclick: () => void Bridge.openInVSCode(task.sessionCwd ?? null),
-      }),
-    );
-  } else if (task.id === "agent_claude-desktop") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open Claude"),
-        onclick: () => void Bridge.openClaudeDesktop(),
-      }),
-    );
-  } else if (task.id === "integration_n8n") {
+  if (task.id === "integration_n8n") {
     actions.append(
       h("button", {
         class: "link-btn",
@@ -126,17 +104,15 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
       }),
     );
   }
-  const hookPill = def?.connect.kind === "hooks";
   if (isComingSoon(task.id) || def?.connect.kind === "none") {
     // Nothing to set up, and nothing to refresh.
-  } else if (configured && (hookPill || def?.category !== "ai")) {
+  } else if (configured && def?.category !== "ai") {
     actions.append(
       h("button", {
         class: "link-btn",
         style: `color:${task.color}d9`,
         text: t("Refresh"),
-        // A hook pill has nothing to poll: look at its hooks again instead.
-        onclick: () => void (hookPill ? refreshHookPills() : Bridge.refreshIntegration(task.id)),
+        onclick: () => void Bridge.refreshIntegration(task.id),
       }),
     );
   } else if (!configured) {

@@ -1,14 +1,8 @@
 ; Uninstall hooks for the NSIS installer.
 ;
-; The app stages coucou-hook.exe into %LOCALAPPDATA%\Coucou\bin at launch, so the
-; installer never recorded it and the default uninstaller leaves it behind. The
-; inbox and the log live in the same place and are ours too.
-;
-; Claude Code's own settings.json is deliberately NOT touched here: it belongs to
-; the user, it may contain hooks from other tools, and rewriting somebody's
-; config from an uninstaller with no diff and no consent is exactly what the rest
-; of this app goes out of its way not to do. A relay that is gone exits 0 without
-; printing anything, so a leftover entry costs nothing beyond a dead path.
+; The inbox and the log live in %LOCALAPPDATA%\Coucou, which the installer never
+; recorded, so the default uninstaller would leave them behind. The bin folder is
+; where versions before Coucou HQ staged their Claude Code relay; it goes too.
 
 !macro NSIS_HOOK_PREUNINSTALL
   RMDir /r "$LOCALAPPDATA\Coucou\bin"

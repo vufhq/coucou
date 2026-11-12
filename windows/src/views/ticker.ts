@@ -6,17 +6,13 @@
 // reset timer let two rows land on the same line when steps arrived in bursts,
 // and any step that arrived mid-animation was dropped outright. Steps are now
 // queued instead, so a burst scrolls past rather than vanishing.
-
 //
-// Diff steps (see core/diff.ts) render as the file name followed by +N −M, and
-// a click on one opens its diff. After Stop the card holds Claude's final
-// message: no shimmer, no chevron, the ✓ on every row (TickerRowView isActive
-// = false on macOS).
+// After Stop the card holds the task's summary: no shimmer, no chevron, the ✓
+// on every row.
 
 import { h, svg } from "./dom";
 import { ICONS } from "./icons";
 import { cubicBezier, clamp, lerp } from "../core/anim";
-import { parseDiffStep, type DiffStep } from "../core/diff";
 import type { AgentTask } from "../core/state";
 
 const ROW_H = 22;
@@ -38,13 +34,7 @@ interface Row {
   body: HTMLElement;
   shimmer: HTMLElement;
   dim: HTMLElement;
-  /** +N −M, attached to the row only while it shows a diff. */
-  counts: HTMLElement;
-  plus: HTMLElement;
-  minus: HTMLElement;
   text: string;
-  /** Set when the row shows a file diff. */
-  diff: DiffStep | null;
 }
 
 function makeRow(): Row {
@@ -61,39 +51,20 @@ function makeRow(): Row {
     style: `position:absolute;top:0;left:0;right:0;color:${DIM}`,
   });
   const body = h("span", { style: "position:relative;flex:1 1 auto;min-width:0" }, shimmer, dim);
-  const plus = h("span", { class: "plus" });
-  const minus = h("span", { class: "minus" });
-  const counts = h("span", { class: "tick-count" }, plus, minus);
   const el = h(
     "div",
     { class: "ticker-row" },
     h("span", { class: "tick-icon", style: "position:relative" }, chevron, check),
     body,
   );
-  return { el, chevron, check, body, shimmer, dim, counts, plus, minus, text: "", diff: null };
+  return { el, chevron, check, body, shimmer, dim, text: "" };
 }
 
 function setText(row: Row, text: string) {
   if (row.text === text) return;
   row.text = text;
-  const diff = parseDiffStep(text);
-  row.diff = diff;
-  const shown = diff ? diff.filename : text;
-  row.shimmer.textContent = shown;
-  row.dim.textContent = shown;
-  if (diff) {
-    // Filename, then the counts right after it; the name truncates first.
-    row.body.style.flex = "0 1 auto";
-    row.plus.textContent = diff.added > 0 ? ` +${diff.added}` : "";
-    row.minus.textContent = diff.removed > 0 ? ` −${diff.removed}` : "";
-    if (row.counts.parentNode !== row.el) row.el.append(row.counts);
-    row.el.classList.add("diff");
-  } else if (row.el.classList.contains("diff")) {
-    // Back to an ordinary step: exactly the row it always was.
-    row.body.style.flex = "1 1 auto";
-    row.counts.remove();
-    row.el.classList.remove("diff");
-  }
+  row.shimmer.textContent = text;
+  row.dim.textContent = text;
 }
 
 /**
@@ -130,19 +101,11 @@ export class Ticker {
   private queue: string[] = [];
   private startMs: number | null = null;
   private displayIndex = -1;
-  /** True once Claude has finished: the final message holds still. */
+  /** True once the task is over: its summary holds still. */
   private still = false;
 
-  /** `onDiffTap` receives the diff id of a clicked diff row. */
-  constructor(onDiffTap?: (diffId: number) => void) {
+  constructor() {
     this.el = h("div", { class: "ticker" }, this.a.el, this.b.el, this.c.el);
-    // The completed and the current row answer a click, as on macOS; the
-    // incoming row is only ever seen mid-slide.
-    for (const row of [this.a, this.b]) {
-      row.el.addEventListener("click", () => {
-        if (row.diff && onDiffTap) onDiffTap(row.diff.diffId);
-      });
-    }
     this.rest();
   }
 

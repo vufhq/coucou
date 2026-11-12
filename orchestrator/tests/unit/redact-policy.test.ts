@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { redact, redactText } from "../../server/src/redact.ts";
+import { MODEL_OP_NAMES, parseDecision } from "@coucou-orchestrator/protocol";
 import { decide, domainOf } from "../../server/src/policy.ts";
 
 describe("redaction", () => {
@@ -46,13 +47,13 @@ describe("policy", () => {
     expect(nav("https://user:pw@python.org/").verdict).toBe("deny");
   });
 
-  it("runs read-only commands and asks for the rest", () => {
+  it("never runs the retired terminal.run, which ran outside the shell's sandbox", () => {
     const run = (...argv: string[]) => decide({ op: "terminal.run", args: { argv } }, ctx).verdict;
-    expect(run("ls", "-la")).toBe("allow");
-    expect(run("cat", "report.md")).toBe("allow");
-    expect(run("rm", "-rf", "x")).toBe("approve");
-    expect(run("pip", "install", "x")).toBe("approve");
-    expect(run("/bin/ls")).toBe("approve");
+    expect(run("ls", "-la")).toBe("deny");
+    expect(run("cat", "link-to-the-worker-token")).toBe("deny");
+    expect(run("sort", "--compress-program=./x.sh", "big.txt")).toBe("deny");
+    expect(MODEL_OP_NAMES).not.toContain("terminal.run");
+    expect(parseDecision({ kind: "action", op: "terminal.run", args: { argv: ["ls"] } })).toMatchObject({ ok: false });
   });
 
   it("never runs a download as a model's step", () => {
@@ -82,7 +83,6 @@ describe("rule levels", () => {
   it("asks before every action at level 1, reading aside", () => {
     expect(verdict("terminal.shell", { command: "ls" }, 1)).toBe("approve");
     expect(verdict("fs.write_artifact", { path: "a.md", content: "" }, 1)).toBe("approve");
-    expect(verdict("terminal.run", { argv: ["ls"] }, 1)).toBe("approve");
     expect(verdict("browser.navigate", { url: "https://docs.python.org/" }, 1)).toBe("approve");
     expect(verdict("fs.read", { path: "a.md" }, 1)).toBe("allow");
     expect(verdict("browser.extract_text", {}, 1)).toBe("allow");
@@ -97,7 +97,7 @@ describe("rule levels", () => {
   it("lets new sites and commands through at levels 3 and 4", () => {
     for (const level of [3, 4] as const) {
       expect(verdict("browser.navigate", { url: "https://pypi.org/" }, level)).toBe("allow");
-      expect(verdict("terminal.run", { argv: ["rm", "-rf", "x"] }, level)).toBe("allow");
+      expect(verdict("terminal.shell", { command: "rm -rf x" }, level)).toBe("allow");
     }
   });
 
@@ -106,6 +106,7 @@ describe("rule levels", () => {
       expect(verdict("browser.navigate", { url: "http://192.168.1.10/" }, level)).toBe("deny");
       expect(verdict("browser.navigate", { url: "https://u:p@python.org/" }, level)).toBe("deny");
       expect(verdict("fs.fetch", { path: "a.png" }, level)).toBe("deny");
+      expect(verdict("terminal.run", { argv: ["ls"] }, level)).toBe("deny");
       expect(verdict("team.retire", { agentId: "scout-2" }, level)).toBe("approve");
       expect(verdict("team.propose", { team: { name: "T" }, members: [] }, level)).toBe("approve");
     }

@@ -13,9 +13,12 @@ import {
   Heartbeat,
   Hello,
   JobOutcome,
+  MAX_ERROR_CHARS,
   MAX_FETCH_BYTES,
+  MAX_RESULT_CHARS,
   READ_ONLY_OPS,
   WorkerEvents,
+  clipText,
   type ClaimResponse,
 } from "@coucou-orchestrator/protocol";
 import type { Uploads } from "./attachments.ts";
@@ -42,6 +45,23 @@ export interface GatewayDeps {
   leaseMs: number;
   claimWaitMs: number;
   retentionDays: number;
+}
+
+/**
+ * A worker's report with its texts cut to the protocol's limits. Workers cut
+ * them themselves; one from before they did (0.6.0) sent up to 64 KiB, and
+ * refusing that left the job, and the task, hanging.
+ */
+function fitReport(body: unknown): unknown {
+  if (!body || typeof body !== "object") return body;
+  const raw = body as { result?: unknown; error?: unknown };
+  const out: Record<string, unknown> = { ...raw };
+  if (typeof raw.result === "string") out.result = clipText(raw.result, MAX_RESULT_CHARS);
+  if (raw.error && typeof raw.error === "object") {
+    const error = raw.error as { message?: unknown };
+    if (typeof error.message === "string") out.error = { ...error, message: clipText(error.message, MAX_ERROR_CHARS) };
+  }
+  return out;
 }
 
 function bad(reply: FastifyReply, error: z.ZodError) {
@@ -244,7 +264,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
   });
 
   app.post<{ Params: { id: string }; Querystring: { agentId?: string } }>("/worker/v1/jobs/:id/complete", async (req, reply) => {
-    const outcome = JobOutcome.safeParse(req.body);
+    const outcome = JobOutcome.safeParse(fitReport(req.body));
     if (!outcome.success) return bad(reply, outcome.error);
     const job = store.job(req.params.id);
     if (!job || job.agentId !== caller(req)) return reply.code(404).send({ error: "not_found" });

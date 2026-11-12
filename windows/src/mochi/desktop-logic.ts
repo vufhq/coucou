@@ -112,13 +112,11 @@ export function agentActive(state: BotStateName): boolean {
 }
 
 /**
- * What sends him back to the island (the Mac's pendingApproval /
- * pendingQuestion): the island's card waiting for an answer — a permission
- * from any agent, or a question Claude Code asked (#216, the same card with
- * `questions`), folded or not — or an agent asking a question by notification.
+ * What sends him back to the island: the approval card waiting for an
+ * answer, folded or not, or an agent asking a question in its chat.
  */
 export function alertActive(s: {
-  pendingApproval: { questions?: unknown } | null;
+  pendingApproval: object | null;
   tasks: ReadonlyArray<{ state: BotStateName }>;
 }): boolean {
   if (s.pendingApproval != null) return true;
