@@ -48,7 +48,7 @@ export function registerOrchestratorAgents() {
     if (s.state === "off") apply(null);
     else if (s.state !== "connected" && s.state !== "connecting") State.markOrchestratorOffline();
   });
-  // Coucou opened while the backend was already connected.
+  // vufh opened while the backend was already connected.
   void OrchestratorBridge.status()
     .then((s) => (
       s.status.state === "connected"

@@ -1,4 +1,4 @@
-// Coucou HQ: the conversations model.ts makes of the backend's tasks, and the
+// vufh HQ: the conversations model.ts makes of the backend's tasks, and the
 // store that loads them, live-updates them and sends what the user types.
 
 import { afterEach, beforeEach, mock, test } from "node:test";

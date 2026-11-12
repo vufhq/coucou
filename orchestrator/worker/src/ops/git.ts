@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { cp, mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { OpArgs } from "@coucou-orchestrator/protocol";
+import type { OpArgs } from "@vufh-orchestrator/protocol";
 import { PathError, inside } from "../paths.ts";
 import type { OpContext, OpResult } from "../worker.ts";
 

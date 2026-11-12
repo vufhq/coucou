@@ -38,7 +38,7 @@ class DesktopMochi {
 
   private snap: DesktopSnapshot = {
     state: "idle", outfit: "none", soundEnabled: true, soundVolume: 0.12, paused: false, dancing: false,
-    character: "mochi", tofuColor: "",
+    character: "", tofuColor: "",
   };
 
   private visible = false;

@@ -15,13 +15,13 @@ import { GREETING_END } from "./mochi/greeting";
 import { applyCharacter } from "./mochi/character";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
-/** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
+/** Shows the language Settings asks for ("" = the system's, when vufh has it). */
 function applyLanguage() {
   setLanguage(resolveLanguage(State.settings.language, systemLanguages()));
 }
 
-/** Once per launch, after the greeting, Coucou HQ opens (it selects Mochi
- *  itself, and says so when the orchestrator is off), unless Coucou started
+/** Once per launch, after the greeting, vufh HQ opens (it selects Mochi
+ *  itself, and says so when the orchestrator is off), unless vufh started
  *  with the computer or the user turned it off. */
 let hqOpened = false;
 async function openHqOnce() {

@@ -22,7 +22,8 @@ import { Ease } from "../core/anim";
 import type { BotStateName } from "../core/layout";
 import type { EyeShape, RGB } from "./engine";
 import { withLayer } from "./layer";
-import { tofuInk } from "./character";
+import { isChrome, tofuInk } from "./character";
+import { metalAdd, metalBegin, metalEnd } from "./metal";
 import { PEBBLE } from "./tofu-shape";
 import type { Outfit } from "./wardrobe";
 
@@ -36,6 +37,8 @@ const K = SPAN / Math.max(PEBBLE.box[2], PEBBLE.box[3]);
 export const UNIT = (2 * 0.88) / (PEBBLE.box[3] * K);
 
 const EYE_INK = "#141414";
+/** On chrome: near-black, pressed into the metal (a light lip below each eye). */
+const CHROME_EYE_INK = "#0c0c0e";
 /** Mini Tofus (pills, HQ) get bigger eyes, like mini Mochis, but the pebble's seat is already wide. */
 const MINI_EYES = 1.35;
 const VIEW_TILT = -0.3;
@@ -124,6 +127,10 @@ export interface TofuPose extends Look {
   isMini: boolean;
   /** The body colour. */
   fill: string;
+  /** The body and hands are liquid chrome (./metal.ts) instead of `fill`… */
+  chrome?: boolean;
+  /** …tinted with this colour (an agent's, a pill's), or bare. */
+  chromeTint?: RGB | null;
 }
 
 export interface TofuHooks {
@@ -560,11 +567,19 @@ function drawHands(c: Ctx, g: Geometry, p: TofuPose) {
     } else if (sd < 0 && waving) {
       ly += Math.sin(6 * (n - p.waveStart)) * 0.04 * bodyH;
     }
+    const rx = 0.3 * g.halfH * p.hands;
+    if (p.chrome) {
+      // One piece of metal with the body: rendered with it, in drawTofu.
+      const hand = new Path2D();
+      hand.ellipse(lx, ly, rx, 0.26 * g.halfH * p.hands, rot, 0, Math.PI * 2);
+      metalAdd(c, hand, lx, ly, rx * 1.2, rx * 1.2);
+      continue;
+    }
     c.save();
     c.translate(lx, ly);
     c.rotate(rot);
     c.beginPath();
-    c.ellipse(0, 0, 0.3 * g.halfH * p.hands, 0.26 * g.halfH * p.hands, 0, 0, Math.PI * 2);
+    c.ellipse(0, 0, rx, 0.26 * g.halfH * p.hands, 0, 0, Math.PI * 2);
     c.fillStyle = p.fill;
     c.fill();
     c.strokeStyle = "rgba(0,0,0,0.08)";
@@ -585,13 +600,19 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
   x.translate(cx, cy);
   if (p.tilt !== 0) x.rotate(p.tilt);
   x.scale(u, u);
+  if (p.chrome) metalBegin();
   if (p.hands > 0.01 && !p.isMini && R > 14) drawHands(x, g, p);
   x.scale(p.sx, p.sy);
 
   drawOutfit(x, g, p, "behind", R);
 
-  x.fillStyle = p.fill;
-  x.fill(g.path);
+  if (p.chrome) {
+    metalAdd(x, g.path, 0, 0, g.halfW * 1.05, g.halfH * 1.05);
+    metalEnd(x, p.chromeTint ?? null, p.isMini ? "mini" : "tofu");
+  } else {
+    x.fillStyle = p.fill;
+    x.fill(g.path);
+  }
   x.save();
   x.clip(g.path);
   const costume = p.outfit === "none" ? null : COSTUMES[p.outfit];
@@ -613,8 +634,8 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
     x.fillStyle = tg;
     x.fillRect(-2, -2, 4, 4);
   }
-  // Mochi's cheeks: only while blushing or tinted.
-  const blush = Math.max(p.blush, p.tint * 0.5) * (1 - p.morph);
+  // Mochi's cheeks: only while blushing or tinted, and never on chrome.
+  const blush = p.chrome ? 0 : Math.max(p.blush, p.tint * 0.5) * (1 - p.morph);
   if (blush > 0.01) {
     x.fillStyle = `rgba(255,120,150,${0.5 * blush})`;
     const cw = g.eye.w * 0.7;
@@ -626,8 +647,14 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
     }
   }
   // Eyes on the face ellipsoid, clipped by the outline: they roll out over the top and back from below.
-  x.fillStyle = EYE_INK;
-  x.strokeStyle = EYE_INK;
+  const ink = p.chrome ? CHROME_EYE_INK : EYE_INK;
+  x.fillStyle = ink;
+  x.strokeStyle = ink;
+  if (p.chrome) {
+    const m = x.getTransform();
+    x.shadowColor = "rgba(255,255,255,0.55)";
+    x.shadowOffsetY = Math.max(1, Math.hypot(m.c, m.d) * 0.012);
+  }
   const scale = p.es * (p.isMini ? MINI_EYES : 1);
   for (const sd of [-1, 1]) {
     const f = facePoint(g, p, sd * g.eyeSp, g.eyeP, true);
@@ -635,7 +662,7 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
     x.save();
     x.translate(f.x, f.y + (p.morph > 0 ? g.face.ry * 0.14 * p.morph : 0));
     x.scale(f.fx + (1 - f.fx) * p.morph * 0.7, f.fy + (1 - f.fy) * p.morph * 0.7);
-    hooks.eye(x, p.eye, g.eye.w * scale, g.eye.h * scale, sd, EYE_INK);
+    hooks.eye(x, p.eye, g.eye.w * scale, g.eye.h * scale, sd, ink);
     x.restore();
   }
   x.restore();
@@ -667,7 +694,7 @@ export function drawTofuStill(x: Ctx, size: number, outfit: Outfit) {
   const pose: TofuPose = {
     ...REST, tilt: 0, sx: 1, sy: 1, es: 1, blush: 0, tint: 0, hands: 0, morph: 0,
     col: [0, 0, 0], state: "idle", eye: "pill", outfit, presence: 1, physDx: 0, physDy: 0,
-    waveStart: 0, waveUntil: 0, isMini: false, fill: tofuInk(),
+    waveStart: 0, waveUntil: 0, isMini: false, fill: tofuInk(), chrome: isChrome(), chromeTint: null,
   };
   drawTofu(x, pose, R, size / 2, size / 2 + R * 0.62, { eye: pillEye });
 }

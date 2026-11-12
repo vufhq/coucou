@@ -519,27 +519,27 @@
    "ru": "Скопировать в Markdown",
    "id": "Salin sebagai Markdown"
   },
-  "Coucou can't hear you: the microphone is not allowed or not available.": {
-   "zh-Hans": "Coucou 听不到你：麦克风未获允许或不可用。",
-   "hi": "Coucou आपको सुन नहीं पा रहा: माइक्रोफ़ोन की अनुमति नहीं है या वह उपलब्ध नहीं।",
-   "es": "Coucou no te oye: el micrófono no está permitido o no está disponible.",
-   "ar": "لا يسمعك Coucou: الميكروفون غير مسموح به أو غير متاح.",
-   "fr": "Coucou ne t'entend pas : le micro n'est pas autorisé ou pas disponible.",
-   "bn": "Coucou আপনাকে শুনতে পাচ্ছে না: মাইক্রোফোনের অনুমতি নেই বা পাওয়া যাচ্ছে না।",
-   "pt-BR": "O Coucou não te ouve: o microfone não está permitido ou indisponível.",
-   "ru": "Coucou вас не слышит: микрофон не разрешён или недоступен.",
-   "id": "Coucou tidak bisa mendengarmu: mikrofon tidak diizinkan atau tidak tersedia."
+  "vufh can't hear you: the microphone is not allowed or not available.": {
+   "zh-Hans": "vufh 听不到你：麦克风未获允许或不可用。",
+   "hi": "vufh आपको सुन नहीं पा रहा: माइक्रोफ़ोन की अनुमति नहीं है या वह उपलब्ध नहीं।",
+   "es": "vufh no te oye: el micrófono no está permitido o no está disponible.",
+   "ar": "لا يسمعك vufh: الميكروفون غير مسموح به أو غير متاح.",
+   "fr": "vufh ne t'entend pas : le micro n'est pas autorisé ou pas disponible.",
+   "bn": "vufh আপনাকে শুনতে পাচ্ছে না: মাইক্রোফোনের অনুমতি নেই বা পাওয়া যাচ্ছে না।",
+   "pt-BR": "O vufh não te ouve: o microfone não está permitido ou indisponível.",
+   "ru": "vufh вас не слышит: микрофон не разрешён или недоступен.",
+   "id": "vufh tidak bisa mendengarmu: mikrofon tidak diizinkan atau tidak tersedia."
   },
-  "Coucou is writing the transcript, person by person…": {
-   "zh-Hans": "Coucou 正在按人逐句写转写…",
-   "hi": "Coucou हर व्यक्ति के हिसाब से ट्रांसक्रिप्ट लिख रहा है…",
-   "es": "Coucou está escribiendo la transcripción, persona por persona…",
-   "ar": "يكتب Coucou النص شخصًا بشخص…",
-   "fr": "Coucou écrit la transcription, personne par personne…",
-   "bn": "Coucou প্রতিজনের ট্রান্সক্রিপ্ট লিখছে…",
-   "pt-BR": "O Coucou está escrevendo a transcrição, pessoa por pessoa…",
-   "ru": "Coucou составляет расшифровку по участникам…",
-   "id": "Coucou sedang menulis transkrip, per orang…"
+  "vufh is writing the transcript, person by person…": {
+   "zh-Hans": "vufh 正在按人逐句写转写…",
+   "hi": "vufh हर व्यक्ति के हिसाब से ट्रांसक्रिप्ट लिख रहा है…",
+   "es": "vufh está escribiendo la transcripción, persona por persona…",
+   "ar": "يكتب vufh النص شخصًا بشخص…",
+   "fr": "vufh écrit la transcription, personne par personne…",
+   "bn": "vufh প্রতিজনের ট্রান্সক্রিপ্ট লিখছে…",
+   "pt-BR": "O vufh está escrevendo a transcrição, pessoa por pessoa…",
+   "ru": "vufh составляет расшифровку по участникам…",
+   "id": "vufh sedang menulis transkrip, per orang…"
   },
   "Default": {
    "zh-Hans": "默认",
@@ -1256,16 +1256,16 @@
    "ru": "Имя",
    "id": "Nama"
   },
-  "Names and words Coucou must always spell right.": {
-   "zh-Hans": "Coucou 必须始终写对的名字和词语。",
-   "hi": "नाम और शब्द जिन्हें Coucou को हमेशा सही लिखना चाहिए।",
-   "es": "Los nombres y palabras que Coucou siempre debe escribir bien.",
-   "ar": "الأسماء والكلمات التي يجب أن يكتبها Coucou دائمًا بشكل صحيح.",
-   "fr": "Les noms et les mots que Coucou doit toujours bien écrire.",
-   "bn": "যে নাম আর শব্দ Coucou-কে সবসময় ঠিক লিখতে হবে।",
-   "pt-BR": "Os nomes e palavras que o Coucou deve sempre escrever certo.",
-   "ru": "Имена и слова, которые Coucou всегда должен писать правильно.",
-   "id": "Nama dan kata yang harus selalu ditulis benar oleh Coucou."
+  "Names and words vufh must always spell right.": {
+   "zh-Hans": "vufh 必须始终写对的名字和词语。",
+   "hi": "नाम और शब्द जिन्हें vufh को हमेशा सही लिखना चाहिए।",
+   "es": "Los nombres y palabras que vufh siempre debe escribir bien.",
+   "ar": "الأسماء والكلمات التي يجب أن يكتبها vufh دائمًا بشكل صحيح.",
+   "fr": "Les noms et les mots que vufh doit toujours bien écrire.",
+   "bn": "যে নাম আর শব্দ vufh-কে সবসময় ঠিক লিখতে হবে।",
+   "pt-BR": "Os nomes e palavras que o vufh deve sempre escrever certo.",
+   "ru": "Имена и слова, которые vufh всегда должен писать правильно.",
+   "id": "Nama dan kata yang harus selalu ditulis benar oleh vufh."
   },
   "Natural": {
    "zh-Hans": "自然",
@@ -1410,16 +1410,16 @@
    "ru": "Итога пока нет.",
    "id": "Belum ada ringkasan."
   },
-  "No word yet. Add the names, brands and jargon Coucou gets wrong.": {
-   "zh-Hans": "还没有词语。添加 Coucou 写错的名字、品牌和术语。",
-   "hi": "अभी कोई शब्द नहीं। वे नाम, ब्रांड और तकनीकी शब्द जोड़ें जिन्हें Coucou गलत लिखता है।",
-   "es": "Aún no hay palabras. Añade los nombres, marcas y tecnicismos que Coucou escribe mal.",
-   "ar": "لا كلمات بعد. أضف الأسماء والعلامات والمصطلحات التي يخطئ Coucou في كتابتها.",
-   "fr": "Aucun mot pour l'instant. Ajoute les noms, marques et mots techniques que Coucou écrit mal.",
-   "bn": "এখনো কোনো শব্দ নেই। যে নাম, ব্র্যান্ড আর পরিভাষা Coucou ভুল লেখে সেগুলো যোগ করুন।",
-   "pt-BR": "Nenhuma palavra ainda. Adicione nomes, marcas e termos técnicos que o Coucou escreve errado.",
-   "ru": "Слов пока нет. Добавьте имена, бренды и термины, которые Coucou пишет неправильно.",
-   "id": "Belum ada kata. Tambahkan nama, merek, dan istilah yang sering salah ditulis Coucou."
+  "No word yet. Add the names, brands and jargon vufh gets wrong.": {
+   "zh-Hans": "还没有词语。添加 vufh 写错的名字、品牌和术语。",
+   "hi": "अभी कोई शब्द नहीं। वे नाम, ब्रांड और तकनीकी शब्द जोड़ें जिन्हें vufh गलत लिखता है।",
+   "es": "Aún no hay palabras. Añade los nombres, marcas y tecnicismos que vufh escribe mal.",
+   "ar": "لا كلمات بعد. أضف الأسماء والعلامات والمصطلحات التي يخطئ vufh في كتابتها.",
+   "fr": "Aucun mot pour l'instant. Ajoute les noms, marques et mots techniques que vufh écrit mal.",
+   "bn": "এখনো কোনো শব্দ নেই। যে নাম, ব্র্যান্ড আর পরিভাষা vufh ভুল লেখে সেগুলো যোগ করুন।",
+   "pt-BR": "Nenhuma palavra ainda. Adicione nomes, marcas e termos técnicos que o vufh escreve errado.",
+   "ru": "Слов пока нет. Добавьте имена, бренды и термины, которые vufh пишет неправильно.",
+   "id": "Belum ada kata. Tambahkan nama, merek, dan istilah yang sering salah ditulis vufh."
   },
   "Nobody was heard in this recording.": {
    "zh-Hans": "这段录音中没有听到任何人。",
@@ -1553,16 +1553,16 @@
    "ru": "Открыть",
    "id": "Buka"
   },
-  "Open Coucou": {
-   "zh-Hans": "打开 Coucou",
-   "hi": "Coucou खोलें",
-   "es": "Abrir Coucou",
-   "ar": "فتح Coucou",
-   "fr": "Ouvrir Coucou",
-   "bn": "Coucou খুলুন",
-   "pt-BR": "Abrir Coucou",
-   "ru": "Открыть Coucou",
-   "id": "Buka Coucou"
+  "Open vufh": {
+   "zh-Hans": "打开 vufh",
+   "hi": "vufh खोलें",
+   "es": "Abrir vufh",
+   "ar": "فتح vufh",
+   "fr": "Ouvrir vufh",
+   "bn": "vufh খুলুন",
+   "pt-BR": "Abrir vufh",
+   "ru": "Открыть vufh",
+   "id": "Buka vufh"
   },
   "Open Settings": {
    "zh-Hans": "打开设置",
@@ -2015,16 +2015,16 @@
    "ru": "Сохранить",
    "id": "Simpan"
   },
-  "Say the trigger while dictating: Coucou pastes the whole text in its place.": {
-   "zh-Hans": "听写时说出触发语：Coucou 会把整段文字粘贴在它的位置。",
-   "hi": "डिक्टेट करते समय वाक्यांश बोलें: Coucou उसकी जगह पूरा टेक्स्ट चिपका देगा।",
-   "es": "Di la frase al dictar: Coucou pega el texto entero en su lugar.",
-   "ar": "قل العبارة أثناء الإملاء: يلصق Coucou النص كاملًا مكانها.",
-   "fr": "Dis la phrase en dictant : Coucou colle le texte entier à sa place.",
-   "bn": "ডিক্টেট করার সময় বাক্যাংশটি বলুন: Coucou তার জায়গায় পুরো লেখা পেস্ট করবে।",
-   "pt-BR": "Diga a frase ao ditar: o Coucou cola o texto inteiro no lugar dela.",
-   "ru": "Произнесите фразу во время диктовки — Coucou вставит вместо неё весь текст.",
-   "id": "Ucapkan pemicunya saat dikte: Coucou menempel teks utuhnya sebagai gantinya."
+  "Say the trigger while dictating: vufh pastes the whole text in its place.": {
+   "zh-Hans": "听写时说出触发语：vufh 会把整段文字粘贴在它的位置。",
+   "hi": "डिक्टेट करते समय वाक्यांश बोलें: vufh उसकी जगह पूरा टेक्स्ट चिपका देगा।",
+   "es": "Di la frase al dictar: vufh pega el texto entero en su lugar.",
+   "ar": "قل العبارة أثناء الإملاء: يلصق vufh النص كاملًا مكانها.",
+   "fr": "Dis la phrase en dictant : vufh colle le texte entier à sa place.",
+   "bn": "ডিক্টেট করার সময় বাক্যাংশটি বলুন: vufh তার জায়গায় পুরো লেখা পেস্ট করবে।",
+   "pt-BR": "Diga a frase ao ditar: o vufh cola o texto inteiro no lugar dela.",
+   "ru": "Произнесите фразу во время диктовки — vufh вставит вместо неё весь текст.",
+   "id": "Ucapkan pemicunya saat dikte: vufh menempel teks utuhnya sebagai gantinya."
   },
   "Schedule": {
    "zh-Hans": "日程",
@@ -2356,16 +2356,16 @@
    "ru": "Записи этого звонка больше нет.",
    "id": "Rekaman panggilan ini sudah tidak ada."
   },
-  "The text Coucou pastes": {
-   "zh-Hans": "Coucou 要粘贴的文字",
-   "hi": "वह टेक्स्ट जो Coucou चिपकाएगा",
-   "es": "El texto que pega Coucou",
-   "ar": "النص الذي يلصقه Coucou",
-   "fr": "Le texte que Coucou colle",
-   "bn": "যে লেখা Coucou পেস্ট করবে",
-   "pt-BR": "O texto que o Coucou cola",
-   "ru": "Текст, который вставит Coucou",
-   "id": "Teks yang ditempel Coucou"
+  "The text vufh pastes": {
+   "zh-Hans": "vufh 要粘贴的文字",
+   "hi": "वह टेक्स्ट जो vufh चिपकाएगा",
+   "es": "El texto que pega vufh",
+   "ar": "النص الذي يلصقه vufh",
+   "fr": "Le texte que vufh colle",
+   "bn": "যে লেখা vufh পেস্ট করবে",
+   "pt-BR": "O texto que o vufh cola",
+   "ru": "Текст, который вставит vufh",
+   "id": "Teks yang ditempel vufh"
   },
   "The transcript could not be written.": {
    "zh-Hans": "无法生成转写。",
@@ -2565,16 +2565,16 @@
    "ru": "Что вы говорите, напр. моя подпись",
    "id": "Yang kamu ucapkan, mis. tanda tanganku"
   },
-  "When Coucou hears the words on the left, it writes the ones on the right.": {
-   "zh-Hans": "Coucou 听到左边的词时，会写成右边的词。",
-   "hi": "जब Coucou बाईं ओर के शब्द सुनता है, तो दाईं ओर के शब्द लिखता है।",
-   "es": "Cuando Coucou oye las palabras de la izquierda, escribe las de la derecha.",
-   "ar": "عندما يسمع Coucou الكلمات على اليسار، يكتب الكلمات على اليمين.",
-   "fr": "Quand Coucou entend les mots de gauche, il écrit ceux de droite.",
-   "bn": "বাঁ দিকের শব্দ শুনলে Coucou ডান দিকের শব্দ লেখে।",
-   "pt-BR": "Quando o Coucou ouve as palavras da esquerda, escreve as da direita.",
-   "ru": "Услышав слова слева, Coucou пишет слова справа.",
-   "id": "Saat Coucou mendengar kata di kiri, ia menulis kata di kanan."
+  "When vufh hears the words on the left, it writes the ones on the right.": {
+   "zh-Hans": "vufh 听到左边的词时，会写成右边的词。",
+   "hi": "जब vufh बाईं ओर के शब्द सुनता है, तो दाईं ओर के शब्द लिखता है।",
+   "es": "Cuando vufh oye las palabras de la izquierda, escribe las de la derecha.",
+   "ar": "عندما يسمع vufh الكلمات على اليسار، يكتب الكلمات على اليمين.",
+   "fr": "Quand vufh entend les mots de gauche, il écrit ceux de droite.",
+   "bn": "বাঁ দিকের শব্দ শুনলে vufh ডান দিকের শব্দ লেখে।",
+   "pt-BR": "Quando o vufh ouve as palavras da esquerda, escreve as da direita.",
+   "ru": "Услышав слова слева, vufh пишет слова справа.",
+   "id": "Saat vufh mendengar kata di kiri, ia menulis kata di kanan."
   },
   "When the words went to the wrong place.": {
    "zh-Hans": "当文字粘贴到了错误的位置时。",

@@ -2,7 +2,7 @@
 // agent-02`), so it can be piped straight into that agent's VM without ever
 // being written to a file on Windows. Creates the token on first use.
 
-import { AgentId } from "@coucou-orchestrator/protocol";
+import { AgentId } from "@vufh-orchestrator/protocol";
 import { workerToken } from "./tokens.ts";
 
 const agentId = AgentId.parse(process.argv[2] ?? "agent-01");

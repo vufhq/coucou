@@ -78,7 +78,7 @@ export const HelloResponse = z.object({
 export const ClaimRequest = z.object({ agentId: AgentId, health: WorkerHealth.optional() });
 export type ClaimRequest = z.infer<typeof ClaimRequest>;
 
-/** The largest file a download carries (Coucou reads at most 8 MiB). */
+/** The largest file a download carries (vufh reads at most 8 MiB). */
 export const MAX_FETCH_BYTES = 8 * 1024 * 1024 - 64 * 1024;
 
 export const Job = z.object({

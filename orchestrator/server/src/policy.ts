@@ -1,7 +1,7 @@
 // What may run without a human, what needs a click, and what never runs.
 // The model only proposes; this is where its proposal becomes a decision.
 
-import { DEFAULT_RULE_LEVEL, isPrivateHost, type Operation, type RuleLevel } from "@coucou-orchestrator/protocol";
+import { DEFAULT_RULE_LEVEL, isPrivateHost, type Operation, type RuleLevel } from "@vufh-orchestrator/protocol";
 
 export type Verdict =
   | { verdict: "allow" }
@@ -20,7 +20,7 @@ export interface PolicyContext {
 export interface GithubContext {
   /** The user switched this agent's GitHub access on in HQ. */
   allowed: boolean;
-  /** Coucou is signed in to GitHub. */
+  /** vufh is signed in to GitHub. */
   connected: boolean;
   /** Repos this agent cloned with git.clone → their default branch then. */
   repos: Readonly<Record<string, string>>;
@@ -127,7 +127,7 @@ export function decide(op: Operation, ctx: PolicyContext): Verdict {
     case "git.clone":
     case "git.push": {
       const gh = ctx.github;
-      if (!gh?.connected) return { verdict: "deny", reason: "Coucou is not signed in to GitHub (Settings → Tasks → GitHub)" };
+      if (!gh?.connected) return { verdict: "deny", reason: "vufh is not signed in to GitHub (Settings → Tasks → GitHub)" };
       if (!gh.allowed) return { verdict: "deny", reason: "this agent may not use the user's GitHub account (the user switches it on in HQ)" };
       const repo = String(a.repo);
       const known = Object.hasOwn(gh.repos, repo);

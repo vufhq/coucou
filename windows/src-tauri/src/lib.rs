@@ -1,4 +1,4 @@
-// Coucou for Windows — app wiring and the commands the island calls.
+// vufh for Windows — app wiring and the commands the island calls.
 
 mod chat;
 mod claude;
@@ -91,7 +91,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         let manager = app.autolaunch();
         let result = if settings.autostart { manager.enable() } else { manager.disable() };
         if let Err(err) = result {
-            eprintln!("[coucou] autostart: {err}");
+            eprintln!("[vufh] autostart: {err}");
         }
     }
     if screen_changed {
@@ -124,7 +124,7 @@ fn set_system_languages(app: AppHandle, languages: Vec<String>) {
 fn language_changed(app: &AppHandle) {
     tray::retitle(app);
     if let Some(window) = app.get_webview_window(HUB_LABEL) {
-        let _ = window.set_title("Coucou");
+        let _ = window.set_title("vufh");
     }
 }
 
@@ -382,11 +382,11 @@ fn page_url(app: &AppHandle, page: &str) -> WebviewUrl {
     WebviewUrl::App(page.into())
 }
 
-/// The Coucou window (Flow dictation, the Notetaker and every setting of the
+/// The vufh window (Flow dictation, the Notetaker and every setting of the
 /// island), labelled "settings" since it grew out of the settings window.
 pub const HUB_LABEL: &str = "settings";
 
-/// The Coucou window is created hidden at launch and only ever shown and
+/// The vufh window is created hidden at launch and only ever shown and
 /// hidden afterwards. A WebView2 window created later — on the main thread or
 /// not — silently comes up blank in this app, so the window that works is the
 /// one that exists before the island's webview does.
@@ -394,7 +394,7 @@ fn create_settings_window(app: &AppHandle) {
     let url = settings_page_url(app);
     match WebviewWindowBuilder::new(app, HUB_LABEL, url)
         .additional_browser_args(BROWSER_ARGS)
-        .title("Coucou")
+        .title("vufh")
         .inner_size(1100.0, 720.0)
         .min_inner_size(820.0, 560.0)
         .resizable(true)
@@ -422,11 +422,11 @@ fn create_settings_window(app: &AppHandle) {
                 _ => {}
             });
         }
-        Err(err) => log::line(format!("Coucou window failed: {err}")),
+        Err(err) => log::line(format!("vufh window failed: {err}")),
     }
 }
 
-/// Whether the Coucou window is on screen (shown and not minimised). Its page
+/// Whether the vufh window is on screen (shown and not minimised). Its page
 /// animates its canvases only then (hub/hero.ts): WebKitGTK can keep
 /// `document.visibilityState` at "visible" for a hidden window, and its
 /// animation loop then kept a core busy with the window closed (#792).
@@ -448,11 +448,11 @@ pub fn show_settings_window(app: &AppHandle) {
     show_hub(app, Some("general"));
 }
 
-/// Shows the Coucou window, on `page` when given ("dictation", "notes",
+/// Shows the vufh window, on `page` when given ("dictation", "notes",
 /// "settings", "general", "shortcuts"…).
 pub fn show_hub(app: &AppHandle, page: Option<&str>) {
     let Some(win) = app.get_webview_window(HUB_LABEL) else {
-        log::line("Coucou window missing");
+        log::line("vufh window missing");
         return;
     };
     if let Some(page) = page {
@@ -464,12 +464,12 @@ pub fn show_hub(app: &AppHandle, page: Option<&str>) {
     set_hub_shown(&win, true);
 }
 
-// ── Coucou HQ ─────────────────────────────────────────────────────────────────
+// ── vufh HQ ─────────────────────────────────────────────────────────────────
 
-/// Coucou HQ: the agents and their teams, out of the notch, with room to talk to them.
+/// vufh HQ: the agents and their teams, out of the notch, with room to talk to them.
 pub const HQ_LABEL: &str = "hq";
 
-/// Created hidden at launch like the Coucou window, for the same reason (see
+/// Created hidden at launch like the vufh window, for the same reason (see
 /// create_settings_window).
 fn create_hq_window(app: &AppHandle) {
     let builder = WebviewWindowBuilder::new(app, HQ_LABEL, page_url(app, "hq.html"));
@@ -479,7 +479,7 @@ fn create_hq_window(app: &AppHandle) {
     let builder = builder.disable_drag_drop_handler();
     match builder
         .additional_browser_args(BROWSER_ARGS)
-        .title("Coucou HQ")
+        .title("vufh HQ")
         .inner_size(1100.0, 760.0)
         .min_inner_size(820.0, 560.0)
         .resizable(true)
@@ -511,11 +511,11 @@ fn create_hq_window(app: &AppHandle) {
             #[cfg(windows)]
             webview_drop::install(app, HQ_LABEL);
         }
-        Err(err) => log::line(format!("Coucou HQ window failed: {err}")),
+        Err(err) => log::line(format!("vufh HQ window failed: {err}")),
     }
 }
 
-/// Whether Coucou HQ is on screen, so its minis animate only then (like HUB_SHOWN).
+/// Whether vufh HQ is on screen, so its minis animate only then (like HUB_SHOWN).
 static HQ_SHOWN: AtomicBool = AtomicBool::new(false);
 
 fn set_hq_shown(win: &tauri::WebviewWindow, shown: bool) {
@@ -530,10 +530,10 @@ fn hq_shown() -> bool {
     HQ_SHOWN.load(Ordering::Relaxed)
 }
 
-/// Shows Coucou HQ, on `agent_id`'s thread when given.
+/// Shows vufh HQ, on `agent_id`'s thread when given.
 pub fn show_hq_window(app: &AppHandle, agent_id: Option<&str>) {
     let Some(win) = app.get_webview_window(HQ_LABEL) else {
-        log::line("Coucou HQ window missing");
+        log::line("vufh HQ window missing");
         return;
     };
     let _ = win.emit_to(HQ_LABEL, "hq-open", serde_json::json!({ "agentId": agent_id }));
@@ -548,16 +548,16 @@ fn show_hq(app: AppHandle, agent_id: Option<String>) {
     show_hq_window(&app, agent_id.as_deref());
 }
 
-/// The argument the login item starts Coucou with.
+/// The argument the login item starts vufh with.
 const AUTOSTART_ARG: &str = "--autostart";
 
-/// Coucou started with the computer, not opened by the user: the window stays hidden.
+/// vufh started with the computer, not opened by the user: the window stays hidden.
 pub fn launched_at_login() -> bool {
     std::env::args().any(|a| a == AUTOSTART_ARG)
 }
 
-/// Whether Coucou HQ opens after the greeting: the user opened Coucou (it did
-/// not start with the computer) and left "Open Coucou HQ when you open Coucou" on.
+/// Whether vufh HQ opens after the greeting: the user opened vufh (it did
+/// not start with the computer) and left "Open vufh HQ when you open vufh" on.
 #[tauri::command]
 fn open_hq_at_launch(app: AppHandle) -> bool {
     !launched_at_login() && flow::get(&app).map(|f| f.store.lock().unwrap().prefs.open_at_launch).unwrap_or(true)
@@ -576,11 +576,11 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            // `coucou --shortcut <action>`: what a desktop's own keyboard
+            // `vufh --shortcut <action>`: what a desktop's own keyboard
             // settings run where we can't listen for keys ourselves (Wayland).
             match shortcuts::from_args(&argv) {
                 Some(action) => shortcuts::dispatch(app, action),
-                // Opening Coucou again (its shortcut, the Start menu) shows Coucou HQ.
+                // Opening vufh again (its shortcut, the Start menu) shows vufh HQ.
                 None => show_hq_window(app, None),
             }
         }))
@@ -760,21 +760,21 @@ pub fn run() {
             gate.set_active(true);
             island::spawn_cursor_poll(handle.clone(), gate.clone());
 
-            log::line(format!("--- Coucou {} started ---", env!("CARGO_PKG_VERSION")));
+            log::line(format!("--- vufh {} started ---", env!("CARGO_PKG_VERSION")));
             integrations::start(handle.clone());
             orchestrator::setup(&handle);
             spotify::sync(&handle, &loaded.active_integrations);
             shortcuts::apply(&handle, &loaded.shortcuts);
             if loaded.autostart {
-                // Login items written before 0.5 start Coucou without --autostart:
+                // Login items written before 0.5 start vufh without --autostart:
                 // writing it again adds it, so the window stays hidden at login.
                 let _ = handle.autolaunch().enable();
             }
-            // Coucou HQ opens once the island's greeting is over (src/main.ts).
+            // vufh HQ opens once the island's greeting is over (src/main.ts).
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Coucou")
+        .expect("error while building vufh")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 notes::shutdown(app);

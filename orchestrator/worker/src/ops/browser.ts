@@ -5,13 +5,13 @@
 // WebSockets included. That check looks a name up itself, and Chromium looks
 // it up again: a name that answers differently the second time is caught by
 // where the answer really came from (a private address closes the session),
-// and, under all of it, by coucou-worker.service's IPAddressDeny. Chromium
+// and, under all of it, by vufh-worker.service's IPAddressDeny. Chromium
 // runs in its own sandbox whenever the computer allows one.
 
 import { lookup } from "node:dns/promises";
 import { access } from "node:fs/promises";
 import { isIP } from "node:net";
-import { isPrivateHost, type OpArgs } from "@coucou-orchestrator/protocol";
+import { isPrivateHost, type OpArgs } from "@vufh-orchestrator/protocol";
 import { inside } from "../paths.ts";
 import type { OpContext, OpResult } from "../worker.ts";
 

@@ -27,7 +27,7 @@ registerHookHandlers(island);
 
 /** An event of `agent`'s task `task`, as orchestrator.rs emits it. */
 const hook = (name, extra = {}, agent = "agent-01", taskId = "t-1") =>
-  emit("hook", { hook_event_name: name, coucou_agent: agent, session_id: `orch:${taskId}`, ...extra });
+  emit("hook", { hook_event_name: name, vufh_agent: agent, session_id: `orch:${taskId}`, ...extra });
 const request = (approvalId = "a-1", agent = "agent-01", taskId = "t-1") =>
   hook("PermissionRequest", {
     request_id: `orch:${agent}:${approvalId}`,
@@ -76,7 +76,7 @@ test("a paused island ignores every event, approvals included", () => {
 
 test("an untagged event or an invalid tag is ignored", () => {
   emit("hook", { hook_event_name: "UserPromptSubmit", prompt: "go" });
-  emit("hook", { hook_event_name: "UserPromptSubmit", prompt: "go", coucou_agent: "Not An Id" });
+  emit("hook", { hook_event_name: "UserPromptSubmit", prompt: "go", vufh_agent: "Not An Id" });
   assert.equal(State.tasks.some((t) => t.id.startsWith("agent_")), false);
   assert.deepEqual(asked, []);
 });

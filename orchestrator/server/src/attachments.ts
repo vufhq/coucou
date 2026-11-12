@@ -12,7 +12,7 @@ import {
   githubRepo,
   type CreateTaskRequest,
   type Operation,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 import type { StoredAttachment, Store, UploadRow } from "./store.ts";
 
 /** An upload no message took is dropped after this long. */

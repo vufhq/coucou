@@ -187,7 +187,7 @@ export const READ_ONLY_OPS: ReadonlySet<WorkerOpName> = new Set([
 
 /**
  * Operations only the backend asks for, on the user's behalf (a file
- * download for Coucou, a file the user attached). A model answer naming one
+ * download for vufh, a file the user attached). A model answer naming one
  * is refused.
  */
 export const BACKEND_ONLY_OPS: ReadonlySet<OpName> = new Set(["fs.fetch", "fs.receive"]);

@@ -171,7 +171,7 @@ export interface Settings {
    */
   mochiOutfit: string;
   /**
-   * Who Coucou draws: "mochi" (the default) or "tofu", and Tofu's colour, a
+   * Who vufh draws: "chrome" (the default), "tofu" or "mochi", and Tofu's colour, a
    * name from its palette. Read them through mochi/character.ts.
    */
   character: string;
@@ -183,7 +183,7 @@ export interface Settings {
    */
   pillColors: Record<string, string>;
   /**
-   * Interface language: "" follows the system (when Coucou has its language,
+   * Interface language: "" follows the system (when vufh has its language,
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;

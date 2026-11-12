@@ -14,4 +14,4 @@ labels: bug
 
 **Worker version**
 
-**Coucou version**
+**vufh version**

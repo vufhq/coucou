@@ -1,4 +1,4 @@
-// The API Coucou talks to: loopback only, one bearer token, JSON in and out,
+// The API vufh talks to: loopback only, one bearer token, JSON in and out,
 // and the event streams. It never runs anything itself; it reads the store
 // and hands commands to the runner.
 
@@ -24,7 +24,7 @@ import {
   UpdateGoalRequest,
   type Agent,
   type AgentProblem,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
 import type { Github } from "./github.ts";
@@ -119,7 +119,7 @@ function bad(reply: FastifyReply, error: z.ZodError | string) {
 export function buildApi(deps: ApiDeps): FastifyInstance {
   const { store, events, runner, signals } = deps;
   const fileTimeoutMs = deps.fileTimeoutMs ?? 30_000;
-  // wsl.exe takes a moment; Coucou asks for agents on every redraw.
+  // wsl.exe takes a moment; vufh asks for agents on every redraw.
   const vmChecks = new Map<string, { at: number; running: Promise<boolean | null> }>();
   const vmRunning = (vmId: string) => {
     const hit = vmChecks.get(vmId);

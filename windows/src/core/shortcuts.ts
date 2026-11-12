@@ -22,7 +22,7 @@ export const SHORTCUT_TEXT = {
   toggleIsland: N_("Open or close the island"),
   openChat: N_("Open the chat"),
   goToAlert: N_("Go to the waiting permission or question"),
-  jumpToTerminal: N_("Open Coucou HQ"),
+  jumpToTerminal: N_("Open vufh HQ"),
   attachFrontWindow: N_("Attach the front window to the chat"),
   nextPill: N_("Next pill"),
   prevPill: N_("Previous pill"),
@@ -295,7 +295,7 @@ export function duplicates(entries: Iterable<[string, string]>): Set<string> {
   return dups;
 }
 
-/** The (id, keys) pairs Coucou would register with `stored`. */
+/** The (id, keys) pairs vufh would register with `stored`. */
 export function activeKeys(stored: Bindings | undefined): [string, string][] {
   return SHORTCUTS.filter((d) => d.ported)
     .map((d) => [d.id, effective(d, stored)] as const)

@@ -15,7 +15,7 @@ import { Ease } from "../core/anim";
 import type { Outfit, OutfitSelection } from "./wardrobe";
 import { SCRIPT_FONTS } from "../core/fonts";
 import { withLayer } from "./layer";
-import { character } from "./character";
+import { isTofu } from "./character";
 import { drawTofuStill } from "./tofu";
 
 const EXP = 2.7;
@@ -1045,7 +1045,7 @@ const INK = "rgb(26,20,18)";
 
 /** A little Mochi wearing `outfit`, centred in a `size`×`size` icon. */
 function iconMochi(ctx: Ctx, size: number, outfit: Outfit) {
-  if (character() === "tofu") {
+  if (isTofu()) {
     drawTofuStill(ctx, size, outfit);
     return;
   }

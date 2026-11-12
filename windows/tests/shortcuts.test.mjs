@@ -395,7 +395,7 @@ test("the island toggle opens on a waiting card, and folds it rather than droppi
   assert.equal(State.pendingApproval.requestId, "r1");
 });
 
-test("the old terminal shortcut opens Coucou HQ on the focused agent, and folds the island", () => {
+test("the old terminal shortcut opens vufh HQ on the focused agent, and folds the island", () => {
   State.mode = "expanded";
   runGlobalShortcut(host, "jumpToTerminal", resume);
   assert.deepEqual(sent("show_hq"), [{ agentId: null }]);
@@ -442,7 +442,7 @@ test("the desktop shortcut arrives like the others, and runs from the command li
   emit("shortcut", "desktopToggle");
   assert.deepEqual(did, ["resume", "desktop"]);
   const rust = readFileSync(new URL("../src-tauri/src/shortcuts.rs", import.meta.url), "utf8");
-  assert.match(rust, /from_args\(&args\(&\["coucou", "--shortcut", "desktopToggle"\]\)\), Some\("desktopToggle"\)/);
+  assert.match(rust, /from_args\(&args\(&\["vufh", "--shortcut", "desktopToggle"\]\)\), Some\("desktopToggle"\)/);
 });
 
 test("actions that aren't the island's do nothing here", () => {

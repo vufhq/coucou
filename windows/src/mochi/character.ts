@@ -1,24 +1,25 @@
-// Which character Coucou draws: Mochi (the default, as shipped) or Tofu, a flat
-// pebble with Mochi's motion (./tofu.ts). Picked in Settings → General and
-// stored as `character`, Tofu's colour as `tofuColor`. Every window that draws
+// Which character vufh draws: Tofu in liquid chrome (the default, vufh's own
+// face: ./tofu.ts and ./metal.ts), Tofu as a flat pebble in one colour, or
+// Mochi. Picked in Settings → General and stored as `character`, the flat
+// Tofu's colour as `tofuColor`. Every window that draws
 // a BotEngine applies the preferences here at boot and on settings-changed;
 // the engine reads them on each frame, so a change shows at once.
 
 import { TOFU_PALETTE, type TofuColor } from "./tofu-shape";
 
-export const CHARACTERS = ["mochi", "tofu"] as const;
+export const CHARACTERS = ["chrome", "tofu", "mochi"] as const;
 export type Character = (typeof CHARACTERS)[number];
 
-export const DEFAULT_CHARACTER: Character = "mochi";
+export const DEFAULT_CHARACTER: Character = "chrome";
 /** The colour grok-bot-avatar-engine's ID recipe gives "mochi". */
 export const DEFAULT_TOFU_COLOR: TofuColor = "brown";
 
 /** The colours offered, in the library's order. */
 export const TOFU_COLORS = Object.keys(TOFU_PALETTE) as TofuColor[];
 
-/** Anything unknown (a newer build's value, garbage) means Mochi. */
+/** Anything unknown (a newer build's value, garbage) means the default. */
 export function parseCharacter(raw: unknown): Character {
-  return raw === "tofu" ? "tofu" : DEFAULT_CHARACTER;
+  return (CHARACTERS as readonly unknown[]).includes(raw) ? (raw as Character) : DEFAULT_CHARACTER;
 }
 
 export function parseTofuColor(raw: unknown): TofuColor {
@@ -36,5 +37,11 @@ export function applyCharacter(settings: { character?: unknown; tofuColor?: unkn
 
 export const character = (): Character => current;
 
-/** Tofu's body colour. Coucou is always dark, so the palette's dark ink. */
+/** The pebble, in either finish: what ./tofu.ts draws in Mochi's place. */
+export const isTofu = (): boolean => current !== "mochi";
+
+/** Tofu's body is liquid chrome, not one flat colour. */
+export const isChrome = (): boolean => current === "chrome";
+
+/** Tofu's body colour. vufh is always dark, so the palette's dark ink. */
 export const tofuInk = (): string => TOFU_PALETTE[color].dark;

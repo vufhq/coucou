@@ -6,7 +6,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentEvent } from "@coucou-orchestrator/protocol";
+import type { AgentEvent } from "@vufh-orchestrator/protocol";
 import { createBackend, type Backend } from "../../server/src/app.ts";
 import type { Config } from "../../server/src/config.ts";
 import type { Github } from "../../server/src/github.ts";

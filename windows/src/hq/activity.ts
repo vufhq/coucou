@@ -1,4 +1,4 @@
-// Coucou HQ: Activity, the middle pane that lists every agent's tasks, newest
+// vufh HQ: Activity, the middle pane that lists every agent's tasks, newest
 // first (rakazo's runs list). Chips filter by what the task is doing, a box by
 // its prompt and its agent; a click opens that agent's conversation. It reads
 // the tasks from the store when it opens, then again (debounced) when the store

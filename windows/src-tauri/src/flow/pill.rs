@@ -39,7 +39,7 @@ pub struct PillState {
     pub announcement: Option<Announcement>,
     /// Dictation is on (the resting pill shows).
     pub enabled: bool,
-    /// « OK Coucou » is talking with you.
+    /// « OK Tofu » is talking with you.
     pub voice: Option<crate::voice::VoiceView>,
 }
 
@@ -96,7 +96,7 @@ pub fn setup(app: &AppHandle) {
         let park = cfg!(windows);
         let mut builder = WebviewWindowBuilder::new(app, LABEL, page_url(app))
             .additional_browser_args(crate::BROWSER_ARGS)
-            .title("Coucou")
+            .title("vufh")
             .inner_size(BOTTOM.0, BOTTOM.1)
             .resizable(cfg!(target_os = "linux"))
             .decorations(false)

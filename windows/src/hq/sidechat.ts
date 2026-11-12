@@ -1,4 +1,4 @@
-// Coucou HQ: an exchange opened on its own. What the agents said to each
+// vufh HQ: an exchange opened on its own. What the agents said to each
 // other takes the whole middle pane: who is talking at the top ("Mochi ⇄
 // Ada"), their messages in runs, each run with its author's name above and face
 // below, and "Close chat" where the composer was. Nothing here can be typed

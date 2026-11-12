@@ -50,7 +50,7 @@ describe("the backend's connection to a remote computer", () => {
     expect(args).toContain("StrictHostKeyChecking=yes");
     expect(args).toContain("ExitOnForwardFailure=yes");
     expect(args.slice(args.indexOf("-i"), args.indexOf("-i") + 4)).toEqual(["-i", "C:\\keys\\cloud.key", "-o", "IdentitiesOnly=yes"]);
-    expect(args.slice(-5)).toEqual(["-p", "2222", "-R", "/workspace/.coucou/backend.sock:172.20.0.1:47621", "agent@203.0.113.7"]);
+    expect(args.slice(-5)).toEqual(["-p", "2222", "-R", "/workspace/.vufh/backend.sock:172.20.0.1:47621", "agent@203.0.113.7"]);
     expect(tunnelArgs({ host: "h", port: 22 }, { host: "127.0.0.1", port: 1 })).not.toContain("-i");
   });
 

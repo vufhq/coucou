@@ -1,24 +1,24 @@
 [Unit]
-Description=Coucou orchestrator worker
+Description=vufh orchestrator worker
 # /computer is the shared disk: never the VM's own folder by mistake.
-Requires=coucou-computer.service
-After=network-online.target coucou-computer.service
-Wants=network-online.target coucou-runner.socket
+Requires=vufh-computer.service
+After=network-online.target vufh-computer.service
+Wants=network-online.target vufh-runner.socket
 
 [Service]
 User=agent
 Group=agent
-WorkingDirectory=/opt/coucou-worker
+WorkingDirectory=/opt/vufh-worker
 # ORCH_AGENT_ID: which agent this VM is, written by setup.sh.
-EnvironmentFile=/etc/coucou-worker/agent.env
+EnvironmentFile=/etc/vufh-worker/agent.env
 Environment=ORCH_WORKSPACE=/workspace
-# Task folders live on the computer's disk, shared with coucou-runner, which
+# Task folders live on the computer's disk, shared with vufh-runner, which
 # runs the agents' shell commands as another user.
 Environment=ORCH_COMPUTER=/computer
-Environment=HOME=/workspace/.coucou/home
-Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/coucou-worker/browsers
+Environment=HOME=/workspace/.vufh/home
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/vufh-worker/browsers
 # The token file is root-only; systemd hands this service a private copy.
-LoadCredential=worker-token:/etc/coucou-worker/worker-token
+LoadCredential=worker-token:/etc/vufh-worker/worker-token
 ExecStart=/usr/local/bin/node worker/src/main.ts
 Restart=always
 RestartSec=3
@@ -44,7 +44,7 @@ RestrictSUIDSGID=yes
 # router or another machine, whatever a name resolves to. 172.16.0.0/12 is
 # where WSL puts the PC (the default gateway, where the backend listens);
 # 10.255.255.254 is WSL's DNS tunnel. The runner's rule is stricter still
-# (coucou-runner.service): it cannot reach the PC at all.
+# (vufh-runner.service): it cannot reach the PC at all.
 IPAddressDeny=10.0.0.0/8 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
 IPAddressAllow=localhost 10.255.255.254
 

@@ -1,4 +1,4 @@
-// Coucou HQ: the conversation itself, one element per ThreadItem. Elements are
+// vufh HQ: the conversation itself, one element per ThreadItem. Elements are
 // kept by `item.key` and only redrawn when what they show changed, so a live
 // line ticking or a new message never rebuilds the whole thread (and the
 // minis in the exchanges keep their animation). An exchange is one line; a

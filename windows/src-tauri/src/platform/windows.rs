@@ -29,20 +29,46 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 // ── Files ─────────────────────────────────────────────────────────────────────
 
-/// %APPDATA%\Coucou — preferences.
-pub fn config_dir() -> PathBuf {
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("Coucou")
+const DIR: &str = "vufh";
+/// The folder's name before the app was renamed.
+const LEGACY_DIR: &str = "Coucou";
+
+fn base_dir(var: &str) -> PathBuf {
+    std::env::var_os(var).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// %LOCALAPPDATA%\Coucou — where coucou-hook.exe, the inbox and the log live.
+/// `base`\vufh, or the folder from before the rename while it could not be
+/// moved (adopt_legacy_dirs): the files are never split between the two.
+fn app_dir(base: PathBuf) -> PathBuf {
+    let dir = base.join(DIR);
+    let legacy = base.join(LEGACY_DIR);
+    if !dir.exists() && legacy.is_dir() {
+        legacy
+    } else {
+        dir
+    }
+}
+
+/// %APPDATA%\vufh — preferences.
+pub fn config_dir() -> PathBuf {
+    app_dir(base_dir("APPDATA"))
+}
+
+/// %LOCALAPPDATA%\vufh — where the inbox, the models and the log live.
 pub fn local_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("Coucou")
+    app_dir(base_dir("LOCALAPPDATA"))
+}
+
+/// Renames the two folders from before the rename, once, at launch. A folder
+/// still in use (the old app is running) stays where it is and is used there.
+fn adopt_legacy_dirs() {
+    for var in ["APPDATA", "LOCALAPPDATA"] {
+        let base = base_dir(var);
+        let (dir, legacy) = (base.join(DIR), base.join(LEGACY_DIR));
+        if !dir.exists() && legacy.is_dir() {
+            let _ = std::fs::rename(&legacy, &dir);
+        }
+    }
 }
 
 /// %APPDATA% and %LOCALAPPDATA% are already private to the user.
@@ -50,8 +76,10 @@ pub fn ensure_private_dir(dir: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dir)
 }
 
-/// Nothing to set up before the webview starts.
-pub fn prepare_environment() {}
+/// Before the webview starts: the folders of the app's former name.
+pub fn prepare_environment() {
+    adopt_legacy_dirs();
+}
 
 pub fn local_time() -> LocalTime {
     let t = unsafe { GetLocalTime() };

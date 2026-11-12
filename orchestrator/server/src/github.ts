@@ -1,13 +1,13 @@
 // The user's GitHub account, through their own GitHub App and the device
-// flow: Coucou shows a code, the user enters it on github.com, and the tokens
+// flow: vufh shows a code, the user enters it on github.com, and the tokens
 // land in the Windows Credential Manager. No client secret exists (the client
 // id is public), so refreshing needs none either. The tokens never reach a
 // model, the database, an event or a log: a git.* job gets the access token
 // at claim time, for that one job, and redaction knows its value.
 
+import { keyringEntry } from "./keyring.ts";
 import { addSecret } from "./redact.ts";
 
-const SERVICE = "fr.louisraille.coucou";
 export const GITHUB_KEY = "orchestrator-github";
 
 const DEVICE_CODE_URL = "https://github.com/login/device/code";
@@ -25,15 +25,7 @@ export interface SecretSlot {
 }
 
 export async function keyringSlot(key = GITHUB_KEY): Promise<SecretSlot> {
-  const { Entry } = await import("@napi-rs/keyring");
-  const entry = new Entry(SERVICE, key);
-  return {
-    read: () => entry.getPassword() ?? null,
-    write: (value) => entry.setPassword(value),
-    delete: () => {
-      entry.deletePassword();
-    },
-  };
+  return keyringEntry(key);
 }
 
 /** A slot in memory, for tests and machines without a credential store. */
@@ -230,7 +222,7 @@ export class Github {
   private async login(access: string): Promise<string> {
     addSecret(access);
     const res = await this.fetch(USER_URL, {
-      headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${access}`, "User-Agent": "coucou-orchestrator" },
+      headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${access}`, "User-Agent": "vufh-orchestrator" },
     });
     if (!res.ok) throw new GithubError(`GitHub did not say who signed in (HTTP ${res.status})`);
     const login = str(((await res.json()) as Record<string, unknown>).login);
@@ -258,7 +250,7 @@ export class Github {
   private async post(url: string, form: Record<string, string>): Promise<Record<string, unknown>> {
     const res = await this.fetch(url, {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "coucou-orchestrator" },
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "vufh-orchestrator" },
       body: new URLSearchParams(form).toString(),
     });
     let body: unknown = null;

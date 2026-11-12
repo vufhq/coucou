@@ -6,7 +6,7 @@
 
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { JournalEntry, type JobOutcome } from "@coucou-orchestrator/protocol";
+import { JournalEntry, type JobOutcome } from "@vufh-orchestrator/protocol";
 
 const KEEP_MS = 24 * 60 * 60_000;
 
@@ -14,7 +14,7 @@ export class Journal {
   private readonly dir: string;
 
   constructor(workspace: string) {
-    this.dir = join(workspace, ".coucou", "journal");
+    this.dir = join(workspace, ".vufh", "journal");
   }
 
   private file(jobId: string): string {

@@ -4,7 +4,7 @@
 // behind a router: so the backend opens one SSH connection out to it and
 // keeps it open, and the worker's calls come back through it.
 //
-// On the far side the connection ends in a socket, /workspace/.coucou/
+// On the far side the connection ends in a socket, /workspace/.vufh/
 // backend.sock, in the worker's own folder: nothing listens on a port there,
 // and what the agents run (the runner, another user) cannot enter that folder.
 // The login is `agent`, which that machine's SSH server gives no shell and
@@ -25,7 +25,7 @@ export interface Remote {
 
 /** The login setup.sh allows to open the socket, and where the worker looks for it. */
 export const TUNNEL_USER = "agent";
-export const TUNNEL_SOCKET = "/workspace/.coucou/backend.sock";
+export const TUNNEL_SOCKET = "/workspace/.vufh/backend.sock";
 
 /** `ssh:203.0.113.7:22`, a remote computer's vmId. */
 export function remoteVmId(remote: Remote): string {

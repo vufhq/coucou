@@ -1,4 +1,4 @@
-// Coucou HQ (hq.html): the window where the user is the boss of Mochi and his
+// vufh HQ (hq.html): the window where the user is the boss of Mochi and his
 // team. Three panes: the sidebar lists the agents by team; the middle shows
 // the conversation with the one selected (or Activity, every task); the side
 // panel on the right shows its computer, goals, memory and files, or its
@@ -60,10 +60,10 @@ async function main() {
   setLanguage(resolveLanguage(boot?.settings.language, systemLanguages()));
   applyCharacter(boot?.settings);
 
-  // The window is borderless (lib.rs): its title bar, with Coucou's settings in reach.
+  // The window is borderless (lib.rs): its title bar, with vufh's settings in reach.
   const settingsBtn = h("button", { class: "cc-tb-action", title: tl("Settings") }, svg(ICONS.gear, 14), h("span", { text: tl("Settings") }));
   settingsBtn.addEventListener("click", () => void Bridge.openHubPage("general"));
-  mountTitleBar({ title: "Coucou HQ", actions: [settingsBtn] });
+  mountTitleBar({ title: "vufh HQ", actions: [settingsBtn] });
 
   const root = document.getElementById("hq")!;
   const sidebar = h("aside", { class: "hq-sidebar" });

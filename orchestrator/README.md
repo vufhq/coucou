@@ -1,6 +1,6 @@
-# Coucou orchestrator
+# vufh orchestrator
 
-The backend that turns Coucou into the control surface for Mochi and a team of
+The backend that turns vufh into the control surface for Mochi and a team of
 AI coworkers. Provisioned Linux VMs are **computers** (`agent-01`,
 `agent-02`…), while the characters the user names, colours and chats with are
 **agents**. The computers are a pool: any computer with room takes the next
@@ -10,14 +10,14 @@ task, whoever's it is, and each works on two tasks at once
 Activity remains reconnectable and durable.
 
 ```
-Coucou (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (this folder, Node on Windows)
+vufh (Tasks page, island)  ──REST + SSE, 127.0.0.1:47620──►  backend (this folder, Node on Windows)
                                                                  tasks · steps · jobs · approvals · events (SQLite)
                                                                  policy · model router (Claude Code / Cursor CLIs)
                                                                      ▲ worker pulls jobs (WSL interface :47621)
                                                        computers agent-01, agent-02… (one WSL2 distro each, Ubuntu 24.04)
-                                                       coucou-worker · browser (Playwright/Chromium) · files
-                                                       coucou-runner · the agents' bash shell, as another user, in /computer
-                                                       /computer = D:\coucou-vms\shared, the same folder on every computer
+                                                       vufh-worker · browser (Playwright/Chromium) · files
+                                                       vufh-runner · the agents' bash shell, as another user, in /computer
+                                                       /computer = D:\vufh-vms\shared, the same folder on every computer
 ```
 
 ## Mochi and the team
@@ -69,11 +69,11 @@ scripts, installs and servers, and it needs no click. The computer is the
 boundary, not each command.
 
 - Commands run as `runner`, a second user with no sudo, in the
-  `coucou-runner` service. The worker hands it each command over a socket only
+  `vufh-runner` service. The worker hands it each command over a socket only
   the worker's group can open. `runner` can't see the worker's processes, its
   token, its journal or `/workspace`.
-- `/computer` is one Windows folder, `D:\coucou-vms\shared` (`provision.ps1
-  -SharedDir`), mounted in every computer by `coucou-computer.service`, and
+- `/computer` is one Windows folder, `D:\vufh-vms\shared` (`provision.ps1
+  -SharedDir`), mounted in every computer by `vufh-computer.service`, and
   kept across tasks and updates: `tasks/<id>` is each task's folder (what you
   see and download, where a command starts), `agents/<agent>` is each agent's
   own folder and `~` in its shell, and `shared/` is shared by the team. As in
@@ -89,17 +89,17 @@ boundary, not each command.
   everything it started. A server started with `&` doesn't hold the command
   and keeps running. The runner may use at most 75 % of the VM's memory and
   512 processes.
-- Output streams live to Coucou; the model gets the exit code and up to
+- Output streams live to vufh; the model gets the exit code and up to
   20,000 characters of it, the start and the end (the middle of a longer
   output is cut).
 
 ## Files and links in messages
 
-Drop files on Coucou HQ (or pick them from the composer's + menu) and paste
+Drop files on vufh HQ (or pick them from the composer's + menu) and paste
 GitHub links in the message: the agent finds them in its task folder before it
 starts, with nothing to copy into WSL by hand.
 
-- Coucou sends each file to the backend as soon as it is dropped
+- vufh sends each file to the backend as soon as it is dropped
   (`POST /api/attachments?name=…`, the bytes as the body, 20 MB at most, 8 per
   message), and only a path a real drop or the file chooser just delivered.
   The backend keeps it in `uploads/` in its data folder until the task ends; a
@@ -116,7 +116,7 @@ starts, with nothing to copy into WSL by hand.
 - `fs.receive` is a backend-only operation like `fs.fetch`: a model naming it
   is refused. It needs worker 0.4; an older worker gets a clear failure
   ("update it with provision.ps1 -Update") instead of a job it can't read.
-- Coucou shows the files and repositories as chips under the user's message.
+- vufh shows the files and repositories as chips under the user's message.
 
 ## Layout
 
@@ -133,9 +133,9 @@ You need Node 24+ on Windows, WSL2, and at least one subscription CLI signed in:
 Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
 
 1. **Install and start the backend once.** This creates its access tokens
-   in the Windows Credential Manager (`orchestrator-token` for Coucou, and one
+   in the Windows Credential Manager (`orchestrator-token` for vufh, and one
    worker token per agent: `orchestrator-worker-token` for agent-01,
-   `orchestrator-worker-token-agent-02` and so on; service `fr.louisraille.coucou`):
+   `orchestrator-worker-token-agent-02` and so on; service `dev.vufh.hq`):
 
    ```powershell
    cd orchestrator
@@ -149,7 +149,7 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    run this in an administrator PowerShell instead:
 
    ```powershell
-   New-NetFirewallRule -DisplayName "Coucou orchestrator worker port" -Direction Inbound `
+   New-NetFirewallRule -DisplayName "vufh orchestrator worker port" -Direction Inbound `
      -Protocol TCP -LocalPort 47621 -InterfaceAlias "vEthernet (WSL*)" -Action Allow
    ```
 
@@ -160,7 +160,7 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    ```
 
    This creates a WSL2 distro named `agent-01` with its disk in
-   `D:\coucou-vms\agent-01`. Pass `-Location` to put it somewhere else. It then
+   `D:\vufh-vms\agent-01`. Pass `-Location` to put it somewhere else. It then
    installs Node, Chromium and the worker, and restarts the distro. To update
    the worker later, run the same command with `-Update`. The disk and
    `/workspace` and `/computer` are kept. (After a backend update that changes
@@ -168,7 +168,7 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    shell, 0.4 for attached files and 0.5 for the shared folder, run `-Update`
    once.)
 
-   It also creates `D:\coucou-vms\shared`, the folder every computer mounts
+   It also creates `D:\vufh-vms\shared`, the folder every computer mounts
    at `/computer` (`-SharedDir` to put it elsewhere: give every computer the
    same one). The first `-Update` from 0.4 moves what the computer had in
    `/computer` there.
@@ -180,7 +180,7 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-02
    ```
 
-   It goes in `D:\coucou-vms\agent-02` (about 3.5 GB). Then list every computer in
+   It goes in `D:\vufh-vms\agent-02` (about 3.5 GB). Then list every computer in
    `orchestrator\.env` and restart the backend:
 
    ```
@@ -220,10 +220,10 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    passphrase, or held by your SSH agent). Your PC still has to be on: the
    backend and the models stay here. A remote computer has its own disk, not
    the shared folder, so move the agents that should work there onto it in
-   Coucou HQ; their tasks then run only there. `-Update` refreshes it like any
+   vufh HQ; their tasks then run only there. `-Update` refreshes it like any
    other computer.
 
-3. **In Coucou**, open **Tasks** in the sidebar and switch on
+3. **In vufh**, open **Tasks** in the sidebar and switch on
    **Orchestrator backend**. Then give agent-01 a task, for example:
    *"Open the documentation for httpx, find the current installation
    instructions, and save a summary to report.md."*
@@ -240,11 +240,11 @@ Claude Code (`claude` on PATH) and/or the Cursor CLI (`cursor-agent login`).
    needs you lights its dot. Rename an agent or change its colour on the Tasks
    page.
 
-Once the backend is on, Coucou starts it for you whenever it is not running:
-from this folder when Coucou was built from this repository, else from the
-folder picked under **Start the backend with Coucou** on the Tasks page (its
-output goes to `%LOCALAPPDATA%\Coucou\orchestrator-backend.log`). Turn that off
-to run `npm start` yourself. Closing Coucou leaves the backend running and
+Once the backend is on, vufh starts it for you whenever it is not running:
+from this folder when vufh was built from this repository, else from the
+folder picked under **Start the backend with vufh** on the Tasks page (its
+output goes to `%LOCALAPPDATA%\vufh\orchestrator-backend.log`). Turn that off
+to run `npm start` yourself. Closing vufh leaves the backend running and
 does not stop a task. Stopping the backend pauses tasks, and they carry on when
 it starts again.
 
@@ -275,7 +275,7 @@ Pausing an agent applies the same boundary to its running tasks and leaves its
 queue waiting until the agent is resumed. Time paused does not use the task's
 timeout budget.
 
-Agents default to 30 task starts and 300 steps per local day. Coucou can change
+Agents default to 30 task starts and 300 steps per local day. vufh can change
 both limits per agent. Once either limit is reached, queued work remains visible
 with `waitingReason: "daily_limit"` and starts after local midnight; a running
 step is allowed to finish first.
@@ -289,7 +289,7 @@ fails the task as `worker_lost`.
 ## Memory
 
 Agents can keep up to 50 short notes, and the user can add or remove notes in
-Coucou. A task may remember up to three facts when it finishes. Notes are
+vufh. A task may remember up to three facts when it finishes. Notes are
 redacted before storage, and every prompt receives them inside a `<memory>`
 block explicitly labelled as background, never instructions. When the limit is
 reached, the oldest agent-written notes are removed first.
@@ -321,7 +321,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 
 | Variable | Default | |
 |---|---|---|
-| `ORCH_API_PORT` | `47620` | Coucou's API, always on 127.0.0.1 |
+| `ORCH_API_PORT` | `47620` | vufh's API, always on 127.0.0.1 |
 | `ORCH_WORKER_PORT` | `47621` | The worker's listener |
 | `ORCH_WORKER_HOST` | WSL adapter address | Where the worker listener binds |
 | `ORCH_MODEL_PROFILE` | `claude-cli` | The model tasks use unless they name one |
@@ -332,7 +332,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 | `ORCH_CURSOR_STATE_DIR` | `<data dir>\cursor` | Cursor's private home and empty folder (several GB) |
 | `ORCH_LOCAL_URL` | unset | Base URL of an OpenAI-compatible server on this machine (loopback only), e.g. `http://127.0.0.1:11434/v1` |
 | `ORCH_LOCAL_MODEL` | `local` | Model sent to the local server |
-| `ORCH_DATA_DIR` | `%LOCALAPPDATA%\CoucouOrchestrator` | The SQLite database |
+| `ORCH_DATA_DIR` | `%LOCALAPPDATA%\VufhOrchestrator` | The SQLite database |
 | `ORCH_RETENTION_DAYS` | `30` | Finished tasks, their history and their folders in the VM are removed after this many days. `0` keeps everything |
 | `ORCH_KEEP_ALIVE` | on | `0` stops the backend keeping the WSL distros running |
 | `ORCH_AGENTS` | `agent-01` | Provisioned computers, comma-separated. Each is a distro of the same name, made by `provision.ps1 -Name`, or `name@host` (`name@host:port`) for one made with `-RemoteHost`. Any WSL one runs any agent's task; a remote one runs the tasks of the agents placed on it. Agents whose own computer was dropped from the list move to the first at startup |
@@ -353,7 +353,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 - **The browser** runs in Chromium's own sandbox when the computer allows one
   (the worker's log says when it does not). Every request and WebSocket is
   checked against the PC and private networks; an answer that still comes from
-  a private address closes the session; and `coucou-worker.service` denies the
+  a private address closes the session; and `vufh-worker.service` denies the
   local network to the worker and its browser, whatever a name resolves to.
 - **A remote computer** is reached by one SSH connection the backend opens
   (`server/src/tunnel.ts`), as that machine's `agent` user, which its SSH
@@ -379,7 +379,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   | 3 Act freely within budget | a push past `ORCH_RISKY_PER_DAY` today |
   | 4 Fully trusted | nothing below |
 
-- **GitHub:** you sign in once in Coucou (Settings → Tasks → GitHub: a code
+- **GitHub:** you sign in once in vufh (Settings → Tasks → GitHub: a code
   to enter on github.com, through your own GitHub App, which only sees the
   repos you installed it on). The tokens stay in Credential Manager
   (`orchestrator-github`), are refreshed by the backend, and reach a computer
@@ -393,7 +393,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   copies the branch out with `git clone --bare --no-local` and pushes from that
   clean copy. Disconnecting forgets the tokens; revoke the app on github.com
   to cut it off there too.
-- **Needs your click at every level:** creating or retiring an agent. Coucou
+- **Needs your click at every level:** creating or retiring an agent. vufh
   never approves on its own; approving a site remembers it.
 - **Always refused:** the host machine, the LAN, cloud metadata, URLs with
   credentials, and paths or command arguments that leave the task folder.
@@ -446,7 +446,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 - A task that runs out of time while the agent's computer is offline fails as
   `worker_lost`, not `timeout`.
 - **Health:** the worker reports its free disk space and whether Chromium is
-  installed, once a minute. Coucou's Tasks page shows the agent's state and
+  installed, once a minute. vufh's Tasks page shows the agent's state and
   what is wrong: its computer is stopped (checked with
   `wsl --list --running`), its worker does not answer, its disk has under
   1 GB free, or Chromium is missing.
@@ -454,7 +454,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
   `ORCH_RETENTION_DAYS`, and the worker removes task folders in the VM nothing
   has touched for a day longer than that. Tasks still running are never touched.
 - **Downloads:** files come down byte for byte, up to 8 MB, screenshots
-  included. The bytes go straight from the worker to Coucou: they are never
+  included. The bytes go straight from the worker to vufh: they are never
   stored in the database or the event log. Text files (`.md`, `.txt`, `.json`,
   `.csv`, `.html`…) are redacted like everything else that leaves the VM as text.
   Downloading is the backend's own operation (`fs.fetch`): a model can't ask for it.

@@ -1,4 +1,4 @@
-// coucou-worker, as systemd starts it inside the agent's VM.
+// vufh-worker, as systemd starts it inside the agent's VM.
 //
 // Configuration comes from the environment (the unit's EnvironmentFile) and
 // the token from systemd's credential store, which only this service reads:
@@ -6,8 +6,8 @@
 //   ORCH_BACKEND_URL   optional; default http://<default gateway>:47621
 //   ORCH_BACKEND_SOCKET  a remote computer: the socket the backend's SSH connection opens
 //   ORCH_WORKSPACE     /workspace
-//   ORCH_COMPUTER      /computer, shared with coucou-runner (task folders, the agents' own folders)
-//   ORCH_RUNNER_SOCKET /run/coucou-runner.sock
+//   ORCH_COMPUTER      /computer, shared with vufh-runner (task folders, the agents' own folders)
+//   ORCH_RUNNER_SOCKET /run/vufh-runner.sock
 //   $CREDENTIALS_DIRECTORY/worker-token   (or ORCH_WORKER_TOKEN, for development)
 
 import { readFile } from "node:fs/promises";
@@ -43,7 +43,7 @@ const workspace = process.env.ORCH_WORKSPACE ?? "/workspace";
 const socket = process.env.ORCH_BACKEND_SOCKET || undefined;
 const base = socket ? "http://backend" : (process.env.ORCH_BACKEND_URL ?? `http://${await defaultGateway()}:47621`);
 const agentId = process.env.ORCH_AGENT_ID ?? "agent-01";
-const browser = playwrightDriver((line) => console.log(`coucou-worker: ${line}`));
+const browser = playwrightDriver((line) => console.log(`vufh-worker: ${line}`));
 
 const worker = new Worker({
   client: new BackendClient(base, await token(), agentId, socket),
@@ -51,8 +51,8 @@ const worker = new Worker({
   browser,
   workspace,
   computer: process.env.ORCH_COMPUTER ?? workspace,
-  shell: socketShell(process.env.ORCH_RUNNER_SOCKET ?? "/run/coucou-runner.sock"),
-  log: (line) => console.log(`coucou-worker: ${line}`),
+  shell: socketShell(process.env.ORCH_RUNNER_SOCKET ?? "/run/vufh-runner.sock"),
+  log: (line) => console.log(`vufh-worker: ${line}`),
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -62,5 +62,5 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
-console.log(`coucou-worker: ${agentId}, backend ${socket ?? base}, workspace ${workspace}`);
+console.log(`vufh-worker: ${agentId}, backend ${socket ?? base}, workspace ${workspace}`);
 await worker.run();

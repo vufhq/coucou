@@ -20,7 +20,7 @@ import {
   WorkerEvents,
   clipText,
   type ClaimResponse,
-} from "@coucou-orchestrator/protocol";
+} from "@vufh-orchestrator/protocol";
 import type { Uploads } from "./attachments.ts";
 import type { EventLog } from "./events.ts";
 import type { Github } from "./github.ts";
@@ -186,7 +186,7 @@ export function buildGateway(deps: GatewayDeps): FastifyInstance {
       if (job && GITHUB_OPS.has(job.op)) {
         const token = await deps.github?.token().catch(() => null);
         if (!token) {
-          finish(job, { status: "failed", error: { code: "refused", message: "Coucou is not signed in to GitHub any more: the user signs in again in Settings → Tasks" } });
+          finish(job, { status: "failed", error: { code: "refused", message: "vufh is not signed in to GitHub any more: the user signs in again in Settings → Tasks" } });
           continue;
         }
         secrets = { github: token };

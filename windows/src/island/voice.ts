@@ -1,4 +1,4 @@
-// « OK Coucou » asks the island what only it knows (src-tauri/src/voice): the
+// « OK Tofu » asks the island what only it knows (src-tauri/src/voice): the
 // pills, to add or remove, and the user's own data for Claude to answer from.
 
 import { invoke } from "@tauri-apps/api/core";

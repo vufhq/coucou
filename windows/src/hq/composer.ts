@@ -1,6 +1,6 @@
-// Coucou HQ: the box at the bottom of the conversation. Enter sends, Shift+Enter
+// vufh HQ: the box at the bottom of the conversation. Enter sends, Shift+Enter
 // makes a new line; the + holds Pause / Resume and "New goal…"; the mic
-// dictates into the box, on this computer (Coucou's voice model). Above it, a
+// dictates into the box, on this computer (vufh's voice model). Above it, a
 // slim line says when the agent is working (with Stop) or waiting. Other
 // parts prefill it with `document.dispatchEvent(new CustomEvent("hq-compose",
 // { detail: { text } }))`.
@@ -262,10 +262,10 @@ export function createComposer(store: HqStore, onSent: () => void): Composer {
       dictation = "listening";
     } catch (err) {
       if (String(err).includes("models")) {
-        // The voice model is downloaded once, in Coucou's settings.
+        // The voice model is downloaded once, in vufh's settings.
         const open = h("button", { class: "hq-composer-note-link", text: tl("Open Settings") });
         open.addEventListener("click", () => void Bridge.openHubPage("settings"));
-        note.replaceChildren(h("span", { text: t("Dictation needs Coucou's voice model. Download it in Settings → Recognition.") }), " ", open);
+        note.replaceChildren(h("span", { text: t("Dictation needs vufh's voice model. Download it in Settings → Recognition.") }), " ", open);
       } else {
         note.textContent = t("Couldn't open the microphone: {error}", { error: String(err) });
       }

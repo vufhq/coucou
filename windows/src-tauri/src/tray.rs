@@ -1,4 +1,4 @@
-// Notification-area icon: Coucou HQ, Wardrobe, Settings, Pause, Quit.
+// Notification-area icon: vufh HQ, Wardrobe, Settings, Pause, Quit.
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -10,7 +10,7 @@ use crate::island::WINDOW_LABEL;
 /// The menu's items, id and English label, in order. The labels are shown in
 /// the interface language (i18n.rs) and follow it when it changes.
 const ITEMS: [(&str, &str); 5] = [
-    ("hq", n_("Coucou HQ")),
+    ("hq", n_("vufh HQ")),
     ("wardrobe", n_("Wardrobe…")),
     ("settings", n_("Settings…")),
     ("pause", n_("Pause")),
@@ -32,14 +32,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[hq, &sep1, wardrobe, settings, pause, &sep2, quit])?;
     app.manage(Items(items));
 
-    let mut builder = TrayIconBuilder::with_id("coucou")
-        .tooltip("Coucou")
+    let mut builder = TrayIconBuilder::with_id("vufh")
+        .tooltip("vufh")
         .menu(&menu)
         .on_menu_event(|app: &AppHandle, event| match event.id.as_ref() {
             "quit" => app.exit(0),
-            // The Coucou window: dictation, notes and every setting.
+            // The vufh window: dictation, notes and every setting.
             "settings" => crate::show_settings_window(app),
-            // Coucou HQ: the agents and their teams.
+            // vufh HQ: the agents and their teams.
             "hq" => crate::show_hq_window(app, None),
             id => {
                 let _ = app.emit_to(WINDOW_LABEL, "tray", id.to_string());

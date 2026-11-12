@@ -1,4 +1,4 @@
-// What the island's service pills show, as small read-only summaries that « OK Coucou » answers from
+// What the island's service pills show, as small read-only summaries that « OK Tofu » answers from
 // (island/voice.ts): a headline, why, and three lines, kept short on purpose.
 //
 // What never goes in a summary: an email address or subject (Resend), a payment's description (Stripe), the text of

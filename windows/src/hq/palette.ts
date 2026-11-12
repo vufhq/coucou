@@ -1,4 +1,4 @@
-// Coucou HQ: the command palette (Ctrl+K, Cmd+K on a Mac). A box and a list
+// vufh HQ: the command palette (Ctrl+K, Cmd+K on a Mac). A box and a list
 // of what the user can do from anywhere in the window: go to an agent, open
 // Activity, ask Mochi to hire, and pause, plan or set up the agent on screen.
 // Typing filters the list; the arrows move, Enter runs, Esc or a click

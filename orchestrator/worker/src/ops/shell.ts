@@ -5,7 +5,7 @@
 
 import { connect } from "node:net";
 import { join } from "node:path";
-import { SHELL_DEFAULT_TIMEOUT_SEC, type OpArgs } from "@coucou-orchestrator/protocol";
+import { SHELL_DEFAULT_TIMEOUT_SEC, type OpArgs } from "@vufh-orchestrator/protocol";
 import type { OpContext, OpResult } from "../worker.ts";
 import { CommandError } from "./terminal.ts";
 
@@ -36,7 +36,7 @@ export function agentHome(computer: string, agentId: string): string {
   return join(computer, "agents", agentId);
 }
 
-/** Talks to coucou-runner over its socket. */
+/** Talks to vufh-runner over its socket. */
 export function socketShell(path: string): ShellRunner {
   return {
     run: (req, onOutput, signal) =>

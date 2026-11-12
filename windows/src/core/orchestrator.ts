@@ -8,7 +8,7 @@ import { t } from "../i18n/i18n";
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!IS_TAURI) throw new Error("not running inside Coucou");
+  if (!IS_TAURI) throw new Error("not running inside vufh");
   return invoke<T>(cmd, args);
 }
 
@@ -79,7 +79,7 @@ export interface OrchApproval {
 /** What the backend found wrong with an agent's computer (AgentProblem in the protocol). */
 export type AgentProblem = "vm_stopped" | "worker_down" | "low_disk" | "no_browser" | "daily_limit";
 
-/** The backend's GitHub sign-in (Settings → Tasks). The tokens never come to Coucou. */
+/** The backend's GitHub sign-in (Settings → Tasks). The tokens never come to vufh. */
 export interface OrchGithub {
   configured: boolean;
   connected: boolean;
@@ -195,13 +195,13 @@ export interface OrchStatus {
   prefs: { enabled: boolean; url: string; startBackend: boolean; backendDir: string };
   status: { state: "off" | "connecting" | "connected" | "noToken" | "unreachable"; error: string | null };
   hasToken: boolean;
-  /** The orchestrator folder Coucou starts the backend from, or null when there is none. */
+  /** The orchestrator folder vufh starts the backend from, or null when there is none. */
   backendDir: string | null;
 }
 
 export const OrchestratorBridge = {
   status: () => callOrThrow<OrchStatus>("orchestrator_status"),
-  /** `backend` left out keeps whether and where Coucou starts the backend. */
+  /** `backend` left out keeps whether and where vufh starts the backend. */
   setPrefs: (enabled: boolean, url: string, backend: { startBackend?: boolean; backendDir?: string } = {}) =>
     callOrThrow<void>("orchestrator_set_prefs", {
       enabled, url, startBackend: backend.startBackend ?? null, backendDir: backend.backendDir ?? null,
@@ -330,7 +330,7 @@ export function modelLabel(profileId: string): string {
 /** A fresh idempotency key: a retried click sends the same one and gets the same task. */
 export function newTaskKey(): string {
   const rand = Math.random().toString(36).slice(2, 10);
-  return `coucou-${Date.now().toString(36)}-${rand}`;
+  return `vufh-${Date.now().toString(36)}-${rand}`;
 }
 
 /** How an agent's computer is doing, in one line: its state, then whatever is wrong. */

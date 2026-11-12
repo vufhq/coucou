@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { redact, redactText } from "../../server/src/redact.ts";
-import { MODEL_OP_NAMES, parseDecision } from "@coucou-orchestrator/protocol";
+import { MODEL_OP_NAMES, parseDecision } from "@vufh-orchestrator/protocol";
 import { decide, domainOf } from "../../server/src/policy.ts";
 
 describe("redaction", () => {

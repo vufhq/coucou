@@ -3,9 +3,28 @@
 
 use keyring::Entry;
 
-const SERVICE: &str = "fr.louisraille.coucou";
+const SERVICE: &str = "dev.vufh.hq";
+/// The service these entries were kept under before the app was renamed. A key
+/// found only there is copied to SERVICE on first read, so nobody types their
+/// keys again; clearing a key clears both.
+const LEGACY_SERVICE: &str = "fr.louisraille.coucou";
 
-/// Every key Coucou may store. Anything outside this list is refused.
+fn read(entry: &Entry, key: &str) -> Option<String> {
+    if let Some(value) = entry.get_password().ok().filter(|v| !v.is_empty()) {
+        return Some(value);
+    }
+    let old = Entry::new(LEGACY_SERVICE, key).ok()?.get_password().ok().filter(|v| !v.is_empty())?;
+    let _ = entry.set_password(&old);
+    Some(old)
+}
+
+fn forget_legacy(key: &str) {
+    if let Ok(old) = Entry::new(LEGACY_SERVICE, key) {
+        let _ = old.delete_credential();
+    }
+}
+
+/// Every key vufh may store. Anything outside this list is refused.
 pub const KNOWN_KEYS: &[&str] = &[
     "anthropic-api-key",
     "openai-api-key",
@@ -20,7 +39,7 @@ pub const KNOWN_KEYS: &[&str] = &[
     "resend-api-key",
     "notion-api-key",
     "calcom-api-key",
-    // « OK Coucou »'s answers in an ElevenLabs voice.
+    // « OK Tofu »'s answers in an ElevenLabs voice.
     "elevenlabs-api-key",
 ];
 
@@ -32,13 +51,14 @@ fn entry(key: &str) -> Option<Entry> {
 }
 
 pub fn get(key: &str) -> Option<String> {
-    entry(key)?.get_password().ok().filter(|v| !v.is_empty())
+    read(&entry(key)?, key)
 }
 
 pub fn set(key: &str, value: &str) -> Result<(), String> {
     let entry = entry(key).ok_or_else(|| format!("unknown key {key}"))?;
     if value.is_empty() {
         let _ = entry.delete_credential();
+        forget_legacy(key);
         return Ok(());
     }
     entry.set_password(value).map_err(|e| e.to_string())
@@ -46,6 +66,7 @@ pub fn set(key: &str, value: &str) -> Result<(), String> {
 
 pub fn clear(key: &str) -> Result<(), String> {
     let entry = entry(key).ok_or_else(|| format!("unknown key {key}"))?;
+    forget_legacy(key);
     match entry.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
@@ -80,7 +101,7 @@ fn internal_entry(key: &str) -> Result<Entry, String> {
 }
 
 pub fn get_internal(key: &str) -> Option<String> {
-    internal_entry(key).ok()?.get_password().ok().filter(|v| !v.is_empty())
+    read(&internal_entry(key).ok()?, key)
 }
 
 #[cfg(test)]

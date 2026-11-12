@@ -1,4 +1,4 @@
-// The title bar of the borderless windows (Coucou and Coucou HQ): the window
+// The title bar of the borderless windows (vufh and vufh HQ): the window
 // is created without the system frame (lib.rs), so the page draws its own bar.
 // Dragging it moves the window, a double-click maximises it, and the three
 // buttons on the right minimise, maximise and close it (closing only hides it,
