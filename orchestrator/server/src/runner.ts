@@ -510,12 +510,14 @@ export class Runner {
    * The computer for a task about to start: one with room, online first. An
    * offline one is chosen only when none is online, so the task waits for it
    * as before. Then the one the task last ran on (its browser session is
-   * there), the agent's own, the least loaded, the configured order.
+   * there), the agent's own, the least loaded, the configured order. Only
+   * computers sharing a disk with the agent's own are considered: its folder
+   * is not on the others (a remote computer has its own disk).
    */
   private pickComputer(task: Task): string | null {
     const agent = this.store.agent(task.agentId);
     const online = (c: { status: string }) => c.status === "ready" || c.status === "busy";
-    const all = this.store.computers();
+    const all = this.store.sameDisk(agent?.computerId);
     const pool = all.some(online) ? all.filter(online) : all;
     const ranked = pool
       .map((c, order) => ({

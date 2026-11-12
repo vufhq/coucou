@@ -17,7 +17,19 @@
   task folders live there, so any computer can run any agent. Give every
   computer the same -SharedDir.
 
-  What it does, and nothing else:
+  A computer that is not on this PC: -RemoteHost, a rented Ubuntu 24.04
+  machine you can already reach with `ssh` as a user with sudo (x86 or ARM):
+
+      powershell -ExecutionPolicy Bypass -File worker\provision\provision.ps1 -Name agent-03 -RemoteHost 203.0.113.7 -IdentityFile $HOME\.ssh\cloud.key
+
+  -RemoteUser (ubuntu) and -RemotePort (22) say how. It copies the worker
+  there over SSH, runs setup.sh, hands it its token, and lets your SSH keys
+  open one thing as the machine's `agent` user: the socket the worker uses to
+  talk to the backend on this PC. It creates, resizes and deletes no machine,
+  and its /computer is that machine's own disk, not -SharedDir. Then list it
+  in ORCH_AGENTS as agent-03@203.0.113.7 and restart the backend.
+
+  What it does on this PC, and nothing else:
     1. wsl --install Ubuntu-24.04 --name <Name> --location <Location>   (first run only)
     2. creates -SharedDir if needed, gives you full control of it and makes it
        case-sensitive like a Linux folder (only while it is still empty)
@@ -31,6 +43,10 @@ param(
   [string]$Name = "agent-01",
   [string]$Location = "",
   [string]$SharedDir = "D:\coucou-vms\shared",
+  [string]$RemoteHost = "",
+  [string]$RemoteUser = "ubuntu",
+  [int]$RemotePort = 22,
+  [string]$IdentityFile = "",
   [switch]$Update
 )
 
@@ -39,12 +55,6 @@ $ErrorActionPreference = "Stop"
 if ($Name -cnotmatch '^[a-z0-9-]{1,24}$' -or $Name -eq "claude") {
   throw "-Name must be lowercase letters, digits and dashes (up to 24), e.g. agent-02."
 }
-if (-not $Location) { $Location = "D:\coucou-vms\$Name" }
-# setup.sh checks the same rule: a plain Windows path, nothing a shell could read as more.
-if ($SharedDir -notmatch '^[A-Za-z]:\\[-A-Za-z0-9 ._\\]+$') {
-  throw "-SharedDir must be a plain Windows folder path (letters, digits, space, . _ - and \), e.g. D:\coucou-vms\shared."
-}
-$SharedDir = $SharedDir.TrimEnd('\')
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 function Invoke-Checked([string]$what, [scriptblock]$block) {
@@ -52,6 +62,79 @@ function Invoke-Checked([string]$what, [scriptblock]$block) {
   & $block
   if ($LASTEXITCODE -ne 0) { throw "$what failed (exit $LASTEXITCODE)" }
 }
+
+if ($RemoteHost) {
+  # Plain values only: each one ends up on an ssh command line.
+  if ($RemoteHost -notmatch '^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$') {
+    throw "-RemoteHost must be a host name or an IPv4 address, e.g. 203.0.113.7."
+  }
+  if ($RemoteUser -cnotmatch '^[a-z_][a-z0-9_-]{0,31}$') { throw "-RemoteUser must be a Linux user name, e.g. ubuntu." }
+  if ($RemotePort -lt 1 -or $RemotePort -gt 65535) { throw "-RemotePort must be between 1 and 65535." }
+  if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
+    throw "ssh.exe was not found. Add Windows' OpenSSH Client (Settings, System, Optional features)."
+  }
+  # accept-new: the first connection remembers the machine's key (in your
+  # known_hosts); the backend then refuses any other key.
+  $ssh = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-p", "$RemotePort")
+  if ($IdentityFile) {
+    if (-not (Test-Path -LiteralPath $IdentityFile -PathType Leaf)) { throw "-IdentityFile: $IdentityFile is not a file." }
+    $IdentityFile = (Resolve-Path -LiteralPath $IdentityFile).Path
+    if ($IdentityFile -match '"') { throw "-IdentityFile must not contain a quote." }
+    $ssh += @("-i", $IdentityFile, "-o", "IdentitiesOnly=yes")
+  }
+  $target = "$RemoteUser@$RemoteHost"
+  # Remote commands hold no double quote: Windows PowerShell would mangle one.
+  function Invoke-Remote([string]$command) { & ssh.exe @ssh $target $command }
+
+  Invoke-Checked "Reaching $target (it must let $RemoteUser use sudo without a password)" { Invoke-Remote "sudo -n true" }
+  Invoke-Remote "test -d /opt/coucou-worker/worker"
+  $installed = $LASTEXITCODE -eq 0
+  if ($installed -and -not $Update) { throw "$RemoteHost already has a worker. Use -Update to refresh it." }
+  if (-not $installed -and $Update) { throw "$RemoteHost has no worker yet; run without -Update first." }
+
+  Invoke-Checked "Copying the worker to $RemoteHost" {
+    Invoke-Remote "sudo rm -rf /opt/coucou-worker.new && sudo mkdir -p /opt/coucou-worker.new /opt/coucou-worker"
+    if ($LASTEXITCODE -ne 0) { return }
+    # Through cmd.exe: Windows PowerShell would turn the tar stream into text.
+    $sshLine = ($ssh | ForEach-Object { if ($_ -match '[ ]') { "`"$_`"" } else { $_ } }) -join " "
+    cmd.exe /c "tar.exe -C `"$root`" --exclude=node_modules --exclude=.data --exclude=.env --exclude=tests -cf - . | ssh.exe $sshLine $target sudo tar -C /opt/coucou-worker.new -xf -"
+    if ($LASTEXITCODE -ne 0) { return }
+    Invoke-Remote "sudo cp -a /opt/coucou-worker.new/. /opt/coucou-worker/ && sudo rm -rf /opt/coucou-worker.new"
+  }
+
+  Invoke-Checked "Setting up $Name on $RemoteHost (this takes a few minutes the first time)" {
+    Invoke-Remote "sudo bash /opt/coucou-worker/worker/provision/setup.sh $Name remote"
+  }
+
+  Invoke-Checked "Handing the worker its token" {
+    Push-Location $root
+    try {
+      node server/src/print-token.ts $Name |
+        & ssh.exe @ssh $target "sudo sh -c 'umask 077 && mkdir -p /etc/coucou-worker && cat > /etc/coucou-worker/worker-token'"
+    } finally { Pop-Location }
+  }
+
+  Invoke-Checked "Starting the worker" {
+    Invoke-Remote "sudo systemctl restart coucou-computer.service coucou-runner.socket coucou-worker.service"
+  }
+
+  $entry = if ($RemotePort -eq 22) { "$Name@$RemoteHost" } else { "$Name@${RemoteHost}:$RemotePort" }
+  Write-Host ""
+  Write-Host "$Name is ready on $RemoteHost."
+  Write-Host "List it in ORCH_AGENTS in $root\.env as $entry (for example ORCH_AGENTS=agent-01,$entry),"
+  if ($IdentityFile) { Write-Host "add ORCH_SSH_KEY=$IdentityFile on its own line," }
+  Write-Host "then restart the backend. It opens the connection itself and keeps it open; that key must work without a passphrase prompt."
+  Write-Host "Worker log: ssh $target sudo journalctl -u coucou-worker -n 50"
+  Write-Host "Shell log:  ssh $target sudo journalctl -u coucou-runner -n 50"
+  return
+}
+
+if (-not $Location) { $Location = "D:\coucou-vms\$Name" }
+# setup.sh checks the same rule: a plain Windows path, nothing a shell could read as more.
+if ($SharedDir -notmatch '^[A-Za-z]:\\[-A-Za-z0-9 ._\\]+$') {
+  throw "-SharedDir must be a plain Windows folder path (letters, digits, space, . _ - and \), e.g. D:\coucou-vms\shared."
+}
+$SharedDir = $SharedDir.TrimEnd('\')
 
 $existing = (wsl.exe --list --quiet) -replace "`0", "" | Where-Object { $_.Trim() -eq $Name }
 if (-not $existing) {

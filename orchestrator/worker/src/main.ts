@@ -4,6 +4,7 @@
 // the token from systemd's credential store, which only this service reads:
 //   ORCH_AGENT_ID      agent-01
 //   ORCH_BACKEND_URL   optional; default http://<default gateway>:47621
+//   ORCH_BACKEND_SOCKET  a remote computer: the socket the backend's SSH connection opens
 //   ORCH_WORKSPACE     /workspace
 //   ORCH_COMPUTER      /computer, shared with coucou-runner (task folders, the agents' own folders)
 //   ORCH_RUNNER_SOCKET /run/coucou-runner.sock
@@ -38,12 +39,14 @@ async function token(): Promise<string> {
 }
 
 const workspace = process.env.ORCH_WORKSPACE ?? "/workspace";
-const base = process.env.ORCH_BACKEND_URL ?? `http://${await defaultGateway()}:47621`;
+// A remote computer has no gateway that is the PC: the backend comes to it.
+const socket = process.env.ORCH_BACKEND_SOCKET || undefined;
+const base = socket ? "http://backend" : (process.env.ORCH_BACKEND_URL ?? `http://${await defaultGateway()}:47621`);
 const agentId = process.env.ORCH_AGENT_ID ?? "agent-01";
 const browser = playwrightDriver((line) => console.log(`coucou-worker: ${line}`));
 
 const worker = new Worker({
-  client: new BackendClient(base, await token(), agentId),
+  client: new BackendClient(base, await token(), agentId, socket),
   journal: new Journal(workspace),
   browser,
   workspace,
@@ -59,5 +62,5 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
-console.log(`coucou-worker: ${agentId}, backend ${base}, workspace ${workspace}`);
+console.log(`coucou-worker: ${agentId}, backend ${socket ?? base}, workspace ${workspace}`);
 await worker.run();

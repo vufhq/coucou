@@ -1,5 +1,10 @@
-// The worker's half of the worker protocol: plain fetch, a bearer token,
-// every answer validated before it is believed.
+// The worker's half of the worker protocol: plain HTTP, a bearer token,
+// every answer validated before it is believed. On the PC's own computers the
+// backend is at an address (fetch); on a remote one it is behind a socket the
+// backend's SSH connection opens (ORCH_BACKEND_SOCKET), which fetch cannot
+// use, so those calls go through node:http.
+
+import { request } from "node:http";
 
 import {
   ClaimResponse,
@@ -24,26 +29,55 @@ export class BackendClient {
   private readonly base: string;
   private readonly token: string;
   readonly agentId: string;
+  private readonly socketPath: string | undefined;
 
-  constructor(base: string, token: string, agentId: string) {
+  /** `socketPath`: the backend is behind this socket, and `base` is not used. */
+  constructor(base: string, token: string, agentId: string, socketPath?: string) {
     this.base = base.replace(/\/$/, "");
     this.token = token;
     this.agentId = agentId;
+    this.socketPath = socketPath;
+  }
+
+  /** One call, by address or through the socket. */
+  private async send(
+    method: "GET" | "POST",
+    path: string,
+    body: { type: string; bytes: Uint8Array } | null,
+    timeoutMs: number,
+  ): Promise<{ status: number; bytes: Buffer }> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (body) headers["Content-Type"] = body.type;
+    const signal = AbortSignal.timeout(timeoutMs);
+    if (!this.socketPath) {
+      const res = await fetch(`${this.base}${path}`, { method, headers, body: body?.bytes, signal });
+      return { status: res.status, bytes: Buffer.from(await res.arrayBuffer()) };
+    }
+    if (body) headers["Content-Length"] = String(body.bytes.byteLength);
+    return new Promise((resolve, reject) => {
+      const req = request({ socketPath: this.socketPath, path, method, headers, signal }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("error", reject);
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, bytes: Buffer.concat(chunks) }));
+      });
+      req.on("error", reject);
+      req.end(body?.bytes);
+    });
   }
 
   private async post(path: string, body: unknown, timeoutMs: number): Promise<unknown> {
     const binary = body instanceof Uint8Array;
-    const res = await fetch(`${this.base}${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": binary ? "application/octet-stream" : "application/json",
-        Authorization: `Bearer ${this.token}`,
-      },
-      body: binary ? body : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new BackendError(res.status, `${path}: HTTP ${res.status} ${text.slice(0, 200)}`);
+    const res = await this.send(
+      "POST",
+      path,
+      binary
+        ? { type: "application/octet-stream", bytes: body }
+        : { type: "application/json", bytes: Buffer.from(JSON.stringify(body)) },
+      timeoutMs,
+    );
+    const text = res.bytes.toString("utf8");
+    if (res.status < 200 || res.status > 299) throw new BackendError(res.status, `${path}: HTTP ${res.status} ${text.slice(0, 200)}`);
     return text ? JSON.parse(text) : {};
   }
 
@@ -63,12 +97,11 @@ export class BackendClient {
 
   /** The bytes of a file the user attached, for an fs.receive job. */
   async download(jobId: string): Promise<Buffer> {
-    const res = await fetch(`${this.base}/worker/v1/jobs/${encodeURIComponent(jobId)}/file?agentId=${this.agentId}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-      signal: AbortSignal.timeout(120_000),
-    });
-    if (!res.ok) throw new BackendError(res.status, `file: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-    return Buffer.from(await res.arrayBuffer());
+    const res = await this.send("GET", `/worker/v1/jobs/${encodeURIComponent(jobId)}/file?agentId=${this.agentId}`, null, 120_000);
+    if (res.status < 200 || res.status > 299) {
+      throw new BackendError(res.status, `file: HTTP ${res.status} ${res.bytes.toString("utf8").slice(0, 200)}`);
+    }
+    return res.bytes;
   }
 
   async heartbeat(running: string[]): Promise<string[]> {
