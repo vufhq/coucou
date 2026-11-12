@@ -1,12 +1,11 @@
-// The drop choreography — port of UploadSequenceEngine.swift, itself a port of
-// design/prototype/upload-sequence.html.
+// The drop choreography.
 //
 // The engine is pure arithmetic: it owns no DOM and draws nothing. It takes the
 // cursor and a drop time, and hands `frame()` back everything the canvas needs
 // for one frame. All coordinates are island points (the island is 640 × 176),
 // so every constant below is the macOS constant unchanged.
 
-/** Constants — exact mirror of USC in UploadSequenceEngine.swift. */
+/** Constants. */
 export const USC = {
   W: 640,
   ISL_H: 176,
@@ -348,7 +347,7 @@ class UploadSequence {
       this.by.step(USC.REST_Y, response, damping, dt);
     }
 
-    // Tilt follows how fast Mochi is sliding.
+    // Tilt follows how fast Tofu is sliding.
     const tiltTarget = isDragging ? Math.max(-0.18, Math.min(0.18, this.bx.vel * 0.0015)) : 0;
     this.tilt = lerp(this.tilt, tiltTarget, 1 - Math.pow(0.0005, dt));
 

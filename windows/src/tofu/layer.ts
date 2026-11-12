@@ -1,5 +1,5 @@
-// Drawing a group of parts as one layer — shared by Mochi's outfits (./outfits.ts)
-// and Tofu's (./tofu.ts).
+// Drawing a group of parts as one layer — for Tofu's outfits
+// (./tofu.ts).
 
 type Ctx = CanvasRenderingContext2D;
 

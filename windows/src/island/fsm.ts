@@ -1,4 +1,4 @@
-// Island open/close FSM — port of IslandStateMachine.swift.
+// Island open/close FSM.
 // No DOM, no Tauri: it only reports transitions.
 
 export type FsmState = "hidden" | "petit" | "home" | "greeting";

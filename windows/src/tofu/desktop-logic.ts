@@ -1,6 +1,4 @@
-// Mochi on the desktop — the pure logic, port of
-// NotchBuddy/Sources/App/DesktopMochiLogic.swift and of the life cycle in
-// DesktopMochiController (DesktopMochi.swift). No DOM, no Tauri: the island
+// Tofu on the desktop — the pure logic and the life cycle. No DOM, no Tauri: the island
 // wires it up in src/island/desktop.ts, the desktop window draws him in
 // src/desktop/main.ts, and Rust owns the window (src-tauri/src/desktop.rs).
 //
@@ -13,7 +11,7 @@ import type { Outfit } from "./wardrobe";
 /** What the island tells the desktop window, whenever it changes. */
 export interface DesktopSnapshot {
   state: BotStateName;
-  /** He is always the main Mochi, so always dressed (try-ons included). */
+  /** He is always the main Tofu, so always dressed (try-ons included). */
   outfit: Outfit;
   soundEnabled: boolean;
   soundVolume: number;
@@ -21,30 +19,30 @@ export interface DesktopSnapshot {
   paused: boolean;
   /** Music plays: he dances (the compact island's rules, core/spotify.ts). */
   dancing: boolean;
-  /** The character and Tofu's colour, as in the preferences (mochi/character.ts). */
+  /** The character and Tofu's colour, as in the preferences (tofu/character.ts). */
   character: string;
   tofuColor: string;
 }
 
-/** Events between the two windows. Rust adds `desktop-mochi-dropped`. */
+/** Events between the two windows. Rust adds `desktop-tofu-dropped`. */
 export const DESKTOP_EVENTS = {
   /** island → desktop window */
-  state: "desktop-mochi-state",
-  emote: "desktop-mochi-emote",
+  state: "desktop-tofu-state",
+  emote: "desktop-tofu-emote",
   /** desktop window → island */
-  ready: "desktop-mochi-ready",
-  home: "desktop-mochi-home",
-  wardrobe: "desktop-mochi-wardrobe",
-  dizzy: "desktop-mochi-dizzy",
+  ready: "desktop-tofu-ready",
+  home: "desktop-tofu-home",
+  wardrobe: "desktop-tofu-wardrobe",
+  dizzy: "desktop-tofu-dizzy",
   /** Rust → island: a drag ended, `{ from: "island" | "desktop", home }`. */
-  dropped: "desktop-mochi-dropped",
+  dropped: "desktop-tofu-dropped",
   /** Rust → desktop window */
   cursor: "desktop-cursor",
   visible: "desktop-visible",
   flight: "desktop-flight",
 } as const;
 
-// ── Constants (DesktopMochiLogic) ────────────────────────────────────────────
+// ── Constants (DesktopTofuLogic) ────────────────────────────────────────────
 
 /** Side of the desktop window, logical pixels. */
 export const PANEL_SIZE = 120;
@@ -55,7 +53,7 @@ export const SLEEP_MOUSE_DISTANCE = 150;
 /** Clickable body radius, as a fraction of the window side. */
 export const BODY_RADIUS_FRACTION = 0.24;
 
-/** Surprised, then off to the island (DesktopMochi.swift: 0.45 s). */
+/** Surprised, then off to the island (DesktopTofu.swift: 0.45 s). */
 export const RETRACT_DELAY_MS = 450;
 /** Pause in the island after the alert is answered, before flying back (0.6 s). */
 export const RETURN_DELAY_MS = 600;
@@ -72,7 +70,7 @@ export interface Point {
 }
 
 /**
- * Whether Mochi should be asleep: no agent activity for longer than
+ * Whether Tofu should be asleep: no agent activity for longer than
  * SLEEP_TIMEOUT (strictly), and the pointer not close to him.
  */
 export function shouldSleep(sinceAgentActive: number, mouseDistanceToCenter: number): boolean {
@@ -164,7 +162,7 @@ export function windowDragTopLeft(origin: Point, screen: Point, screenAtPress: P
   };
 }
 
-// ── Life cycle (DesktopMochiController) ──────────────────────────────────────
+// ── Life cycle (DesktopTofuController) ──────────────────────────────────────
 
 export type DesktopPhase =
   /** No window on screen. */
@@ -190,9 +188,9 @@ export interface DesktopPorts {
   flyOut(anywhere: boolean): Promise<boolean>;
   /** Flies the window to the island and hides it. `forget`: he lives there again. */
   flyHome(forget: boolean): Promise<boolean>;
-  /** The island's own Mochi hides while he is out. */
+  /** The island's own Tofu hides while he is out. */
   setAway(away: boolean): void;
-  /** An emote on the desktop Mochi. */
+  /** An emote on the desktop Tofu. */
   emote(emote: BotEmoteName, duration?: number): void;
   play(sound: string): void;
   alertActive(): boolean;
@@ -201,7 +199,7 @@ export interface DesktopPorts {
   later(fn: () => void, ms: number): void;
 }
 
-export class DesktopMochiController {
+export class DesktopTofuController {
   phase: DesktopPhase = "home";
   /** He lives on the desktop (the `onDesktop` preference). */
   enabled = false;
@@ -259,7 +257,7 @@ export class DesktopMochiController {
   }
 
   /**
-   * The desktop shortcut (DesktopMochiController.flyOutOrHome, ⌃⌥D on the
+   * The desktop shortcut (DesktopTofuController.flyOutOrHome, ⌃⌥D on the
    * Mac): out to his spot from the island, home from the desktop. In flight,
    * or away for an alert, nothing.
    */

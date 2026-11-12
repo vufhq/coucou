@@ -516,10 +516,12 @@ export class Store {
         .prepare(
           `INSERT INTO agents (
              id, name, vm_id, model_profile_id, kind, computer_id, color, created_by
-           ) VALUES (?, 'Mochi', ?, ?, 'chief', ?, ?, 'system')`,
+           ) VALUES (?, 'Tofu', ?, ?, 'chief', ?, ?, 'system')`,
         )
         .run(input.id, input.vmId, input.modelProfileId, input.id, this.nextColor());
     }
+    // The chief's default name from before the rename.
+    this.db.prepare("UPDATE agents SET name = 'Tofu' WHERE id = ? AND name = 'Mochi'").run(input.id);
     this.db.prepare("UPDATE agents SET kind = 'coworker' WHERE kind = 'chief' AND id != ?").run(input.id);
     this.db
       .prepare(

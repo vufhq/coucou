@@ -9,8 +9,8 @@ import "./pill.css";
 import { Bridge, onEvent } from "../core/bridge";
 import { FlowBridge, clock, type PillState } from "../core/flow";
 import type { Settings } from "../core/state";
-import { BotEngine, hexToRGB } from "../mochi/engine";
-import { applyCharacter } from "../mochi/character";
+import { BotEngine, hexToRGB } from "../tofu/engine";
+import { applyCharacter } from "../tofu/character";
 import { resolveLanguage, setLanguage, systemLanguages, t } from "../i18n/i18n";
 import { HUB_ICONS, keyLabel } from "../hub/ui";
 
@@ -46,17 +46,17 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""):
   return e;
 }
 
-// ── Mochi ─────────────────────────────────────────────────────────────────────
+// ── Tofu ─────────────────────────────────────────────────────────────────────
 
-const mochi = new BotEngine();
-mochi.isMini = true;
-mochi.bodyColor = hexToRGB("#F5F6F8");
-mochi.setState("idle", true);
-const mochiCanvas = el("canvas");
+const tofu = new BotEngine();
+tofu.isMini = true;
+tofu.bodyColor = hexToRGB("#F5F6F8");
+tofu.setState("idle", true);
+const tofuCanvas = el("canvas");
 
-function mochiSlot(): HTMLElement {
-  const slot = el("span", "mochi");
-  slot.append(mochiCanvas);
+function tofuSlot(): HTMLElement {
+  const slot = el("span", "tofu");
+  slot.append(tofuCanvas);
   return slot;
 }
 
@@ -157,7 +157,7 @@ function content(l: Look): HTMLElement {
   switch (l) {
     case "toolbar": {
       c.style.gap = "4px";
-      const m = mochiSlot();
+      const m = tofuSlot();
       m.style.margin = vertical() ? "0 0 5px" : "0 5px 0 0";
       c.append(
         m,
@@ -179,9 +179,9 @@ function content(l: Look): HTMLElement {
         const icon = el("span");
         icon.append(svgIcon(state.phase === "failed" ? "mic" : "copy"));
         icon.querySelector("svg")!.setAttribute("style", "width:13px;height:13px;fill:none;stroke:#e8e9ec;stroke-width:2");
-        c.append(mochiSlot(), icon);
+        c.append(tofuSlot(), icon);
       } else {
-        c.append(mochiSlot(), el("span", "message", messageText() ?? ""));
+        c.append(tofuSlot(), el("span", "message", messageText() ?? ""));
       }
       break;
     case "note": {
@@ -193,11 +193,11 @@ function content(l: Look): HTMLElement {
         e.stopPropagation();
         void FlowBridge.pillAction("stopNote");
       });
-      c.append(mochiSlot(), el("span", "rec"), noteClock(), stop);
+      c.append(tofuSlot(), el("span", "rec"), noteClock(), stop);
       break;
     }
     default:
-      c.append(mochiSlot(), barsEl);
+      c.append(tofuSlot(), barsEl);
   }
   return c;
 }
@@ -270,7 +270,7 @@ function render() {
   for (const old of root.querySelectorAll(".bubble")) old.remove();
   const b = bubble();
   root.replaceChildren(...(b ? [b] : []), capsule);
-  mochi.setState(state.phase === "thinking" || state.voice?.phase === "thinking" ? "thinking" : "idle");
+  tofu.setState(state.phase === "thinking" || state.voice?.phase === "thinking" ? "thinking" : "idle");
   wake();
   // Where the mouse is taken, once the sizes have settled.
   setTimeout(reportHot, 60);
@@ -378,22 +378,22 @@ function tick(now: number) {
     if (vertical()) bar.style.width = `${size}px`;
     else bar.style.height = `${size}px`;
   }
-  // Mochi: his eyes wander while you speak; still while only a call shows.
+  // Tofu: his eyes wander while you speak; still while only a call shows.
   if (l !== "note" || hovered) {
-    mochi.lookX = Math.sin(now / 900) * 0.6;
-    mochi.lookY = Math.cos(now / 1300) * 0.3;
-    mochi.update(dt);
+    tofu.lookX = Math.sin(now / 900) * 0.6;
+    tofu.lookY = Math.cos(now / 1300) * 0.3;
+    tofu.update(dt);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const size = 22 / 0.6;
-    if (mochiCanvas.width !== Math.round(size * dpr)) {
-      mochiCanvas.width = Math.round(size * dpr);
-      mochiCanvas.height = Math.round(size * dpr);
+    if (tofuCanvas.width !== Math.round(size * dpr)) {
+      tofuCanvas.width = Math.round(size * dpr);
+      tofuCanvas.height = Math.round(size * dpr);
     }
-    const ctx = mochiCanvas.getContext("2d");
+    const ctx = tofuCanvas.getContext("2d");
     if (ctx) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
-      mochi.draw(ctx, size, size);
+      tofu.draw(ctx, size, size);
     }
   }
   const c = root.querySelector<HTMLElement>("[data-clock]");

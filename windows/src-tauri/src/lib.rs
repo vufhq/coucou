@@ -77,9 +77,9 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         let screen_changed = current.screen != settings.screen;
         let autostart_changed = current.autostart != settings.autostart;
         let shortcuts_changed = current.shortcuts != settings.shortcuts;
-        // Where Mochi sits on the desktop is desktop.rs's to say, not a webview's.
+        // Where Tofu sits on the desktop is desktop.rs's to say, not a webview's.
         let mut settings = settings.clone();
-        settings.desktop_mochi = current.desktop_mochi.clone();
+        settings.desktop_tofu = current.desktop_tofu.clone();
         *current = settings;
         (screen_changed, autostart_changed, shortcuts_changed)
     };
@@ -670,16 +670,16 @@ pub fn run() {
             orchestrator::orchestrator_memory,
             orchestrator::orchestrator_add_memory,
             orchestrator::orchestrator_delete_memory,
-            desktop::desktop_mochi_info,
-            desktop::desktop_mochi_pick_up,
-            desktop::desktop_mochi_carry,
-            desktop::desktop_mochi_carry_end,
-            desktop::desktop_mochi_drag_begin,
-            desktop::desktop_mochi_drag_move,
-            desktop::desktop_mochi_drag_end,
-            desktop::desktop_mochi_fly_out,
-            desktop::desktop_mochi_fly_home,
-            desktop::desktop_mochi_set_asleep,
+            desktop::desktop_tofu_info,
+            desktop::desktop_tofu_pick_up,
+            desktop::desktop_tofu_carry,
+            desktop::desktop_tofu_carry_end,
+            desktop::desktop_tofu_drag_begin,
+            desktop::desktop_tofu_drag_move,
+            desktop::desktop_tofu_drag_end,
+            desktop::desktop_tofu_fly_out,
+            desktop::desktop_tofu_fly_home,
+            desktop::desktop_tofu_set_asleep,
             sounds::custom_sounds,
             sounds::custom_sound,
             sounds::reveal_sounds_folder,
@@ -732,7 +732,7 @@ pub fn run() {
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
             create_hq_window(&handle);
-            // Same rule for Mochi's desktop window and the dictation pill.
+            // Same rule for Tofu's desktop window and the dictation pill.
             desktop::setup(&handle);
             flow::setup(&handle);
             notes::setup(&handle);

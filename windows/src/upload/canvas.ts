@@ -1,8 +1,8 @@
-// The upload canvas — port of UploadCanvasView.swift.
+// The upload canvas.
 //
 // While the sequence engine is active this canvas draws the whole island body:
-// card, dashed drop frame, drop text, progress bar, the choose card, Mochi and
-// the file being sucked in. The island's own Mochi is hidden for the duration,
+// card, dashed drop frame, drop text, progress bar, the choose card, Tofu and
+// the file being sucked in. The island's own Tofu is hidden for the duration,
 // exactly as on macOS, because this canvas draws its own.
 
 import { State } from "../core/state";
@@ -12,6 +12,7 @@ import {
   USC, eIn, eInOut, eOut, lerp, progressAt,
   type UploadEyeShape, type UploadFrame,
 } from "./sequence";
+import { fillFinish } from "../tofu/tofu";
 
 const FONT = `system-ui, "Segoe UI Variable Text", "Segoe UI", ${SCRIPT_FONTS}, sans-serif`;
 
@@ -31,23 +32,23 @@ function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 }
 
 /** Superellipse body — port of usBodyPath(m, R). */
-function bodyPath(ctx: CanvasRenderingContext2D, m: number, R: number): { rx: number; ry: number } {
+function bodyPath(m: number, R: number): { path: Path2D; rx: number; ry: number } {
   const mc = Math.max(0, Math.min(m, 1));
   const n = 2.15 + (5.5 - 2.15) * mc;
   const rx = R * (1.04 - 0.04 * mc);
   const ry = R * (0.97 - 0.03 * mc);
-  ctx.beginPath();
+  const path = new Path2D();
   for (let i = 0; i <= 96; i++) {
     const a = (i / 96) * Math.PI * 2;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
     const px = rx * Math.sign(ca) * Math.pow(Math.abs(ca), 2 / n);
     const py = ry * Math.sign(sa) * Math.pow(Math.abs(sa), 2 / n);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+    if (i === 0) path.moveTo(px, py);
+    else path.lineTo(px, py);
   }
-  ctx.closePath();
-  return { rx, ry };
+  path.closePath();
+  return { path, rx, ry };
 }
 
 function text(
@@ -214,7 +215,7 @@ export class UploadCanvas {
     if (f.barAlpha > 0 || f.barReveal > 0) this.drawProgressBar(ctx, f);
     if (f.chooseAlpha > 0) this.drawChoose(ctx, f);
 
-    this.drawMochi(ctx, f);
+    this.drawTofu(ctx, f);
     if (f.fileVisible) this.drawFile(ctx, f);
   }
 
@@ -357,9 +358,9 @@ export class UploadCanvas {
     ctx.restore();
   }
 
-  // ── Mochi ─────────────────────────────────────────────────────────────────
+  // ── Tofu ─────────────────────────────────────────────────────────────────
 
-  private drawMochi(ctx: CanvasRenderingContext2D, f: UploadFrame) {
+  private drawTofu(ctx: CanvasRenderingContext2D, f: UploadFrame) {
     const R = f.d / 2 / 1.04;
     const mc = Math.max(0, Math.min(f.morph, 1));
 
@@ -368,14 +369,10 @@ export class UploadCanvas {
     ctx.rotate(f.tilt);
     ctx.scale(f.sx, f.sy);
 
-    const { rx, ry } = bodyPath(ctx, f.morph, R);
+    const { path, rx, ry } = bodyPath(f.morph, R);
 
-    // Body.
-    const bg = ctx.createLinearGradient(rx * 0.7, -ry * 0.9, -rx * 0.8, ry * 0.9);
-    bg.addColorStop(0, "#EDEDEF");
-    bg.addColorStop(1, "#C4C5CA");
-    ctx.fillStyle = bg;
-    ctx.fill();
+    // Body, in Tofu's finish.
+    fillFinish(ctx, [{ path, cx: 0, cy: 0, hw: rx, hh: ry }], "upload");
 
     // Edge shadow.
     const sg = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R * 1.3);
@@ -383,14 +380,13 @@ export class UploadCanvas {
     sg.addColorStop(0.62, "rgba(0,0,0,0)");
     sg.addColorStop(1, "rgba(0,0,0,0.12)");
     ctx.fillStyle = sg;
-    ctx.fill();
+    ctx.fill(path);
 
     // The body path is reused as a clip for everything drawn inside it.
     ctx.save();
-    bodyPath(ctx, f.morph, R);
-    ctx.clip();
+    ctx.clip(path);
 
-    // Top rim, once Mochi is box-shaped enough to have one.
+    // Top rim, once Tofu is box-shaped enough to have one.
     if (mc > 0.3) {
       const a = Math.max(0, Math.min(1, (mc - 0.3) / 0.7));
       ctx.beginPath();

@@ -13,18 +13,16 @@
 
 </div>
 
-<img src="screenshots/greeting.png" width="640" alt="Mochi waving hello at launch">
-
 ---
 
 The app has three parts:
 
 - **vufh HQ**, the window where you run your agents (see the
   [top-level README](../README.md) and [orchestrator/README.md](../orchestrator/README.md)).
-  It opens after Mochi's greeting, from the tray, and when you launch vufh
+  It opens after Tofu's greeting, from the tray, and when you launch vufh
   again. **Flow → Settings → App → Open vufh HQ when you open vufh** turns
   that off; it never opens when vufh starts with the computer.
-- **The island**, at the top of the screen: Mochi, a pill per agent and the
+- **The island**, at the top of the screen: Tofu, a pill per agent and the
   chat and service pills you add.
 - **The vufh window** (tray → Settings…): Flow dictation, the Notetaker, the
   Tasks page and every setting.
@@ -39,23 +37,19 @@ PC"** the first time: click **More info**, then **Run anyway**.
 
 ## The island
 
-<img src="screenshots/compact.png" width="292" alt="The compact island, with the pills as mini Mochis">
-<img src="screenshots/overview.png" width="640" alt="The overview: the focused pill on the left, the others on the right">
-<img src="screenshots/approval.png" width="640" alt="An approval request, with Deny and Allow">
-
 | What you do | What happens |
 |---|---|
-| Move the mouse to the very top-centre of the screen | Mochi peeks out |
+| Move the mouse to the very top-centre of the screen | Tofu peeks out |
 | Click the small island | It opens. With **Settings → General → Open on hover**, resting the pointer on it is enough |
-| An agent works | Its pill's mini Mochi works too, and the overview shows its steps; its summary stays when it is done |
+| An agent works | Its pill's mini Tofu works too, and the overview shows its steps; its summary stays when it is done |
 | An agent asks for approval | The island opens on **Deny / Allow** with exactly what it wants to do. The card stays until you answer: fold it with the **⌃** in its corner (or `Esc`), and opening the island brings it back. Answered in HQ, it goes |
 | Pick an agent's pill at rest | Its card: how it is, how its last task ended, **Chat with …** |
 | ↗ on an agent, or **Open in HQ** | vufh HQ on that agent's thread |
-| Click Mochi | He gets annoyed. Three times in a row and he goes dizzy |
-| Right-click Mochi | The wardrobe: rest the pointer on an outfit to try it on, click to keep it |
-| Drag Mochi out of the island | He lives on your desktop, watching your cursor, and flies back for an approval. Drop him on the island to bring him home |
-| Drag a file onto the island | Mochi turns into a box, swallows it, then offers to answer questions about it |
-| Put a file named like one of Mochi's sounds (`finish.wav`…) in `%APPDATA%\vufh\sounds` | It replaces that sound after **Settings → General → Reload sounds** |
+| Click Tofu | He gets annoyed. Three times in a row and he goes dizzy |
+| Right-click Tofu | The wardrobe: rest the pointer on an outfit to try it on, click to keep it |
+| Drag Tofu out of the island | He lives on your desktop, watching your cursor, and flies back for an approval. Drop him on the island to bring him home |
+| Drag a file onto the island | Tofu turns into a box, swallows it, then offers to answer questions about it |
+| Put a file named like one of Tofu's sounds (`finish.wav`…) in `%APPDATA%\vufh\sounds` | It replaces that sound after **Settings → General → Reload sounds** |
 | Tray icon | vufh HQ, Wardrobe…, Settings…, Pause, Quit |
 
 More than four pills go in pages, with a dot for each page; a page whose pill
@@ -69,9 +63,9 @@ needs you lights its dot.
 | `Ctrl+Alt+A` | Jumps to the waiting approval, or to the agent asking a question |
 | `Ctrl+Alt+T` | Opens vufh HQ on the focused agent |
 | `Ctrl+Alt+→` / `Ctrl+Alt+←` | Next / previous pill |
-| `Ctrl+Alt+S` | Mutes or unmutes Mochi |
+| `Ctrl+Alt+S` | Mutes or unmutes Tofu |
 | `Ctrl+Alt+G` | Opens the wardrobe |
-| `Ctrl+Alt+D` | Sends Mochi to the desktop, or brings him home |
+| `Ctrl+Alt+D` | Sends Tofu to the desktop, or brings him home |
 | `Ctrl+Alt+N` | Opens and closes the island (off until you turn it on) |
 | In the open island: `Ctrl+→` `Ctrl+←`, `Ctrl+1`–`Ctrl+9` | Switch pills |
 | In the open island: `Ctrl+↓` `Ctrl+↑`, `Ctrl+O` | Walk the open GitHub list, open the highlighted row |
@@ -102,7 +96,7 @@ or « OK Tofu », the text — never the audio — goes to Anthropic with your k
 
 ## Your pills
 
-Your agents always have their pills, first, in the backend's order with Mochi
+Your agents always have their pills, first, in the backend's order with Tofu
 leading. **Settings → Active pills** adds up to four chat providers (Anthropic,
 Google AI, OpenAI, Ollama, LM Studio) and services (in **Integrations**:
 GitHub, Vercel, Stripe, n8n, Resend, Notion, Cal.com, Spotify).
@@ -150,7 +144,7 @@ cd windows
 npm install
 npm run tauri dev      # live-reloading development build
 npm run pack           # the installer, in windows\release\
-npm run icons          # regenerates src-tauri/icons from scripts/gen-icons.mjs
+npm run sounds         # writes sounds/ again from scripts/gen-sounds.mjs
 ```
 
 `npm run dev` alone serves the front end in an ordinary browser, enough to work
@@ -165,11 +159,11 @@ windows/
     island/            the island: state machine, agent events, integrations
     views/             every island view
     hub/, settings/    the vufh window: Flow, the Notetaker, the Tasks page, settings
-    mochi/             Mochi and the greeting, in Canvas 2D
-    desktop/           Mochi's own window, when he lives on the desktop
+    tofu/             Tofu and the greeting, in Canvas 2D
+    desktop/           Tofu's own window, when he lives on the desktop
     i18n/              the translation tables
   src-tauri/           Rust: windows, the orchestrator client, chat, pollers, Flow
-  sounds/              Mochi's sounds
+  sounds/              Tofu's sounds
 ```
 
 ### Log

@@ -1,5 +1,5 @@
 // Flow dictation: hold a key anywhere, speak, let go, and the words are pasted
-// where you type. Port of FlowDictation.swift for Windows and Linux.
+// where you type.
 //
 // One thread owns the dictation: the key's events come in from the OS listener
 // (os_windows.rs / os_linux.rs) and the pill's buttons, KeyLogic turns them
@@ -451,7 +451,7 @@ pub struct FlowStatus {
     platform: &'static str,
     /// vufh started with the computer.
     autostarted: bool,
-    /// The user's first name, for "Hello Louis".
+    /// The user's first name, for "Hello Alex".
     user_name: Option<String>,
 }
 

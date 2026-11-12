@@ -1,7 +1,7 @@
-// Mochi's wardrobe — the pure logic, port of NotchBuddy/Sources/CoucouKit/MochiWardrobe.swift.
-// What Mochi wears is picked in the wardrobe view (right-click on Mochi, or the
-// tray menu) and stored in the preferences as `mochiOutfit`. The drawing lives
-// in ./outfits.ts.
+// Tofu's wardrobe — the pure logic.
+// What Tofu wears is picked in the wardrobe view (right-click on Tofu, or the
+// tray menu) and stored in the preferences as `tofuOutfit`. The drawing lives
+// in ./tofu.ts.
 
 import { N_, labels, t } from "../i18n/i18n";
 
@@ -14,7 +14,7 @@ export const OUTFIT_SELECTIONS = [
 /** What can be stored in the preferences. The raw values are the Mac's, keep them stable. */
 export type OutfitSelection = (typeof OUTFIT_SELECTIONS)[number];
 
-/** What Mochi actually wears: a selection with "auto" resolved. */
+/** What Tofu actually wears: a selection with "auto" resolved. */
 export type Outfit = Exclude<OutfitSelection, "auto">;
 
 export const DEFAULT_OUTFIT: OutfitSelection = "auto";

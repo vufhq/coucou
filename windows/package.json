@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "node --import ./tests/setup.mjs --test \"tests/**/*.test.mjs\"",
-    "icons": "node scripts/gen-icons.mjs",
+    "sounds": "node scripts/gen-sounds.mjs",
     "tauri": "tauri",
     "pack": "tauri build && node scripts/pack.mjs"
   },

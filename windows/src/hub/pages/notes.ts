@@ -1,5 +1,5 @@
 // The Notetaker: your calls, transcribed person by person, with a summary,
-// the key points and the to-dos. Port of FlowHubNotes.swift.
+// the key points and the to-dos.
 
 import { h, clear } from "../../views/dom";
 import { t } from "../../i18n/i18n";

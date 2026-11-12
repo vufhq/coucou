@@ -23,7 +23,7 @@ import {
 } from "../core/orchestrator";
 import { PILL_PALETTE } from "../core/pill-colors";
 import { t, tl } from "../i18n/i18n";
-import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../mochi/wardrobe";
+import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../tofu/wardrobe";
 import { HUB_ICONS } from "../hub/ui";
 import { ICONS } from "../views/icons";
 import { clear, h, svg } from "../views/dom";

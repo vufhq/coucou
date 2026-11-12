@@ -1,4 +1,4 @@
-// vufh HQ (hq.html): the window where the user is the boss of Mochi and his
+// vufh HQ (hq.html): the window where the user is the boss of Tofu and his
 // team. Three panes: the sidebar lists the agents by team; the middle shows
 // the conversation with the one selected (or Activity, every task); the side
 // panel on the right shows its computer, goals, memory and files, or its
@@ -15,8 +15,8 @@ import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages, tl } f
 import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { mountTitleBar } from "../views/titlebar";
-import { miniBotCount, pruneMiniBots, tickMiniBots } from "../mochi/minibots";
-import { applyCharacter } from "../mochi/character";
+import { miniBotCount, pruneMiniBots, tickMiniBots } from "../tofu/minibots";
+import { applyCharacter } from "../tofu/character";
 import { createHqStore } from "./store";
 import { mountSidebar } from "./sidebar";
 import { mountConversation } from "./conversation";

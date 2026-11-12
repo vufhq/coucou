@@ -1,4 +1,4 @@
-// vufh HQ: the window where the user runs Mochi and his team.
+// vufh HQ: the window where the user runs Tofu and his team.
 // The shared shapes between the store (store.ts, model.ts), the sidebar
 // (sidebar.ts, avatar.ts, activity.ts), the conversation (conversation.ts,
 // thread.ts, composer.ts, palette.ts) and the side panel (panel.ts). Each part
@@ -32,8 +32,8 @@ export type ThreadItem =
   | { kind: "agent"; key: string; taskId: string; agentId: string; markdown: string; at: string; artifacts: string[]; failed: boolean }
   /**
    * Agents talking among themselves, folded into one line:
-   * - in Mochi's conversation: the work he handed out and the reports;
-   * - in a coworker's: Mochi's message and the coworker's reply.
+   * - in Tofu's conversation: the work he handed out and the reports;
+   * - in a coworker's: Tofu's message and the coworker's reply.
    */
   | { kind: "exchange"; key: string; taskId: string; withAgentIds: string[]; messages: ExchangeMessage[] }
   /** The agent is working on this task right now: a one-line status. */
@@ -76,7 +76,7 @@ export interface HqStore {
   setView(view: HqView): void;
   setPanel(panel: HqPanel | null): void;
   agent(agentId: string): OrchAgent | undefined;
-  /** The chief (Mochi). */
+  /** The chief (Tofu). */
   chief(): OrchAgent | undefined;
   /** The agent's conversation. Empty until loaded; loading starts on first ask. */
   thread(agentId: string): ThreadItem[];

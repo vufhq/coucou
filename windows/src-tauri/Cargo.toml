@@ -1,7 +1,7 @@
 [package]
 name = "vufh"
 description = "vufh HQ — a team of AI agents, run from your desktop"
-authors = ["vufh", "Louis Raille"]
+authors = ["vufh"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

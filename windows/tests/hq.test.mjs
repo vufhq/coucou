@@ -19,7 +19,7 @@ import {
 } from "../src/hq/model.ts";
 import { createHqStore } from "../src/hq/store.ts";
 
-const CHIEF = "mochi";
+const CHIEF = "tofu";
 const ADA = "ada";
 const LINUS = "linus";
 
@@ -79,7 +79,7 @@ test("the conversation reads oldest first, whatever order the backend lists it i
   assert.deepEqual(items.filter((i) => i.kind === "user").map((i) => i.text), ["one", "two"]);
 });
 
-test("Mochi's task that handed work out gets one exchange, before his reply", () => {
+test("Tofu's task that handed work out gets one exchange, before his reply", () => {
   const parent = task({ prompt: "Build me a site", result: { summary: "The site is up.", artifacts: [] },
     createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:30:00Z" });
   const toAda = task({ agentId: ADA, source: "delegated", parentTaskId: parent.id, prompt: "Design the page",
@@ -103,7 +103,7 @@ test("Mochi's task that handed work out gets one exchange, before his reply", ()
   assert.equal(items[3].markdown, "The site is up.");
 });
 
-test("a coworker's delegated task is one exchange with Mochi: his message and the reply", () => {
+test("a coworker's delegated task is one exchange with Tofu: his message and the reply", () => {
   const job = task({ agentId: ADA, source: "delegated", parentTaskId: "t-parent", prompt: "Design the page",
     result: { summary: "Here is the design.", artifacts: [] } });
   const items = buildThread({ agentId: ADA, chiefId: CHIEF, tasks: [job] });
@@ -115,7 +115,7 @@ test("a coworker's delegated task is one exchange with Mochi: his message and th
   ]);
 });
 
-test("teammates asking teammates: Mochi sees the whole chain, each coworker its own part", () => {
+test("teammates asking teammates: Tofu sees the whole chain, each coworker its own part", () => {
   const GRACE = "grace";
   const parent = task({ prompt: "Review PR #4", result: { summary: "Reviewed.", artifacts: [] },
     createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:30:00Z" });
@@ -131,9 +131,9 @@ test("teammates asking teammates: Mochi sees the whole chain, each coworker its 
   const children = groupChildren([toAda, toLinus, toGrace]);
   const said = (item) => item.messages.map((m) => [m.fromAgentId, m.toAgentId, m.text]);
 
-  const mochi = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [parent], children }).find((i) => i.kind === "exchange");
-  assert.deepEqual(mochi.withAgentIds, [ADA, LINUS, GRACE]);
-  assert.deepEqual(said(mochi), [
+  const tofu = buildThread({ agentId: CHIEF, chiefId: CHIEF, tasks: [parent], children }).find((i) => i.kind === "exchange");
+  assert.deepEqual(tofu.withAgentIds, [ADA, LINUS, GRACE]);
+  assert.deepEqual(said(tofu), [
     [CHIEF, ADA, "Review it"],
     [ADA, LINUS, "Is the host safe?"],
     [LINUS, GRACE, "Confirm the host"],
@@ -142,7 +142,7 @@ test("teammates asking teammates: Mochi sees the whole chain, each coworker its 
     [ADA, CHIEF, "Fine, Linus checked the host."],
   ]);
 
-  // Linus was asked by Ada, not Mochi, and asked Grace himself.
+  // Linus was asked by Ada, not Tofu, and asked Grace himself.
   const linus = buildThread({ agentId: LINUS, chiefId: CHIEF, tasks: [toLinus], children }).find((i) => i.kind === "exchange");
   assert.deepEqual(linus.withAgentIds, [ADA, GRACE]);
   assert.deepEqual(said(linus), [
@@ -250,7 +250,7 @@ test("a running task shows its latest step, else Working…", () => {
   assert.equal(paused.at(-1).line, "Paused");
 });
 
-test("Mochi waiting for his team names who he waits for", () => {
+test("Tofu waiting for his team names who he waits for", () => {
   const parent = task({ status: "waiting_for_agents", result: null });
   const kid = task({ agentId: ADA, source: "delegated", parentTaskId: parent.id, status: "running", result: null });
   const names = { [ADA]: "Ada" };
@@ -339,7 +339,7 @@ test("sizeLabel speaks the user's units", () => {
 
 const AGENTS = [
   { id: ADA, name: "Ada", kind: "coworker", status: "ready" },
-  { id: CHIEF, name: "Mochi", kind: "chief", status: "ready" },
+  { id: CHIEF, name: "Tofu", kind: "chief", status: "ready" },
 ];
 let backend;
 const realInvoke = internals.invoke;
@@ -370,7 +370,7 @@ afterEach(() => {
   mock.timers.reset();
 });
 
-test("the store loads the agents, selects Mochi and loads every conversation", async () => {
+test("the store loads the agents, selects Tofu and loads every conversation", async () => {
   const store = createHqStore();
   await store.start();
   const snap = store.snapshot();
@@ -494,7 +494,7 @@ test("events are gathered, then only the agents they touch are fetched again", a
   assert.ok(changes > 0);
 });
 
-test("a delegation refetches Mochi, the coworker, the roster and the exchanges", async () => {
+test("a delegation refetches Tofu, the coworker, the roster and the exchanges", async () => {
   mock.timers.enable({ apis: ["setTimeout"] });
   const store = createHqStore();
   await store.start();
@@ -565,7 +565,7 @@ test("Activity's filters sort the statuses as the spec says", () => {
   for (const s of ["queued", "paused", "waiting_for_agents"]) assert.ok(inFilter(is(s), "waiting"), s);
   assert.ok(inFilter(is("waiting_for_approval", "delegated"), "needs"));
   assert.ok(inFilter(is("waiting_for_answer"), "needs"));
-  // A question in a task Mochi handed out is his to answer, not the user's.
+  // A question in a task Tofu handed out is his to answer, not the user's.
   assert.ok(!taskNeedsYou(is("waiting_for_answer", "delegated")));
   assert.ok(inFilter(is("succeeded"), "done") && inFilter(is("cancelled"), "done"));
   assert.ok(!inFilter(is("failed"), "done") && inFilter(is("failed"), "failed"));

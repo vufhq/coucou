@@ -1,4 +1,4 @@
-// Global keyboard shortcuts — port of HotKeyCenter.swift + ShortcutLogic.swift.
+// Global keyboard shortcuts.
 //
 // The shortcuts are registered from Rust through tauri-plugin-global-shortcut
 // (RegisterHotKey on Windows, XGrabKey on X11). Wayland has no key grabs: there
@@ -17,9 +17,9 @@
 // on E, Q, M, W, C and on every digit and most punctuation keys:
 //
 //   Ctrl+Alt+Space   open the chat           Ctrl+Alt+→ / ←  next / previous pill
-//   Ctrl+Alt+A       waiting permission      Ctrl+Alt+S      mute Mochi
+//   Ctrl+Alt+A       waiting permission      Ctrl+Alt+S      mute Tofu
 //   Ctrl+Alt+T       open the terminal       Ctrl+Alt+G      wardrobe
-//   Ctrl+Alt+D       Mochi to the desktop, or home again (the Mac's ⌃⌥D)
+//   Ctrl+Alt+D       Tofu to the desktop, or home again (the Mac's ⌃⌥D)
 //   Ctrl+Alt+N       open / close the island (off by default, as on the Mac)
 //
 // ⌃⌥[ and ⌃⌥] became the arrows (brackets are AltGr characters almost
@@ -62,7 +62,7 @@ pub const ACTIONS: &[ActionDef] = &[
     action("openChat", "Ctrl+Alt+Space", true, true),
     action("goToAlert", "Ctrl+Alt+A", true, true),
     action("jumpToTerminal", "Ctrl+Alt+T", true, true),
-    // Dragging Mochi onto a window is not in this version.
+    // Dragging Tofu onto a window is not in this version.
     action("attachFrontWindow", "Ctrl+Alt+F", true, false),
     action("nextPill", "Ctrl+Alt+Right", true, true),
     action("prevPill", "Ctrl+Alt+Left", true, true),
@@ -89,8 +89,8 @@ pub fn description(id: &str) -> &'static str {
         "attachFrontWindow" => n_("Attach the front window to the chat"),
         "nextPill" => n_("Next pill"),
         "prevPill" => n_("Previous pill"),
-        "muteToggle" => n_("Mute or unmute Mochi"),
-        "desktopToggle" => n_("Send Mochi to the desktop"),
+        "muteToggle" => n_("Mute or unmute Tofu"),
+        "desktopToggle" => n_("Send Tofu to the desktop"),
         "wardrobeToggle" => n_("Open the wardrobe"),
         _ => "vufh",
     }

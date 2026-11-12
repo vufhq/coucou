@@ -1,5 +1,5 @@
 // Dictionary (names vufh always spells right, and replacements) and
-// Snippets (say a short phrase, paste a whole text). Port of FlowHubWords.swift.
+// Snippets (say a short phrase, paste a whole text).
 
 import { h, clear } from "../../views/dom";
 import { t } from "../../i18n/i18n";

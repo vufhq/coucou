@@ -143,7 +143,7 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
 
 // ── Who we are ────────────────────────────────────────────────────────────────
 //
-// The display name only feeds Mochi's greeting (identity.rs). The calls are
+// The display name only feeds Tofu's greeting (identity.rs). The calls are
 // declared here by hand, with their documented C signatures, so they need no
 // extra `windows` crate features.
 #[link(name = "secur32")]
@@ -160,7 +160,7 @@ extern "system" {
 /// EXTENDED_NAME_FORMAT::NameDisplay.
 const NAME_DISPLAY: i32 = 3;
 
-/// The account's display name ("Louis Raille"): the directory's for a domain
+/// The account's display name ("Alex Martin"): the directory's for a domain
 /// or Entra account, else the local account's "Full name", else nothing.
 pub fn user_full_name() -> Option<String> {
     directory_display_name().or_else(local_full_name).filter(|n| !n.trim().is_empty())
@@ -337,7 +337,7 @@ pub fn ctrl_alt_types(vk: u16, shift: bool) -> Option<String> {
     None
 }
 
-// ── Desktop Mochi window ──────────────────────────────────────────────────────
+// ── Desktop Tofu window ──────────────────────────────────────────────────────
 
 /// Windows places a window wherever it is asked, and the cursor poll is there.
 pub fn desktop_mode() -> super::DesktopMode {
@@ -361,7 +361,7 @@ pub fn set_layer_margins(_win: &WebviewWindow, _x: f64, _y: f64) {}
 pub fn set_layer_overlay(_win: &WebviewWindow, _on: bool) {}
 
 /// Layer-shell only (Linux): the logical size of the display the island is on.
-pub fn layer_display(_island: &WebviewWindow, _mochi: &WebviewWindow) -> Option<(f64, f64)> {
+pub fn layer_display(_island: &WebviewWindow, _tofu: &WebviewWindow) -> Option<(f64, f64)> {
     None
 }
 

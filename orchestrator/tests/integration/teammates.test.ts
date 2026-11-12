@@ -1,4 +1,4 @@
-// Coworkers asking teammates: the chain of delegated tasks below Mochi's, its
+// Coworkers asking teammates: the chain of delegated tasks below Tofu's, its
 // limits (no loops, no self, three levels, a coworker's caps), questions
 // answered by whoever asked, and cancellation running down the chain.
 
@@ -52,7 +52,7 @@ async function setup(model: ModelAdapter, names: string[]) {
   return r;
 }
 
-/** The user's message to Mochi. */
+/** The user's message to Tofu. */
 async function submit(r: Running, prompt: string): Promise<Task> {
   const response = await r.api<{ task: Task }>("/api/tasks", { body: { prompt, agentId: "agent-01", idempotencyKey: key() } });
   expect(response.status).toBe(201);
@@ -66,7 +66,7 @@ const finalTask = (r: Running, id: string) =>
   }, 10_000, `task ${id} to finish`);
 
 describe("teammates asking teammates", () => {
-  it("lets a coworker ask a teammate, whose report goes to the coworker, then to Mochi", async () => {
+  it("lets a coworker ask a teammate, whose report goes to the coworker, then to Tofu", async () => {
     let qaSystem = "";
     const model = new PerAgentModel({
       "agent-01": [
@@ -91,7 +91,7 @@ describe("teammates asking teammates", () => {
       sim: [
         (input) => {
           expect(input.system).toContain("handed to you by QA (qa)");
-          // Nobody left to ask: QA and Mochi are on it, and there is no other coworker.
+          // Nobody left to ask: QA and Tofu are on it, and there is no other coworker.
           expect(input.system).not.toContain("<teammates>");
           return done("Recorder is off.");
         },
@@ -114,7 +114,7 @@ describe("teammates asking teammates", () => {
     ]);
   });
 
-  it("refuses asking yourself, Mochi or anyone already on the request, and caps a coworker's requests", async () => {
+  it("refuses asking yourself, Tofu or anyone already on the request, and caps a coworker's requests", async () => {
     const model = new PerAgentModel({
       "agent-01": [ask("qa", "Check it."), done("Checked.")],
       qa: [

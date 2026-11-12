@@ -33,7 +33,7 @@ import type { HubContext } from "../shell";
 import { button, card, divider, label, row, segmented, select, toggle } from "../ui";
 import { colorDot } from "../../settings/colors";
 import { agentColor } from "../../island/agents";
-import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../../mochi/wardrobe";
+import { OUTFIT_LABELS, OUTFIT_SELECTIONS } from "../../tofu/wardrobe";
 
 /** The agent the island's Activity link asked for, picked up by the next draw. */
 let agentFilter: string | null = null;

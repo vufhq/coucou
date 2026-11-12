@@ -5,7 +5,7 @@
 // you say into stretches; only a stretch of speech goes to Parakeet, on this
 // computer, and only a stretch that starts with « OK Tofu » goes further:
 // what you said after it goes to Claude with your own key (brain.rs), never
-// the audio. Mochi shows it all in the pill at the bottom of the screen —
+// the audio. Tofu shows it all in the pill at the bottom of the screen —
 // listening, thinking, then the answer, said out loud by the system's voice
 // (the pill's speechSynthesis) or ElevenLabs with your key.
 //

@@ -1,4 +1,4 @@
-// vufh HQ: an agent's face, a mini Mochi in its colour and outfit on a
+// vufh HQ: an agent's face, a mini Tofu in its colour and outfit on a
 // round tinted disc. The sidebar and the conversation both use it. Each one is
 // a live canvas ticked by main.ts's loop; when the element leaves the
 // document, pruneMiniBots() forgets it, so callers simply replace it.
@@ -6,12 +6,12 @@
 import type { AgentTask } from "../core/state";
 import type { OrchAgent } from "../core/orchestrator";
 import { agentColor } from "../island/agents";
-import { createMiniBot } from "../mochi/minibots";
+import { createMiniBot } from "../tofu/minibots";
 import { ICONS } from "../views/icons";
 import { h, svg } from "../views/dom";
 
 export interface AvatarOptions {
-  /** The agent is on a task: Mochi looks busy. */
+  /** The agent is on a task: Tofu looks busy. */
   working?: boolean;
   /** The chief's orange star, bottom right. */
   star?: boolean;

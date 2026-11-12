@@ -48,7 +48,7 @@ test("English is the key itself, other languages come from either table", () => 
 test("a string nobody translated falls back to its English text", () => {
   inLanguage("ru", () => {
     assert.equal(t("Some brand new sentence."), "Some brand new sentence.");
-    assert.equal(t("Hello {name}", { name: "Mochi" }), "Hello Mochi");
+    assert.equal(t("Hello {name}", { name: "Tofu" }), "Hello Tofu");
   });
 });
 
@@ -236,7 +236,7 @@ test("lookup() answers from the merged tables", () => {
 // upload canvas or the recap that is exactly a translated string, and is not
 // the argument of t() / tl() / tn() / N_(), is English that would stay English.
 
-const CHECKED = ["src/views", "src/settings", "src/island", "src/upload", "src/mochi/wardrobe.ts", "src/main.ts"];
+const CHECKED = ["src/views", "src/settings", "src/island", "src/upload", "src/tofu/wardrobe.ts", "src/main.ts"];
 /** Literals that are a translated word but are values in the code, not text on screen. */
 const NOT_TEXT = new Set([
   "file", // the kind of a chat context: { kind: "file" }

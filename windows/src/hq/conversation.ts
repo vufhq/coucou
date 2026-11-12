@@ -143,7 +143,7 @@ export function mountConversation(root: HTMLElement, store: HqStore): void {
     );
   }
 
-  /** Before the first message: Mochi introduces himself; a coworker says what a message does. */
+  /** Before the first message: Tofu introduces himself; a coworker says what a message does. */
   function drawEmpty(agent: OrchAgent | undefined, connected: boolean, error: string | null) {
     const sig = agent
       ? `${agent.id}|${agent.name}|${agent.role ?? ""}|${agent.kind}|${avatarSignature(agent, 72)}|${language()}`

@@ -143,7 +143,7 @@ describe("retention", () => {
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT
     )`);
     db.exec(`INSERT INTO agents (id, name, vm_id, model_profile_id) VALUES
-      ('agent-01', 'Old Mochi name', 'wsl:agent-01', 'scripted'),
+      ('agent-01', 'Old Tofu name', 'wsl:agent-01', 'scripted'),
       ('agent-02', 'Old coworker', 'wsl:agent-02', 'scripted')`);
     db.exec(`INSERT INTO tasks (
       id, agent_id, prompt, status, model_profile_id, workspace, budget,
@@ -178,7 +178,7 @@ describe("retention", () => {
       migrated.ensureChief({ id: "agent-01", vmId: "wsl:agent-01", modelProfileId: "scripted" });
       expect(migrated.agent("agent-01")?.health).toBeNull();
       expect(migrated.agent("agent-01")).toMatchObject({
-        name: "Old Mochi name",
+        name: "Old Tofu name",
         kind: "chief",
         computerId: "agent-01",
         paused: false,

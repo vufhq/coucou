@@ -1,15 +1,15 @@
 // App state — mirror of AppState.swift (the parts the island needs).
 
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
-import type { EyeShape } from "../mochi/engine";
+import type { EyeShape } from "../tofu/engine";
 import {
   HOST_OS, availablePills, orderPills, pillDefinition, sanitizeDeclared, toggleDeclared,
   type HostOs, type PillDefinition,
 } from "./pills";
 import type { ProviderId } from "./providers";
 import type { Bindings } from "./shortcuts";
-import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
-import { DEFAULT_CHARACTER, DEFAULT_TOFU_COLOR } from "../mochi/character";
+import { DEFAULT_OUTFIT, type Outfit } from "../tofu/wardrobe";
+import { DEFAULT_CHARACTER, DEFAULT_TOFU_COLOR } from "../tofu/character";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicPlaying } from "./spotify";
 
@@ -166,18 +166,18 @@ export interface Settings {
   /** Global shortcuts the user changed, by action id (see core/shortcuts.ts). */
   shortcuts: Bindings;
   /**
-   * Mochi's outfit: "auto" (dresses for the season), "none" or an outfit id.
-   * Same raw values as the Mac's "mochiOutfit"; read it through parseOutfit.
+   * Tofu's outfit: "auto" (dresses for the season), "none" or an outfit id.
+   * Same raw values as the Mac's "tofuOutfit"; read it through parseOutfit.
    */
-  mochiOutfit: string;
+  tofuOutfit: string;
   /**
-   * Who vufh draws: "chrome" (the default), "tofu" or "mochi", and Tofu's colour, a
-   * name from its palette. Read them through mochi/character.ts.
+   * How Tofu is drawn: "chrome" (the default) or "tofu", one flat colour, and that colour, a
+   * name from its palette. Read them through tofu/character.ts.
    */
   character: string;
   tofuColor: string;
   /**
-   * A colour of the user's own for a pill's Mochi, by pill ID ("#RRGGBB").
+   * A colour of the user's own for a pill's Tofu, by pill ID ("#RRGGBB").
    * Empty means the catalog's colours; read it through core/pill-colors.ts.
    * Same key and values as the Mac's "pillColors".
    */
@@ -187,8 +187,8 @@ export interface Settings {
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;
-  /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
-  desktopMochi?: {
+  /** Tofu on the desktop. Rust owns it: whatever the page sends back is ignored. */
+  desktopTofu?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
@@ -213,7 +213,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lmstudioUrl: "",
   customUrl: "",
   shortcuts: {},
-  mochiOutfit: DEFAULT_OUTFIT,
+  tofuOutfit: DEFAULT_OUTFIT,
   character: DEFAULT_CHARACTER,
   tofuColor: DEFAULT_TOFU_COLOR,
   pillColors: {},
@@ -267,12 +267,12 @@ class AppState {
   /** Rows in the list on screen, 0 when there is none (AppState.cardItemCount). */
   cardItemCount = 0;
   /**
-   * Mochi is out of the island — on the desktop, flying, or being dragged
-   * there — so the island's own Mochi is hidden (AppState.mochiOnDesktop).
+   * Tofu is out of the island — on the desktop, flying, or being dragged
+   * there — so the island's own Tofu is hidden (AppState.tofuOnDesktop).
    */
-  mochiOnDesktop = false;
+  tofuOnDesktop = false;
 
-  /** Outfit shown on Mochi while the pointer rests on a wardrobe button. */
+  /** Outfit shown on Tofu while the pointer rests on a wardrobe button. */
   wardrobePreview: Outfit | null = null;
 
   lastActivity = performance.now();
@@ -302,7 +302,7 @@ class AppState {
     return this.stateOverride ?? this.focusTask?.state ?? "idle";
   }
 
-  /** Spotify plays on a declared pill: Mochi dances (Linux; never on Windows yet). */
+  /** Spotify plays on a declared pill: Tofu dances (Linux; never on Windows yet). */
   get spotifyPlaying(): boolean {
     return musicPlaying(Spotify.state, this.declared);
   }

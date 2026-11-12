@@ -509,7 +509,7 @@ describe("agents", () => {
     expect(r.backend.events.after(0).filter((e) => e.type === "agent.updated")).toHaveLength(1);
 
     // Null puts the default back; a missing field is left alone.
-    expect((await patch({ name: null })).body.agent).toMatchObject({ name: "Mochi", color: "#22C55E" });
+    expect((await patch({ name: null })).body.agent).toMatchObject({ name: "Tofu", color: "#22C55E" });
     for (const bad of [{ name: "" }, { name: "x".repeat(25) }, { name: "ab" }, { color: "green" }, { color: "#22C55E", extra: 1 }]) {
       expect((await patch(bad)).status).toBe(400);
     }

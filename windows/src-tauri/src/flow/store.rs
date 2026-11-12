@@ -1,7 +1,7 @@
 // Everything the vufh window shows and edits about dictation: the history,
 // the numbers, the dictionary, the snippets, the styles and the preferences.
 // Small JSON files in the app's folder (%LOCALAPPDATA%\vufh\Flow or
-// ~/.local/share/vufh/Flow), on this computer only. Port of FlowStore.swift.
+// ~/.local/share/vufh/Flow), on this computer only.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;

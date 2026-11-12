@@ -1,7 +1,7 @@
 // The Notetaker: records a call (your microphone, and what the computer plays
 // for the other people), shows a live transcript, then writes the whole
 // transcript person by person with Parakeet and the diarizer, and a summary
-// with the to-dos. Port of NoteTaker.swift for Windows and Linux.
+// with the to-dos.
 //
 // Everything is stored in the app's folder (Notes/<id>/note.json); the audio is
 // deleted once the transcript is written. No bot joins the call: the other

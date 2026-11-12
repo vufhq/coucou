@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "What vufh's windows are allowed to do. Everything that touches the OS goes through vufh's own commands.",
-  "windows": ["island", "settings", "hq", "mochi", "pill"],
+  "windows": ["island", "settings", "hq", "tofu", "pill"],
   "permissions": ["core:default", "autostart:default"]
 }

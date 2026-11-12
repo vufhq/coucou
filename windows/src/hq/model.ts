@@ -5,7 +5,7 @@
 // - a chat task: what the user wrote, then the agent's reply (or why it failed);
 // - a goal run: the agent's message, titled with the goal;
 // - a task handed to a coworker (in its conversation): one exchange with
-//   whoever asked (Mochi or a teammate), their message, what the coworker asked
+//   whoever asked (Tofu or a teammate), their message, what the coworker asked
 //   its own teammates, and its reply;
 // - a task that handed work out: the exchange (the messages, the teammates'
 //   own exchanges below them, and the reports) goes before the reply;
@@ -24,7 +24,7 @@ export const TIME_GAP_MS = 60 * 60 * 1000;
 export interface ThreadInput {
   /** The agent whose conversation this is. */
   agentId: string;
-  /** The chief (Mochi), who hands work out; null when there is none. */
+  /** The chief (Tofu), who hands work out; null when there is none. */
   chiefId: string | null;
   /** The agent's own tasks (chat, delegated, goal), in any order. */
   tasks: readonly OrchTask[];
@@ -99,7 +99,7 @@ function exchangeOf(
   return { withAgentIds, messages };
 }
 
-/** Who handed `task` out: the owner of its parent when that is a delegated task too, else Mochi. */
+/** Who handed `task` out: the owner of its parent when that is a delegated task too, else Tofu. */
 function askerOf(task: OrchTask, input: ThreadInput): string {
   for (const kids of input.children?.values() ?? []) {
     const parent = kids.find((other) => other.id === task.parentTaskId);

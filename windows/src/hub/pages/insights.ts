@@ -1,5 +1,5 @@
 // Statistics: words, time saved, speed, dictations, the words of each day and
-// the apps you dictate in. Port of FlowHubInsights.swift.
+// the apps you dictate in.
 
 import { h, clear } from "../../views/dom";
 import { t } from "../../i18n/i18n";

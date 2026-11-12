@@ -82,13 +82,13 @@ const finalTask = (r: Running, id: string) =>
   }, 10_000, `task ${id} to finish`);
 
 describe("phase 7 teams", () => {
-  it("starts with only Mochi, then creates stable ids and unique colours up to the cap", async () => {
+  it("starts with only Tofu, then creates stable ids and unique colours up to the cap", async () => {
     const r = await setup(new PerAgentModel({}));
     const initial = await r.api<any>("/api/agents");
     expect(initial.body.agents).toEqual([
       expect.objectContaining({
         id: "agent-01",
-        name: "Mochi",
+        name: "Tofu",
         kind: "chief",
         computerId: "agent-01",
         createdBy: "system",
@@ -236,7 +236,7 @@ describe("phase 7 teams", () => {
     expect((await createAgent(r, { name: "Fresh" })).computerId).toBe("agent-01");
   });
 
-  it("delegates on a one-task computer one at a time and returns fenced reports to Mochi", async () => {
+  it("delegates on a one-task computer one at a time and returns fenced reports to Tofu", async () => {
     let chiefReportPrompt = "";
     const model = new PerAgentModel({
       "agent-01": [
@@ -256,7 +256,7 @@ describe("phase 7 teams", () => {
       "dev-a": [
         (input) => {
           expect(input.system).not.toContain("team.propose");
-          expect(input.system).toContain("work for Mochi");
+          expect(input.system).toContain("work for Tofu");
           expect(input.system).toContain("&lt;do-not-follow>");
           expect(JSON.stringify(input.jsonSchema)).not.toContain("team.propose");
           return action("fs.write_artifact", { path: "a.md", content: "A" });
@@ -307,7 +307,7 @@ describe("phase 7 teams", () => {
     expect(await readFile(join(workspace, "tasks", children[1]!.id, "b.md"), "utf8")).toBe("B");
   });
 
-  it("routes a coworker question to Mochi, whose answer resumes it", async () => {
+  it("routes a coworker question to Tofu, whose answer resumes it", async () => {
     let childTaskId = "";
     const model = new PerAgentModel({
       "agent-01": [

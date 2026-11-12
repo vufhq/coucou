@@ -55,7 +55,7 @@ const WORKING: ReadonlySet<TaskStatus> = new Set(["starting", "running"]);
 const WAITING: ReadonlySet<TaskStatus> = new Set(["queued", "paused", "waiting_for_agents"]);
 const DONE: ReadonlySet<TaskStatus> = new Set(["succeeded", "cancelled"]);
 
-/** The task waits for the user's click: an approval, or a question in a task Mochi didn't hand out. */
+/** The task waits for the user's click: an approval, or a question in a task Tofu didn't hand out. */
 export function taskNeedsYou(task: Pick<OrchTask, "status" | "source">): boolean {
   return task.status === "waiting_for_approval" || (task.status === "waiting_for_answer" && task.source !== "delegated");
 }

@@ -1,22 +1,22 @@
-// Tofu — a flat pebble that moves exactly like Mochi. BotEngine keeps every
-// tween, spring, particle and outfit transition; when the character is Tofu
-// (./character.ts) its draw() hands the body, eyes, hands and outfit to this
-// file. The badge and the particles stay the engine's own.
+// Tofu — a pebble, in liquid chrome or one flat colour. BotEngine keeps every
+// tween, spring, particle and outfit transition; its draw() hands the body,
+// eyes, hands and outfit to this file. The badge and the particles stay the
+// engine's own.
 //
 // Tofu's look: grok-bot-avatar-engine's pebble and eye seat (./tofu-shape.ts),
-// one flat colour, flat eyes with no highlight. Mochi's life on top: the eyes
-// are projected on an ellipsoid the size of the pebble (his EYE_SP and EYE_P
-// become angles derived from the seat), the state tint and the cheeks paint over
-// the body, and the hands come out only to wave.
+// chrome (./metal.ts) or one flat colour, flat eyes with no highlight. The eyes
+// are projected on an ellipsoid the size of the pebble (angles derived from
+// the seat), the state tint and the cheeks paint over the body, and the hands
+// come out only to wave.
 //
-// Tofu's outfits are Mochi's twelve, redrawn as flat parts on anchors (crown,
-// brim, side, eyes, neck, body…) projected on the head like outfits.ts does
-// (view tilted −0.3, 40 % of the pitch). They enter and leave on the engine's
-// presence tween with Mochi's four transitions: drop, slide, pop and fade.
+// The twelve outfits are flat parts on anchors (crown, brim, side, eyes, neck,
+// body…) projected on the head (view tilted −0.3, 40 % of the pitch). They
+// enter and leave on the engine's presence tween with four transitions: drop,
+// slide, pop and fade.
 //
 // Coordinates here are Tofu units: origin at the centre of the pebble, y down,
 // the pebble 1.8 wide. One unit is UNIT × the engine's R, so the pebble is
-// exactly as tall as Mochi (2 × 0.88 R) and sits where he does.
+// 2 × 0.88 R tall.
 
 import { Ease } from "../core/anim";
 import type { BotStateName } from "../core/layout";
@@ -33,13 +33,13 @@ type XY = readonly [number, number];
 /** The pebble's longest side, in Tofu units. */
 const SPAN = 1.8;
 const K = SPAN / Math.max(PEBBLE.box[2], PEBBLE.box[3]);
-/** Engine R → Tofu units: the pebble is as tall as Mochi. */
+/** Engine R → Tofu units: the pebble is 2 × 0.88 R tall. */
 export const UNIT = (2 * 0.88) / (PEBBLE.box[3] * K);
 
 const EYE_INK = "#141414";
 /** On chrome: near-black, pressed into the metal (a light lip below each eye). */
 const CHROME_EYE_INK = "#0c0c0e";
-/** Mini Tofus (pills, HQ) get bigger eyes, like mini Mochis, but the pebble's seat is already wide. */
+/** Mini Tofus (pills, HQ) get bigger eyes, but the pebble's seat is already wide. */
 const MINI_EYES = 1.35;
 const VIEW_TILT = -0.3;
 const ACC_PITCH = 0.4;
@@ -57,7 +57,7 @@ interface Geometry {
   top: number;
   eye: { w: number; h: number; gap: number; y: number };
   face: { rx: number; ry: number };
-  /** Mochi's EYE_SP and EYE_P for the pebble. */
+  /** The eyes' spread and pitch on the face, as angles. */
   eyeSp: number;
   eyeP: number;
   /** The head outfits are projected on: its crown lands on the top of the pebble. */
@@ -134,7 +134,7 @@ export interface TofuPose extends Look {
 }
 
 export interface TofuHooks {
-  /** The engine's drawEyeShape: Tofu's eyes are Mochi's thirteen shapes. */
+  /** The engine's drawEyeShape: the thirteen eye shapes. */
   eye(x: Ctx, shape: EyeShape, w: number, h: number, sd: number, ink: string): void;
   /** The mailbox slot, `body` in the engine's pixels. */
   mouth?(x: Ctx, body: Path2D): void;
@@ -142,7 +142,7 @@ export interface TofuHooks {
 
 // ── Projection and anchors ────────────────────────────────────────────────────
 
-/** A point on the face ellipsoid (Mochi's eye projection), with foreshortening. */
+/** A point on the face ellipsoid (Tofu's eye projection), with foreshortening. */
 function facePoint(g: Geometry, l: Look, yawOff: number, pitchOff: number, withRoll: boolean) {
   const yw = yawOff + l.yaw;
   let pt = pitchOff + l.pitch + (withRoll && !l.rigidRoll ? l.roll : 0);
@@ -157,7 +157,7 @@ function facePoint(g: Geometry, l: Look, yawOff: number, pitchOff: number, withR
   };
 }
 
-/** Head-local point (x right, y up, z toward the viewer), as outfits.ts projects it. */
+/** Head-local point (x right, y up, z toward the viewer), projected. */
 function headProj(g: Geometry, l: Look, x: number, y: number, z: number) {
   const cy = Math.cos(l.yaw);
   const sy = Math.sin(l.yaw);
@@ -201,7 +201,7 @@ function anchorFrame(g: Geometry, l: Look, name: Anchor): Frame {
   }
 }
 
-// ── Costumes: Mochi's twelve, as flat parts ───────────────────────────────────
+// ── Costumes: Tofu's twelve, as flat parts ───────────────────────────────────
 
 /** A colour, or a linear gradient in the part's own space. */
 type Paint = string | { from: XY; to: XY; stops: readonly (readonly [number, string])[] };
@@ -221,7 +221,7 @@ interface Part {
   fill?: Paint;
   stroke?: Paint;
   lw?: number;
-  /** Mochi's sheen across [left, right]: light, clear, then shade. */
+  /** Tofu's sheen across [left, right]: light, clear, then shade. */
   shine?: XY;
   /** halfEllipse: the arc alone, not closed. */
   open?: boolean;
@@ -235,7 +235,7 @@ interface Costume {
   enter: "drop" | "slide" | "pop" | "fade";
   /** Where a dropped hat rests on the head, for hat fitting (else 0.1 above its lowest point). */
   seat?: { anchor: "crown" | "brim"; y: number };
-  /** Recolours the body, like Mochi's pumpkin. */
+  /** Recolours the body, like Tofu's pumpkin. */
   body?: readonly [string, string];
   parts: readonly Part[];
 }
@@ -495,7 +495,7 @@ function hatFit(g: Geometry, outfit: Outfit, costume: Costume): Fit {
   return fit;
 }
 
-/** Mochi's layerAlpha: the outfit fades with its presence and away into the mailbox. */
+/** Tofu's layerAlpha: the outfit fades with its presence and away into the mailbox. */
 function layerAlpha(p: TofuPose): number {
   const morphFade = 1 - Math.min(1, Math.max(0, (p.morph - 0.3) / 0.2));
   return morphFade * Math.min(1, p.presence * 2.5);
@@ -511,7 +511,7 @@ function drawOutfit(c: Ctx, g: Geometry, p: TofuPose, layer: "behind" | "front",
   const all = () => true;
 
   if (costume.enter === "drop") {
-    // Only the hat drops (Mochi's 0.88 R), scales and fits the head.
+    // Only the hat drops (Tofu's 0.88 R), scales and fits the head.
     const fit = hatFit(g, p.outfit, costume);
     const s = (0.85 + 0.15 * posP) * fit.s;
     c.save();
@@ -529,7 +529,7 @@ function drawOutfit(c: Ctx, g: Geometry, p: TofuPose, layer: "behind" | "front",
   }
   c.save();
   if (costume.enter === "slide") {
-    // Mochi's slides: glasses come down 0.25 ry, the scarf 0.3 ry.
+    // Tofu's slides: glasses come down 0.25 ry, the scarf 0.3 ry.
     c.translate(0, ((1 - p.presence) * (p.outfit === "scarf" ? 0.3 : 0.25) * 0.88) / UNIT);
   } else if (costume.enter === "pop") {
     const a = anchorFrame(g, p, costume.parts[0].anchor ?? "crown");
@@ -544,7 +544,7 @@ function drawOutfit(c: Ctx, g: Geometry, p: TofuPose, layer: "behind" | "front",
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-/** Hands come out only to wave, in the body's colour (BotEngine.drawHandsBehind). */
+/** Hands come out only to wave, in the body's finish. */
 function drawHands(c: Ctx, g: Geometry, p: TofuPose) {
   const n = now();
   const waving = n >= p.waveStart && p.waveStart > 0 && n < p.waveUntil;
@@ -634,7 +634,7 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
     x.fillStyle = tg;
     x.fillRect(-2, -2, 4, 4);
   }
-  // Mochi's cheeks: only while blushing or tinted, and never on chrome.
+  // The cheeks: only while blushing or tinted, and never on chrome.
   const blush = p.chrome ? 0 : Math.max(p.blush, p.tint * 0.5) * (1 - p.morph);
   if (blush > 0.01) {
     x.fillStyle = `rgba(255,120,150,${0.5 * blush})`;
@@ -680,6 +680,37 @@ export function drawTofu(x: Ctx, p: TofuPose, R: number, cx: number, cy: number,
   x.restore();
 }
 
+// ── For the canvases that draw their own Tofu ────────────────────────────────
+
+/** The pebble alone, 2 `hw` wide and 2 `hh` tall, centred on the origin. */
+export function pebblePath(hw: number, hh: number): Path2D {
+  const g = geo();
+  const p = new Path2D();
+  p.addPath(g.path, new DOMMatrix([hw / g.halfW, 0, 0, hh / g.halfH, 0, 0]));
+  return p;
+}
+
+/** A part of the body, in the canvas's current units; (`cx`, `cy`) ± (`hw`, `hh`) bounds it. */
+export interface FinishPart { path: Path2D; cx: number; cy: number; hw: number; hh: number }
+
+/**
+ * Fills `parts` in Tofu's finish: one piece of liquid chrome, or his flat
+ * colour. `key` names who is drawing (metal.ts keeps a surface per key).
+ */
+export function fillFinish(x: Ctx, parts: FinishPart[], key: string) {
+  if (isChrome()) {
+    metalBegin();
+    for (const p of parts) metalAdd(x, p.path, p.cx, p.cy, p.hw, p.hh);
+    metalEnd(x, null, key);
+    return;
+  }
+  x.fillStyle = tofuInk();
+  for (const p of parts) x.fill(p.path);
+}
+
+/** The eyes' ink on the current finish. */
+export const eyeInk = (): string => (isChrome() ? CHROME_EYE_INK : EYE_INK);
+
 // ── Wardrobe icon ─────────────────────────────────────────────────────────────
 
 function pillEye(x: Ctx, _shape: EyeShape, w: number, h: number) {
@@ -688,7 +719,7 @@ function pillEye(x: Ctx, _shape: EyeShape, w: number, h: number) {
   x.fill();
 }
 
-/** A little Tofu wearing `outfit`, placed like the wardrobe's little Mochi. */
+/** A little Tofu wearing `outfit`, for the wardrobe's buttons. */
 export function drawTofuStill(x: Ctx, size: number, outfit: Outfit) {
   const R = 10;
   const pose: TofuPose = {
