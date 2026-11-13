@@ -26,6 +26,10 @@ vufh HQ: a team of AI agents on their own computers, run from Windows.
   (the hook relay and its installers, live diffs, Claude Code's questions,
   "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
   recap; the phone link
+- **Fixed** — vufh started with Windows, before WSL: the computers on this PC
+  stayed offline until the backend was restarted. The backend now listens for
+  them on WSL's network as soon as it exists, and follows it when WSL restarts
+  with a new address
 - **Fixed** — a command, page or file whose text ran past 20,000 characters
   failed its task as "the computer stopped responding" and left the worker
   stuck on it; results are now cut in the middle, by the worker and, for a

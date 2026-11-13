@@ -323,7 +323,7 @@ Settings go in the environment or in a `.env` file next to `package.json` (git-i
 |---|---|---|
 | `ORCH_API_PORT` | `47620` | vufh's API, always on 127.0.0.1 |
 | `ORCH_WORKER_PORT` | `47621` | The worker's listener |
-| `ORCH_WORKER_HOST` | WSL adapter address | Where the worker listener binds |
+| `ORCH_WORKER_HOST` | `127.0.0.1`, and WSL's adapter while it has an address | Where the worker listener binds. Set it and the backend listens there only |
 | `ORCH_MODEL_PROFILE` | `claude-cli` | The model tasks use unless they name one |
 | `ORCH_MODEL_FALLBACK` | on | `0`: never switch models after a rate limit |
 | `ORCH_CLAUDE_MODEL` | Claude Code's default | e.g. `sonnet`, `opus` |
