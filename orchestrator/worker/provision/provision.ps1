@@ -87,7 +87,8 @@ if ($RemoteHost) {
   function Invoke-Remote([string]$command) { & ssh.exe @ssh $target $command }
 
   Invoke-Checked "Reaching $target (it must let $RemoteUser use sudo without a password)" { Invoke-Remote "sudo -n true" }
-  Invoke-Remote "test -d /opt/vufh-worker/worker"
+  # A worker installed before the rename counts: setup.sh moves it over.
+  Invoke-Remote "test -d /opt/vufh-worker/worker || test -d /opt/coucou-worker/worker"
   $installed = $LASTEXITCODE -eq 0
   if ($installed -and -not $Update) { throw "$RemoteHost already has a worker. Use -Update to refresh it." }
   if (-not $installed -and $Update) { throw "$RemoteHost has no worker yet; run without -Update first." }

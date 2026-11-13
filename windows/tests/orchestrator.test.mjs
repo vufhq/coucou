@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
-import { agentLine, eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
+import { agentLine, computerPlace, eventLine, modelLabel, newTaskKey, statusLabel } from "../src/core/orchestrator.ts";
 import { miniOutfit } from "../src/tofu/minibots.ts";
 
 const AGENT = "agent_agent-01";
@@ -487,4 +487,17 @@ test("a delegated coworker question stays in chat without lighting its pill for 
   assert.equal(State.agentQuestions.has("ada"), false);
   assert.equal(ada.state, "idle");
   assert.equal(ada.pillBadge ?? null, null);
+});
+
+test("a computer says where it is: on this PC, or in the cloud with its address", () => {
+  assert.deepEqual(computerPlace("wsl:agent-01"), { cloud: false, address: null });
+  assert.deepEqual(computerPlace("ssh:203.0.113.7:22"), { cloud: true, address: "203.0.113.7" });
+  assert.deepEqual(computerPlace("ssh:box.example.com:2222"), { cloud: true, address: "box.example.com:2222" });
+  assert.deepEqual(computerPlace("ssh:"), { cloud: true, address: null });
+});
+
+test("a cloud computer that is not running has lost its connection", () => {
+  const down = { status: "offline", problems: ["vm_stopped"] };
+  assert.match(agentLine(down), /Linux computer is not running/);
+  assert.match(agentLine(down, true), /connection to it is down/);
 });
