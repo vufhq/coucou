@@ -36,6 +36,10 @@ vufh HQ: a team of AI agents on their own computers, run from Windows.
   backend opens one SSH connection out to it, so nothing on your PC is opened
   to the internet. It has its own disk, and runs the tasks of the agents you
   place on it
+- **Where a computer is** — in vufh HQ, an agent's computer says **On this PC** or
+  **Cloud** with its address, and a cloud computer that stops answering says
+  its connection is down. `provision.ps1 -Update` also updates a remote
+  computer set up before the rename
 - **Safer computers** (update each with `provision.ps1 -Name <agent> -Update`) —
   `terminal.run` is retired: it ran programs as the worker's own user, outside
   the shell's sandbox. A page or a program can no longer close the fence around
