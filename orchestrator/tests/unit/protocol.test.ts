@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CreateTaskRequest,
+  MAX_PROMPT_CHARS,
   DECISION_JSON_SCHEMA,
   EVENT_PAYLOADS,
   Job,
@@ -105,6 +106,13 @@ describe("task requests", () => {
     expect(CreateTaskRequest.parse({ prompt: "hi", idempotencyKey: "abcdefgh12", agentId: "agent-02" }).agentId).toBe("agent-02");
     expect(CreateTaskRequest.safeParse({ prompt: "hi" }).success).toBe(false);
     expect(CreateTaskRequest.safeParse({ prompt: "hi", idempotencyKey: "abcdefgh12", agentId: "claude" }).success).toBe(false);
+  });
+
+  it("takes a message as long as a pasted brief, and no longer", () => {
+    const ask = (chars: number) => CreateTaskRequest.safeParse({ prompt: "x".repeat(chars), idempotencyKey: "abcdefgh12" });
+    expect(ask(8_001).success).toBe(true);
+    expect(ask(MAX_PROMPT_CHARS).success).toBe(true);
+    expect(ask(MAX_PROMPT_CHARS + 1).success).toBe(false);
   });
 });
 

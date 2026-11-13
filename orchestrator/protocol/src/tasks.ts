@@ -51,8 +51,14 @@ export const GithubLink = z
   .max(2_000)
   .refine((url) => githubRepo(url) !== null, "a link to a GitHub repository");
 
+/**
+ * The longest message a task may start from: a pasted brief or a page of
+ * notes fits. The API's body limit (api.ts) leaves room for it in any script.
+ */
+export const MAX_PROMPT_CHARS = 32_000;
+
 export const CreateTaskRequest = z.object({
-  prompt: z.string().trim().min(1).max(8_000),
+  prompt: z.string().trim().min(1).max(MAX_PROMPT_CHARS),
   source: z.enum(["user", "chat"]).optional().default("user"),
   /** Which agent runs it. Left out, the backend picks one (an idle one first). */
   agentId: AgentId.optional(),
