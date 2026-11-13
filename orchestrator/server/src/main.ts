@@ -3,7 +3,7 @@
 
 import { join } from "node:path";
 import { createBackend } from "./app.ts";
-import { adoptLegacyDataDir, loadConfig } from "./config.ts";
+import { adoptLegacyDataDir, loadConfig, wslHostAddress } from "./config.ts";
 import { Github, keyringSlot } from "./github.ts";
 import { ClaudeCliAdapter } from "./model/claude-cli.ts";
 import { CursorCliAdapter } from "./model/cursor-cli.ts";
@@ -12,6 +12,7 @@ import { CLAUDE_CLI_PROFILE, CURSOR_CLI_PROFILE, ModelRouter } from "./model/rou
 import { loadTokens } from "./tokens.ts";
 import { isRemoteVm, keepTunnel, type Tunnel } from "./tunnel.ts";
 import { keepWslAlive, wslRunning, type VmProbe } from "./vm.ts";
+import { keepWslDoor } from "./wsl-door.ts";
 
 adoptLegacyDataDir();
 const config = loadConfig();
@@ -95,6 +96,16 @@ const keepAlives = config.agents
   .filter((a) => process.platform === "win32" && a.vmId.startsWith("wsl:") && process.env.ORCH_KEEP_ALIVE !== "0")
   .map((a) => keepWslAlive(a.vmId.slice(4), (line) => console.log(`orchestrator: ${line}`)));
 const { apiPort, workerPort } = await backend.listen();
+// WSL computers call the backend on WSL's adapter, which comes and goes with WSL.
+const wslDoor =
+  config.followWsl && config.agents.some((a) => a.vmId.startsWith("wsl:"))
+    ? keepWslDoor({
+        port: workerPort,
+        handler: (req, res) => backend.gateway.routing(req, res),
+        addressOf: wslHostAddress,
+        log: (line) => console.log(`orchestrator: ${line}`),
+      })
+    : null;
 // Computers elsewhere: one SSH connection each, out from here, that their
 // worker's calls come back through.
 for (const a of config.agents) {
@@ -120,6 +131,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     console.log("orchestrator: stopping; running tasks resume on the next start");
     for (const k of keepAlives) k.stop();
     for (const t of tunnels.values()) t.stop();
+    void wslDoor?.close();
     void backend.close().then(() => process.exit(0));
   });
 }
