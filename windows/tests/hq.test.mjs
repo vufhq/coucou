@@ -395,6 +395,50 @@ test("a backend that does not answer leaves the store offline, with words for th
   assert.equal(store.snapshot().error, "The orchestrator is turned off. Turn it on in Tasks.");
 });
 
+/** Lets the store's pending calls finish (setTimeout is mocked in these tests). */
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve));
+};
+
+test("a backend that was still starting is asked again, until it answers", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  backend.orchestrator_agents = new Error("connection refused");
+  backend.orchestrator_status = { prefs: { enabled: true, url: "" }, status: { state: "unreachable", error: null }, hasToken: true };
+  const store = createHqStore();
+  await store.start();
+  assert.equal(store.snapshot().connected, false);
+
+  // Still down three seconds later: it keeps asking.
+  mock.timers.tick(3000);
+  await settle();
+  assert.equal(store.snapshot().connected, false);
+  assert.equal(sent("orchestrator_agents").length, 2);
+
+  backend.orchestrator_agents = { agents: AGENTS, teams: [], computers: [], approvals: [] };
+  mock.timers.tick(3000);
+  await settle();
+  assert.equal(store.snapshot().connected, true);
+  assert.equal(store.snapshot().error, null);
+  assert.equal(store.preview(CHIEF), "Hi!");
+
+  // Connected: nothing asks again.
+  const asked = sent("orchestrator_agents").length;
+  mock.timers.tick(10000);
+  await settle();
+  assert.equal(sent("orchestrator_agents").length, asked);
+});
+
+test("a backend the user turned off is not asked again", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  backend.orchestrator_agents = new Error("connection refused");
+  backend.orchestrator_status = { prefs: { enabled: false, url: "" }, status: { state: "off", error: null }, hasToken: true };
+  const store = createHqStore();
+  await store.start();
+  mock.timers.tick(10000);
+  await settle();
+  assert.equal(sent("orchestrator_agents").length, 1);
+});
+
 test("send starts a chat task with the conversation so far", async () => {
   const store = createHqStore();
   await store.start();

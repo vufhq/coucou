@@ -26,6 +26,9 @@ vufh HQ: a team of AI agents on their own computers, run from Windows.
   (the hook relay and its installers, live diffs, Claude Code's questions,
   "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
   recap; the phone link
+- **Fixed** — vufh HQ opened while the backend was still starting said "The
+  backend stopped answering." and stayed that way until it was reopened. It
+  now asks again every few seconds until the backend answers
 - **Fixed** — vufh started with Windows, before WSL: the computers on this PC
   stayed offline until the backend was restarted. The backend now listens for
   them on WSL's network as soon as it exists, and follows it when WSL restarts
