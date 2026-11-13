@@ -26,6 +26,8 @@ vufh HQ: a team of AI agents on their own computers, run from Windows.
   (the hook relay and its installers, live diffs, Claude Code's questions,
   "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
   recap; the phone link
+- **Fixed** — a message longer than 8,000 characters was refused ("Couldn't
+  send it: prompt Too big"); one may now run to 32,000
 - **Fixed** — vufh HQ opened while the backend was still starting said "The
   backend stopped answering." and stayed that way until it was reopened. It
   now asks again every few seconds until the backend answers

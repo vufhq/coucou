@@ -128,7 +128,8 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     vmChecks.set(vmId, { at: Date.now(), running });
     return running;
   };
-  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
+  // Room for the longest message (MAX_PROMPT_CHARS) with its context, in any script.
+  const app = Fastify({ logger: false, bodyLimit: 256 * 1024 });
   // Attached files, on their one route; everything else is JSON.
   app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: MAX_ATTACHMENT_BYTES }, (_req, body, done) =>
     done(null, body),

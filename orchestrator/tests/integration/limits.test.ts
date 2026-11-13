@@ -3,7 +3,7 @@
 // inside its fence in the model's prompt.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_RESULT_CHARS, clipText, type Task } from "@vufh-orchestrator/protocol";
+import { MAX_PROMPT_CHARS, MAX_RESULT_CHARS, clipText, type Task } from "@vufh-orchestrator/protocol";
 import { ScriptedModel } from "../../server/src/model/scripted.ts";
 import { fitOutcome } from "../../worker/src/worker.ts";
 import { FakeBrowser, WORKER_TOKEN, cleanup, key, startBackend, startWorker, tempDir, waitFor, type Running } from "./harness.ts";
@@ -36,6 +36,16 @@ async function ended(r: Running, taskId: string): Promise<Task> {
     return ["succeeded", "failed", "cancelled"].includes(task.status) ? task : null;
   }, 15_000, "the task to end");
 }
+
+describe("a long message", () => {
+  it("is taken whole, in a script that needs three bytes a character", async () => {
+    const { r } = await setup([]);
+    const prompt = "\u8fd9".repeat(MAX_PROMPT_CHARS);
+    const res = await r.api<{ task: Task }>("/api/tasks", { method: "POST", body: { prompt, idempotencyKey: key() } });
+    expect(res.status).toBe(201);
+    expect(res.body.task.prompt).toBe(prompt);
+  });
+});
 
 describe("results within the protocol's limits", () => {
   it("cuts the middle of a long text and keeps both ends", () => {
