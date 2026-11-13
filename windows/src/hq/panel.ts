@@ -11,6 +11,7 @@ import {
   OrchestratorBridge,
   agentLine,
   newTaskKey,
+  computerPlace,
   taskComputerId,
   type GoalSchedule,
   type MemoryNote,
@@ -199,10 +200,11 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
         }
       }
     }
-    const sig = JSON.stringify([computer?.id, computer?.status, computer?.problems, users, waiting, mine, agent.name, t("Free")]);
+    const sig = JSON.stringify([computer?.id, computer?.vmId, computer?.status, computer?.problems, users, waiting, mine, agent.name, t("Free")]);
     if (sig === computerSig) return;
     computerSig = sig;
 
+    const place = computer ? computerPlace(computer.vmId) : null;
     clear(computerEl);
     computerEl.append(h("div", { class: "hq-pnl-label", text: t("Computer") }));
     if (!computer) {
@@ -217,9 +219,15 @@ export function mountPanel(root: HTMLElement, store: HqStore): void {
         { class: "hq-pnl-computer-top" },
         h("span", { class: `hq-pnl-dot ${computer.status}`, "aria-hidden": "true" }),
         h("span", { class: "hq-pnl-computer-name", text: computer.id }),
-        h("span", { class: "hq-pnl-tag", text: t("Shared by every agent") }),
+        h("span", {
+          class: "hq-pnl-tag",
+          text: place?.cloud ? [t("Cloud"), place.address].filter(Boolean).join(" · ") : t("On this PC"),
+        }),
       ),
-      h("div", { class: "hq-pnl-computer-state", text: agentLine({ status: computer.status, problems: computer.problems }) }),
+      h("div", {
+        class: "hq-pnl-computer-state",
+        text: agentLine({ status: computer.status, problems: computer.problems }, place?.cloud),
+      }),
     );
     const others = users.filter((name) => name !== agent.name);
     if (others.length) card.append(h("div", { class: "hq-pnl-line", text: t("In use by {name}", { name: others.join(", ") }) }));

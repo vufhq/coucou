@@ -146,6 +146,21 @@ export interface OrchComputer {
   capacity?: number;
 }
 
+/**
+ * Where a computer is, from its vmId: a WSL distro on this PC (`wsl:agent-01`),
+ * or a machine the backend reaches over SSH (`ssh:203.0.113.7:22`), with its
+ * address as you would type it (the port only when it is not 22).
+ */
+export function computerPlace(vmId: string): { cloud: boolean; address: string | null } {
+  if (!vmId.startsWith("ssh:")) return { cloud: false, address: null };
+  const rest = vmId.slice(4);
+  const cut = rest.lastIndexOf(":");
+  const host = cut > 0 ? rest.slice(0, cut) : rest;
+  const port = cut > 0 ? rest.slice(cut + 1) : "";
+  if (!host) return { cloud: true, address: null };
+  return { cloud: true, address: port && port !== "22" ? `${host}:${port}` : host };
+}
+
 /** Where a task runs: its own computer, or (older backend) its agent's. */
 export function taskComputerId(task: Pick<OrchTask, "computerId">, agent: Pick<OrchAgent, "computerId">): string {
   return task.computerId ?? agent.computerId;
@@ -333,8 +348,15 @@ export function newTaskKey(): string {
   return `vufh-${Date.now().toString(36)}-${rand}`;
 }
 
-/** How an agent's computer is doing, in one line: its state, then whatever is wrong. */
-export function agentLine(agent: Pick<OrchAgent, "status"> & Partial<Pick<OrchAgent, "paused" | "problems">>): string {
+/**
+ * How an agent's computer is doing, in one line: its state, then whatever is
+ * wrong. `cloud`: the computer is not on this PC, so "not running" means the
+ * backend's connection to it is down.
+ */
+export function agentLine(
+  agent: Pick<OrchAgent, "status"> & Partial<Pick<OrchAgent, "paused" | "problems">>,
+  cloud = false,
+): string {
   const state = agent.paused
     ? t("Paused")
     : agent.status === "offline"
@@ -349,7 +371,7 @@ export function agentLine(agent: Pick<OrchAgent, "status"> & Partial<Pick<OrchAg
   const problems = (agent.problems ?? []).map((p) => {
     switch (p) {
       case "vm_stopped":
-        return t("Its Linux computer is not running.");
+        return cloud ? t("The connection to it is down.") : t("Its Linux computer is not running.");
       case "worker_down":
         return t("Its Linux computer is running, but the worker in it does not answer.");
       case "low_disk":

@@ -12,6 +12,7 @@ import {
   OrchestratorBridge,
   approvalLabel,
   agentLine,
+  computerPlace,
   eventLine,
   modelLabel,
   newTaskKey,
@@ -676,7 +677,7 @@ export async function tasksPage(page: HTMLElement, ctx: HubContext) {
         .join(", ");
       computersCard.append(row(
         computer.id,
-        `${agentLine({ status: computer.status, problems: computer.problems })} · ${t("Agents: {names}", { names: names || "—" })}`,
+        `${agentLine({ status: computer.status, problems: computer.problems }, computerPlace(computer.vmId).cloud)} · ${t("Agents: {names}", { names: names || "—" })}`,
       ));
     }
     if (computers.length === 0) computersCard.append(h("div", { class: "hub-note", text: t("No computer available.") }));

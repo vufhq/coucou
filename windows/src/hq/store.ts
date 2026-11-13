@@ -35,6 +35,8 @@ import type { HqPanel, HqSnapshot, HqStore, HqView, SentFile, ThreadItem } from 
 
 /** Events are gathered this long before anything is fetched again. */
 const DEBOUNCE_MS = 250;
+/** While the backend does not answer (it is still starting, or restarting), ask again this often. */
+const RETRY_MS = 3000;
 const DELEGATED_LIMIT = 200;
 const GOAL_LIMIT = 20;
 
@@ -75,6 +77,8 @@ export function createHqStore(): HqStore {
 
   // What the events asked for, until the debounce fires.
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  let turnedOff = false;
   const dirtyAgents = new Set<string>();
   let dirtyRoster = false;
   let dirtyDelegated = false;
@@ -104,7 +108,9 @@ export function createHqStore(): HqStore {
   /** Why the backend did not answer, in words for the user. */
   async function offlineText(): Promise<string> {
     const s = await OrchestratorBridge.status().catch(() => null);
-    if (s && !s.prefs.enabled) return t("The orchestrator is turned off. Turn it on in Tasks.");
+    // Turned off, it will not answer until the user turns it on: no point asking again.
+    turnedOff = Boolean(s && !s.prefs.enabled);
+    if (turnedOff) return t("The orchestrator is turned off. Turn it on in Tasks.");
     if (s?.status.state === "noToken") return t("Start the orchestrator backend once: it creates the key vufh needs.");
     return s?.status.error ?? t("The backend stopped answering.");
   }
@@ -184,10 +190,26 @@ export function createHqStore(): HqStore {
     else local.delete(agentId);
   }
 
+  /**
+   * HQ often opens while the backend is still starting (vufh launches both):
+   * the first load fails, and nothing else would ask again until an event
+   * came, which a backend HQ never reached does not send.
+   */
+  function retryLater() {
+    if (retry || turnedOff) return;
+    retry = setTimeout(() => {
+      retry = null;
+      void reload();
+    }, RETRY_MS);
+  }
+
   async function reload(): Promise<void> {
     const ok = await loadRoster();
     notify();
-    if (!ok) return;
+    if (!ok) {
+      retryLater();
+      return;
+    }
     await Promise.all([...agents.map((a) => loadAgent(a.id)), loadDelegated()]);
   }
 
@@ -255,6 +277,7 @@ export function createHqStore(): HqStore {
     dirtyDelegated = false;
     if (roster && !(await loadRoster())) {
       notify();
+      retryLater();
       return;
     }
     await Promise.all([
