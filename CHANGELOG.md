@@ -26,6 +26,9 @@ vufh HQ: a team of AI agents on their own computers, run from Windows.
   (the hook relay and its installers, live diffs, Claude Code's questions,
   "Open terminal", the main pill); the Claude and Codex plan gauges; the weekly
   recap; the phone link
+- **Fixed** — vufh HQ opened while the backend was still starting said "The
+  backend stopped answering." and stayed that way until it was reopened. It
+  now asks again every few seconds until the backend answers
 - **Fixed** — a command, page or file whose text ran past 20,000 characters
   failed its task as "the computer stopped responding" and left the worker
   stuck on it; results are now cut in the middle, by the worker and, for a
