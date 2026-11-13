@@ -13,9 +13,14 @@ export interface Config {
   /** vufh's API: loopback only. */
   apiHost: string;
   apiPort: number;
-  /** The worker's listener, on the interface the VM can reach. */
+  /** The worker's listener: loopback, or ORCH_WORKER_HOST. */
   workerHost: string;
   workerPort: number;
+  /**
+   * Also listen for workers on WSL's adapter, whenever it has an address
+   * (wsl-door.ts). Off when ORCH_WORKER_HOST says where to listen.
+   */
+  followWsl?: boolean;
   /** A claimed job is lost when no heartbeat renews it for this long. */
   leaseMs: number;
   /** How long a claim waits for a job before answering "nothing". */
@@ -42,17 +47,18 @@ export interface Config {
 }
 
 /**
- * The Windows side of WSL's NAT network ("vEthernet (WSL…)"). That address is
- * what the distro sees as its default gateway, so the worker finds it without
- * configuration. Falls back to loopback, which only works in mirrored mode.
+ * The Windows side of WSL's NAT network ("vEthernet (WSL…)"), or null while
+ * WSL has no adapter (it is not running yet). That address is what the distro
+ * sees as its default gateway, so the worker finds it without configuration.
+ * It changes when WSL restarts: read it again, never once (wsl-door.ts).
  */
-export function wslHostAddress(): string {
+export function wslHostAddress(): string | null {
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
     if (!/wsl/i.test(name)) continue;
     const v4 = addrs?.find((a) => a.family === "IPv4" && !a.internal);
     if (v4) return v4.address;
   }
-  return "127.0.0.1";
+  return null;
 }
 
 function int(value: string | undefined, fallback: number): number {
@@ -139,7 +145,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: env.ORCH_DATA_DIR ?? defaultDataDir(env),
     apiHost: "127.0.0.1",
     apiPort: int(env.ORCH_API_PORT, 47620),
-    workerHost: env.ORCH_WORKER_HOST ?? wslHostAddress(),
+    workerHost: env.ORCH_WORKER_HOST ?? "127.0.0.1",
+    followWsl: env.ORCH_WORKER_HOST === undefined,
     workerPort: int(env.ORCH_WORKER_PORT, 47621),
     leaseMs: int(env.ORCH_LEASE_MS, 15_000),
     claimWaitMs: int(env.ORCH_CLAIM_WAIT_MS, 25_000),

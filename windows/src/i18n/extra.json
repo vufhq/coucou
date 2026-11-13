@@ -4096,16 +4096,38 @@
    "ru": "Свободен",
    "id": "Kosong"
   },
-  "Shared by every agent": {
-   "zh-Hans": "所有智能体共用",
-   "hi": "सभी एजेंटों का साझा",
-   "es": "Compartido por todos los agentes",
-   "ar": "مشترك بين جميع الوكلاء",
-   "fr": "Partagé par tous les agents",
-   "bn": "সব এজেন্টের জন্য একটাই",
-   "pt-BR": "Compartilhado por todos os agentes",
-   "ru": "Общий для всех агентов",
-   "id": "Dipakai bersama semua agen"
+  "On this PC": {
+   "zh-Hans": "在这台电脑上",
+   "hi": "इस PC पर",
+   "es": "En este PC",
+   "ar": "على هذا الحاسوب",
+   "fr": "Sur ce PC",
+   "bn": "এই PC-তে",
+   "pt-BR": "Neste PC",
+   "ru": "На этом ПК",
+   "id": "Di PC ini"
+  },
+  "Cloud": {
+   "zh-Hans": "云端",
+   "hi": "क्लाउड",
+   "es": "Nube",
+   "ar": "السحابة",
+   "fr": "Cloud",
+   "bn": "ক্লাউড",
+   "pt-BR": "Nuvem",
+   "ru": "Облако",
+   "id": "Cloud"
+  },
+  "The connection to it is down.": {
+   "zh-Hans": "与它的连接已断开。",
+   "hi": "इससे कनेक्शन टूट गया है।",
+   "es": "La conexión con él está caída.",
+   "ar": "الاتصال به مقطوع.",
+   "fr": "La connexion avec lui est coupée.",
+   "bn": "এর সঙ্গে সংযোগ বিচ্ছিন্ন।",
+   "pt-BR": "A conexão com ele caiu.",
+   "ru": "Соединение с ним прервано.",
+   "id": "Koneksi ke komputer itu terputus."
   },
   "In use by {name}": {
    "zh-Hans": "{name} 正在使用",
